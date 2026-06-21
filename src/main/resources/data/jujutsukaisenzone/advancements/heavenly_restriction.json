@@ -1,0 +1,28 @@
+{
+  "parent": "minecraft:adventure/root",
+  "criteria": {
+    "awaken": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "display": {
+    "announce_to_chat": true,
+    "description": {
+      "translate": "advancements.jujutsukaisenzone.heavenly_restriction.description"
+    },
+    "frame": "challenge",
+    "hidden": false,
+    "icon": {
+      "item": "minecraft:netherite_sword"
+    },
+    "show_toast": true,
+    "title": {
+      "translate": "advancements.jujutsukaisenzone.heavenly_restriction.title"
+    }
+  },
+  "requirements": [
+    [
+      "awaken"
+    ]
+  ]
+}

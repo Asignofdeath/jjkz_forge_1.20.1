@@ -1,0 +1,28 @@
+{
+  "parent": "jujutsukaisenzone:sorcerer_special",
+  "criteria": {
+    "perfect_control": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "display": {
+    "announce_to_chat": true,
+    "description": {
+      "translate": "advancements.jujutsukaisenzone.perfect_control.description"
+    },
+    "frame": "task",
+    "hidden": false,
+    "icon": {
+      "item": "jujutsukaisenzone:innate_technique_limitless"
+    },
+    "show_toast": true,
+    "title": {
+      "translate": "advancements.jujutsukaisenzone.perfect_control.title"
+    }
+  },
+  "requirements": [
+    [
+      "perfect_control"
+    ]
+  ]
+}

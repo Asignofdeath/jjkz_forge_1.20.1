@@ -1,0 +1,28 @@
+{
+  "parent": "minecraft:story/root",
+  "criteria": {
+    "join": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "display": {
+    "announce_to_chat": true,
+    "description": {
+      "translate": "advancements.jujutsukaisenzone.become_curse_user.description"
+    },
+    "frame": "goal",
+    "hidden": false,
+    "icon": {
+      "item": "minecraft:wither_skeleton_skull"
+    },
+    "show_toast": true,
+    "title": {
+      "translate": "advancements.jujutsukaisenzone.become_curse_user.title"
+    }
+  },
+  "requirements": [
+    [
+      "join"
+    ]
+  ]
+}

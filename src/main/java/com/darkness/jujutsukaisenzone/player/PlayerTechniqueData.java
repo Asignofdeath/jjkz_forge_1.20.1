@@ -1,0 +1,122 @@
+package com.darkness.jujutsukaisenzone.player;
+
+import com.darkness.jujutsukaisenzone.network.ModNetwork;
+import com.darkness.jujutsukaisenzone.technique.skillset.TechniqueSkillSetRegistry;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Player;
+
+import java.util.List;
+
+public final class PlayerTechniqueData
+{
+    public static final String TECHNIQUE_NONE = "none";
+    public static final String TECHNIQUE_LIMITLESS = "limitless";
+    public static final String TECHNIQUE_SHRINE = "shrine";
+    private static final String TAG_INNATE_TECHNIQUE = "jujutsukaisenzone_innate_technique";
+
+    private PlayerTechniqueData()
+    {
+    }
+
+    public static void setInnateTechnique(Player player, String techniqueId)
+    {
+        String normalized = normalizeTechniqueId(techniqueId);
+        if (!TECHNIQUE_NONE.equals(normalized) && !PlayerFactionData.canBindInnateTechnique(player))
+        {
+            return;
+        }
+        if (player instanceof ServerPlayer serverPlayer)
+        {
+            JjkzPlayerDataStorage.PlayerDataEntry data = JjkzPlayerDataStorage.get(serverPlayer).getOrCreate(serverPlayer);
+            data.innateTechnique = normalized;
+            JjkzPlayerDataStorage.get(serverPlayer).setDirty();
+            ModNetwork.sendTechniqueSync(serverPlayer, normalized);
+            TechniqueSkillSetRegistry.syncSkillBarToClient(serverPlayer);
+            PlayerMimicryData.onTechniqueChanged(serverPlayer, normalized);
+            return;
+        }
+        player.getPersistentData().putString(TAG_INNATE_TECHNIQUE, normalized);
+    }
+
+    public static void applyClientTechnique(Player player, String techniqueId)
+    {
+        player.getPersistentData().putString(TAG_INNATE_TECHNIQUE, normalizeTechniqueId(techniqueId));
+    }
+
+    public static String getInnateTechnique(Player player)
+    {
+        if (player instanceof ServerPlayer serverPlayer)
+        {
+            String techniqueId = JjkzPlayerDataStorage.get(serverPlayer).getOrCreate(serverPlayer).innateTechnique;
+            return normalizeTechniqueId(techniqueId);
+        }
+        String techniqueId = player.getPersistentData().getString(TAG_INNATE_TECHNIQUE);
+        return normalizeTechniqueId(techniqueId);
+    }
+
+    public static boolean isLimitless(Player player)
+    {
+        return TECHNIQUE_LIMITLESS.equals(getInnateTechnique(player));
+    }
+
+    public static boolean isShrine(Player player)
+    {
+        return TECHNIQUE_SHRINE.equals(getInnateTechnique(player));
+    }
+
+    /**
+     * 选择咒术师/诅咒师/咒灵阵营后随机觉醒生得术式；已有术式、天与咒缚或不可绑定阵营时跳过。
+     *
+     * @return 是否成功觉醒
+     */
+    public static boolean tryRandomAwakenInnateTechnique(ServerPlayer player)
+    {
+        if (!PlayerFactionData.canBindInnateTechnique(player))
+        {
+            return false;
+        }
+        if (PlayerCursedEnergyData.isHeavenlyRestricted(player))
+        {
+            player.sendSystemMessage(Component.literal("天与咒缚状态下无法觉醒生得术式"));
+            return false;
+        }
+        if (!TECHNIQUE_NONE.equals(getInnateTechnique(player)))
+        {
+            return false;
+        }
+
+        List<String> pool = TechniqueSkillSetRegistry.getRegisteredTechniqueIds();
+        if (pool.isEmpty())
+        {
+            return false;
+        }
+
+        String chosen = pool.get(player.getRandom().nextInt(pool.size()));
+        setInnateTechnique(player, chosen);
+        player.sendSystemMessage(Component.literal("你觉醒了生得术式：【" + getDisplayName(chosen) + "】"));
+        return true;
+    }
+
+    public static String getDisplayName(String techniqueId)
+    {
+        return switch (normalizeTechniqueId(techniqueId))
+        {
+            case TECHNIQUE_LIMITLESS -> "无下限";
+            case TECHNIQUE_SHRINE -> "御厨子";
+            default -> techniqueId;
+        };
+    }
+    private static String normalizeTechniqueId(String techniqueId)
+    {
+        if (techniqueId == null || techniqueId.isBlank())
+        {
+            return TECHNIQUE_NONE;
+        }
+        if ("sukuna".equals(techniqueId))
+        {
+            return TECHNIQUE_SHRINE;
+        }
+        return techniqueId;
+    }
+}

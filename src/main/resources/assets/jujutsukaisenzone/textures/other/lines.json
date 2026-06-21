@@ -1,0 +1,22 @@
+{
+  "textures": {
+    "0": "jujutsukaisenzone:other/lines",
+    "particle": "jujutsukaisenzone:other/lines"
+  },
+  "elements": [
+    {
+      "from": [0, 0, 8],
+      "to": [16, 16, 8],
+      "faces": {
+        "north": {
+          "uv": [0, 0, 16, 64],
+          "texture": "#0"
+        },
+        "south": {
+          "uv": [0, 0, 16, 64],
+          "texture": "#0"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.darkness.jujutsukaisenzone.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "refmap": "jujutsukaisenzone.refmap.json",
+  "plugin": "",
+  "mixins": [],
+  "client": [
+    "client.AbstractClientPlayerMixin"
+  ],
+  "server": []
+}

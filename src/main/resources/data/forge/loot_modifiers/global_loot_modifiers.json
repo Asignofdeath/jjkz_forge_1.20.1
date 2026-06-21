@@ -1,0 +1,14 @@
+{
+  "replace": false,
+  "entries": [
+    "jujutsukaisenzone:reverse_studybook_simple_dungeon",
+    "jujutsukaisenzone:reverse_studybook_abandoned_mineshaft",
+    "jujutsukaisenzone:barrier_studybook_stronghold_library",
+    "jujutsukaisenzone:barrier_studybook_buried_treasure",
+    "jujutsukaisenzone:domain_studybook_stronghold_library",
+    "jujutsukaisenzone:domain_studybook_desert_pyramid",
+    "jujutsukaisenzone:domain_studybook_jungle_temple",
+    "jujutsukaisenzone:soul_studybook_nether_bridge",
+    "jujutsukaisenzone:soul_studybook_bastion_treasure"
+  ]
+}

@@ -1,0 +1,914 @@
+package com.darkness.jujutsukaisenzone.command;
+
+import com.darkness.jujutsukaisenzone.effect.RushIntoTheZoneClimaxEffect;
+import com.darkness.jujutsukaisenzone.JuJutsuKaisenZone;
+import com.darkness.jujutsukaisenzone.advancement.HeavenlyRestrictionAdvancements;
+import com.darkness.jujutsukaisenzone.entity.DemonSubduingShrineEntity;
+import com.darkness.jujutsukaisenzone.entity.SpecialEffectEntity;
+import com.darkness.jujutsukaisenzone.entity.WedgeEntity;
+import com.darkness.jujutsukaisenzone.gameplay.HungerConsumptionSettings;
+import com.darkness.jujutsukaisenzone.gameplay.CurseSpiritSpawnGrade;
+import com.darkness.jujutsukaisenzone.gameplay.TengenWedgeBarrierLogic;
+import com.darkness.jujutsukaisenzone.gameplay.TengenWedgeCurseSpiritSpawns;
+import com.darkness.jujutsukaisenzone.gameplay.TengenWedgeStartResult;
+import com.darkness.jujutsukaisenzone.player.CursedGradeBonuses;
+import com.darkness.jujutsukaisenzone.player.PlayerCursedEnergyData;
+import com.darkness.jujutsukaisenzone.player.PlayerCursedGradeData;
+import com.darkness.jujutsukaisenzone.player.PlayerFactionData;
+import com.darkness.jujutsukaisenzone.player.PlayerHealthData;
+import com.darkness.jujutsukaisenzone.player.PlayerReverseTechniqueData;
+import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
+import com.darkness.jujutsukaisenzone.player.PlayerTechniqueIntelData;
+import com.darkness.jujutsukaisenzone.player.BarrierTechniqueLevel;
+import com.darkness.jujutsukaisenzone.player.PlayerBarrierTechniqueData;
+import com.darkness.jujutsukaisenzone.player.PlayerSeanceTechniqueData;
+import com.darkness.jujutsukaisenzone.player.SeanceTechniqueLevel;
+import com.darkness.jujutsukaisenzone.technique.DomainExpansionServerLogic;
+import com.darkness.jujutsukaisenzone.network.ModNetwork;
+import com.darkness.jujutsukaisenzone.registry.ModEntities;
+import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
+import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.Commands;
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.phys.Vec3;
+import net.minecraftforge.event.RegisterCommandsEvent;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.common.Mod;
+
+@Mod.EventBusSubscriber(modid = JuJutsuKaisenZone.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE)
+public final class JjkzCommands
+{
+    /** 教程分类 →（主题 → 说明文字） */
+    private static final Map<String, Map<String, String>> ASK_CATEGORIES = new LinkedHashMap<>();
+
+    static
+    {
+        Map<String, String> gettingStarted = new LinkedHashMap<>();
+        gettingStarted.put("阵营选择", "首次登录点击聊天栏选择；也可用 /jjkz select。需要教程帮助时使用 /jjkz ask。");
+        gettingStarted.put("生得术式", "选择术师/咒灵阵营后随机觉醒。");
+        gettingStarted.put("天与咒缚", "咒力换超强肉体；肉体换咒力的咒缚可能在后续加入。");
+        gettingStarted.put("咒力", "蓝条。");
+        gettingStarted.put("咒术等级", "击杀生物升级。");
+        gettingStarted.put("查看个人数据（常用）", "/jjkz data 可查看阵营、咒力、术式、各技能等级等");
+        ASK_CATEGORIES.put("入门必看", gettingStarted);
+
+        Map<String, String> combatGuide = new LinkedHashMap<>();
+        combatGuide.put("战斗模式", "进入 Epic Fight 战斗模式后，体术与术式输入才会生效；黑闪、招式槽、释放情绪等皆依赖此状态。");
+        combatGuide.put("招式组", "九个招式槽分三组，Tab+1/2/3 切换当前组，1/2/3 释放组内招式；支持蓄力的槽位长按后可最大输出。");
+        combatGuide.put("技能快捷配置", "默认 I 键打开配置界面，将术式开发中已解锁的招式拖入九个槽位，战斗时即由此调用。");
+        combatGuide.put("术式开发", "默认 Y 键打开技能树，满足前置与术式情报门槛即可解锁新招式；情报作门槛，解锁后不消耗。");
+        combatGuide.put("释放情绪", "默认 Z 键按住蓄力，在战斗模式下将情绪转化为咒力回流。");
+        combatGuide.put("特别招式", "Shift/Ctrl/Alt 配合数字键触发的变体招式，不占独立槽位，具体组合因生得术式而异。");
+        combatGuide.put("快捷键",
+                """
+                默认键位可于「咒术回战：ZONE」改绑，组合逻辑不变。
+                界面：Y 术式开发，I 技能栏配置。
+                通用：G 按住反转术式，Ctrl+G 按住修补结界/领域；B 结界术，Alt+B 领域展开（已在自有领域内则解除），Shift+B 结界规则；O 降灵拟态，Z 按住释放情绪。
+                招式：1/2/3 释放，Tab+1/2/3 切组，Shift/Ctrl/Alt+数字键为特别招式。
+                鼠标：中键切换施法距离/结界半径调节，侧键4/5调档。
+                战斗模式切换见 Epic Fight 设置。X 键预留未实装。""".stripIndent().trim());
+        ASK_CATEGORIES.put("战斗方法", combatGuide);
+
+        Map<String, String> techniqueLearning = new LinkedHashMap<>();
+        techniqueLearning.put("反转术式的习得方法",
+                "在拥有一定咒力总量的基础上，游走于生死边缘时容易顿悟，可学习《咒力流动反转理论》提升顿悟成功率");
+        techniqueLearning.put("结界术的习得方法",
+                "将咒力铺成一方封闭的帐，需要先读懂空间的语法。《结界的构建与要术》读至三遍，念头才会在醒来的那一刻成形。");
+        techniqueLearning.put("降灵术的习得方法",
+                "生者借亡者残响短暂拟合他术——此道须在地狱研读《灵魂研究手册》，待咒力与残响在意识里重合三遍，门扉自开。");
+        techniqueLearning.put("领域展开的习得方法",
+                "须先能构筑结界，且已觉醒生得术式；在入眠或濒死之际，意识有时会沉入自己的「生得领域」。研读《虚构空间的具象化》可让那次漂流更容易发生。");
+        ASK_CATEGORIES.put("技法学习", techniqueLearning);
+
+        Map<String, String> itemAcquisition = new LinkedHashMap<>();
+        itemAcquisition.put("四本理论书",
+                "《咒力流动反转理论》《结界的构建与要术》《虚构空间的具象化》《灵魂研究手册》——可在世界各地的结构宝箱中偶然发现，亦可向大师级图书管理员购得；每次补货随机陈列一种，以金锭或钻石交换，每轮限购一本。");
+        itemAcquisition.put("术式情报",
+                "击杀怪物时有概率掉落；对已觉醒生得术式者，右键使用可纳入术式开发所用的情报（每次二十点）。");
+        ASK_CATEGORIES.put("物品获取", itemAcquisition);
+    }
+
+    private JjkzCommands()
+    {
+    }
+
+    @SubscribeEvent
+    public static void onRegisterCommands(RegisterCommandsEvent event)
+    {
+        CommandDispatcher<CommandSourceStack> dispatcher = event.getDispatcher();
+        dispatcher.register(
+                Commands.literal("jjkz")
+                        .then(Commands.literal("data")
+                                .executes(ctx -> executeShowPlayerData(ctx.getSource().getPlayerOrException())))
+                        .then(buildAskBranch())
+                        .then(buildHungerConsumptionBranch())
+                        .then(Commands.literal("select")
+                                .then(Commands.argument("faction", StringArgumentType.word())
+                                        .executes(ctx ->
+                                        {
+                                            ServerPlayer player = ctx.getSource().getPlayerOrException();
+                                            String arg = StringArgumentType.getString(ctx, "faction");
+                                            return executeSelect(player, arg);
+                                        })))
+                        .then(buildFactionCheatBranch())
+                        .then(buildCurseLevelCheatBranch())
+                        .then(buildReverseTechniqueCheatBranch())
+                        .then(buildCursedEnergyCheatBranch())
+                        .then(buildTechniqueIntelCheatBranch())
+                        .then(buildBarrierTechniqueCheatBranch())
+                        .then(buildSeanceTechniqueCheatBranch())
+                        .then(buildDomainExpansionCheatBranch())
+                        .then(buildSpecialEffectBranch())
+                        .then(buildDemonSubduingShrineBranch())
+                        .then(buildTengenWedgeBranch())
+                        .then(buildWedgeSpawnBranch())
+                        .then(buildCurseSpiritSpawnBranch())
+                        .then(buildWhiteOverlayBranch())
+                        .then(buildRushIntoTheZoneClimaxBranch())
+        );
+    }
+
+    private static int executeSelect(ServerPlayer player, String arg)
+    {
+        if (PlayerFactionData.hasFaction(player))
+        {
+            player.sendSystemMessage(Component.literal("你已选择过阵营，如需修改请使用作弊指令。"));
+            return 0;
+        }
+        String id = PlayerFactionData.normalizeFactionInput(arg);
+        if (id == null)
+        {
+            player.sendSystemMessage(Component.literal("未知的阵营，请从聊天中点击选项。"));
+            return 0;
+        }
+        PlayerFactionData.setFaction(player, id);
+        player.sendSystemMessage(Component.literal("你已加入阵营：【" + PlayerFactionData.getDisplayName(id) + "】"));
+        return 1;
+    }
+
+    /**
+     * 查看当前玩家核心存档数据（统一持久化方案下的实时结果）。
+     */
+    private static int executeShowPlayerData(ServerPlayer player)
+    {
+        int current = PlayerCursedEnergyData.getCurrent(player);
+        int max = PlayerCursedEnergyData.getMax(player);
+        int experience = PlayerCursedGradeData.getExperience(player);
+        int rank = PlayerCursedGradeData.getRank(player);
+        String factionId = PlayerFactionData.getFactionId(player);
+        String factionDisplay = factionId.isEmpty() ? "未选择" : PlayerFactionData.getDisplayName(factionId) + " (" + factionId + ")";
+        boolean reverseTechniqueLearned = PlayerReverseTechniqueData.hasReverseTechnique(player);
+        String innateTechnique = PlayerTechniqueData.getInnateTechnique(player);
+        boolean heavenlyRestricted = PlayerCursedEnergyData.isHeavenlyRestricted(player);
+        BarrierTechniqueLevel barrierLevel = PlayerBarrierTechniqueData.getLevel(player);
+        SeanceTechniqueLevel seanceLevel = PlayerSeanceTechniqueData.getLevel(player);
+
+        player.sendSystemMessage(Component.literal("========== JJKZ 玩家数据 =========="));
+        player.sendSystemMessage(Component.literal("阵营: " + factionDisplay));
+        player.sendSystemMessage(Component.literal("生得术式: " + innateTechnique));
+        player.sendSystemMessage(Component.literal("反转术式: " + (reverseTechniqueLearned ? "已习得" : "未习得")));
+        player.sendSystemMessage(Component.literal("结界术等级: " + getBarrierLevelDisplayName(barrierLevel) + "（维持减免：" + (int)(barrierLevel.getMaintainCostReduction() * 100) + "%）"));
+        player.sendSystemMessage(Component.literal("降灵术等级: " + getSeanceLevelDisplayName(seanceLevel) + "（维持减免：" + (int)(seanceLevel.getMaintainCostReduction() * 100) + "%）"));
+        player.sendSystemMessage(Component.literal("咒术经验: " + experience + "（等级: " + PlayerCursedGradeData.getRankDisplayName(rank) + "）"));
+        player.sendSystemMessage(Component.literal("咒力: " + current + "/" + max));
+        float health = player.getHealth();
+        float healthMax = PlayerHealthData.getMax(player);
+        double healthBonus = PlayerHealthData.getBonus(player);
+        player.sendSystemMessage(Component.literal(String.format(
+                "生命值: %.1f/%.1f（基础%.0f + 加成%.0f）",
+                health,
+                healthMax,
+                CursedGradeBonuses.BASE_MAX_HEALTH,
+                healthBonus
+        )));
+        player.sendSystemMessage(Component.literal("天与咒缚: " + (heavenlyRestricted ? "是" : "否")));
+        DomainExpansionServerLogic domainLogic = DomainExpansionServerLogic.getInstance();
+        boolean hasDomain = domainLogic.hasLearnedDomainExpansion(player);
+        String domainName = domainLogic.getDomainName();
+        player.sendSystemMessage(Component.literal("领域展开: " + (hasDomain ? "已习得" : "未习得") + (domainName.isEmpty() ? "" : "（" + domainName + "）")));
+        return 1;
+    }
+
+    /**
+     * 全局饥饿消耗倍率（无需作弊）：不消耗 / 0.1倍 / 原版。
+     */
+    private static LiteralArgumentBuilder<CommandSourceStack> buildHungerConsumptionBranch()
+    {
+        LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal("hunger");
+        LiteralArgumentBuilder<CommandSourceStack> set = Commands.literal("set");
+        set.then(hungerModeLiteral("none", HungerConsumptionSettings.Mode.NONE));
+        set.then(hungerModeLiteral("low", HungerConsumptionSettings.Mode.LOW));
+        set.then(hungerModeLiteral("vanilla", HungerConsumptionSettings.Mode.VANILLA));
+        set.then(hungerModeLiteral("不消耗", HungerConsumptionSettings.Mode.NONE));
+        set.then(hungerModeLiteral("0.1倍", HungerConsumptionSettings.Mode.LOW));
+        set.then(hungerModeLiteral("原版", HungerConsumptionSettings.Mode.VANILLA));
+        root.then(set);
+        root.then(Commands.literal("get").executes(ctx ->
+        {
+            HungerConsumptionSettings.Mode mode = HungerConsumptionSettings.getMode();
+            ctx.getSource().sendSuccess(() -> Component.literal("当前全局饥饿消耗倍率：" + mode.zhLabel()), false);
+            return 1;
+        }));
+        return root;
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> hungerModeLiteral(String literal, HungerConsumptionSettings.Mode mode)
+    {
+        return Commands.literal(literal).executes(ctx ->
+        {
+            HungerConsumptionSettings.setMode(mode);
+            ctx.getSource().sendSuccess(() -> Component.literal("已将全局饥饿消耗倍率设置为：" + mode.zhLabel()), true);
+            return 1;
+        });
+    }
+
+    /**
+     * 作弊切换阵营：使用字面量子命令并列注册。输入 {@code /jjkz faction } 后按 Tab 可在候选间切换并回车执行，无需手打长串。
+     */
+    private static LiteralArgumentBuilder<CommandSourceStack> buildFactionCheatBranch()
+    {
+        LiteralArgumentBuilder<CommandSourceStack> faction = Commands.literal("faction")
+                .requires(source -> source.hasPermission(Commands.LEVEL_GAMEMASTERS));
+        faction.then(factionLiteral("sorcerer", PlayerFactionData.FACTION_SORCERER));
+        faction.then(factionLiteral("咒术师", PlayerFactionData.FACTION_SORCERER));
+        faction.then(factionLiteral("curse_user", PlayerFactionData.FACTION_CURSE_USER));
+        faction.then(factionLiteral("诅咒师", PlayerFactionData.FACTION_CURSE_USER));
+        faction.then(factionLiteral("curse_spirit", PlayerFactionData.FACTION_CURSE_SPIRIT));
+        faction.then(factionLiteral("咒灵", PlayerFactionData.FACTION_CURSE_SPIRIT));
+        faction.then(factionLiteral("civilian", PlayerFactionData.FACTION_CIVILIAN));
+        faction.then(factionLiteral("平民", PlayerFactionData.FACTION_CIVILIAN));
+        return faction;
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> factionLiteral(String literal, String factionId)
+    {
+        return Commands.literal(literal).executes(ctx -> executeFactionCheatById(ctx.getSource().getPlayerOrException(), factionId));
+    }
+
+    private static int executeFactionCheatById(ServerPlayer player, String factionId)
+    {
+        PlayerFactionData.setFaction(player, factionId);
+        player.sendSystemMessage(Component.literal("阵营已设为：【" + PlayerFactionData.getDisplayName(factionId) + "】"));
+        return 1;
+    }
+
+    /**
+     * {@code /jjkz curseLevel set <四级|三级|…>}，按 Tab 选择等级，将咒术经验设为对应阈值。
+     */
+    private static LiteralArgumentBuilder<CommandSourceStack> buildCurseLevelCheatBranch()
+    {
+        LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal("curseLevel")
+                .requires(source -> source.hasPermission(Commands.LEVEL_GAMEMASTERS));
+        LiteralArgumentBuilder<CommandSourceStack> set = Commands.literal("set");
+        set.then(curseLevelLiteral("四级", "四级"));
+        set.then(curseLevelLiteral("三级", "三级"));
+        set.then(curseLevelLiteral("二级", "二级"));
+        set.then(curseLevelLiteral("一级", "一级"));
+        set.then(curseLevelLiteral("特级", "特级"));
+        set.then(curseLevelLiteral("grade_4", "四级"));
+        set.then(curseLevelLiteral("grade_3", "三级"));
+        set.then(curseLevelLiteral("grade_2", "二级"));
+        set.then(curseLevelLiteral("grade_1", "一级"));
+        set.then(curseLevelLiteral("special", "特级"));
+        root.then(set);
+        return root;
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> curseLevelLiteral(String literal, String rankKey)
+    {
+        return Commands.literal(literal).executes(ctx -> executeCurseLevelSet(ctx.getSource().getPlayerOrException(), rankKey));
+    }
+
+    private static int executeCurseLevelSet(ServerPlayer player, String rankKey)
+    {
+        int xp = PlayerCursedGradeData.experienceForCheatRank(rankKey);
+        if (xp < 0)
+        {
+            player.sendSystemMessage(Component.literal("未知的等级。"));
+            return 0;
+        }
+        PlayerCursedGradeData.setExperience(player, xp);
+        int rank = PlayerCursedGradeData.getRank(player);
+        player.sendSystemMessage(Component.literal(
+                "咒术经验已设为 " + xp + "（咒术等级：" + PlayerCursedGradeData.getRankDisplayName(rank) + "）"));
+        return 1;
+    }
+
+    /** 作弊习得反转术式：{@code /jjkz reverseTechnique grant} */
+    private static LiteralArgumentBuilder<CommandSourceStack> buildReverseTechniqueCheatBranch()
+    {
+        return Commands.literal("reverseTechnique")
+                .requires(source -> source.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                .then(Commands.literal("grant")
+                        .executes(ctx ->
+                        {
+                            ServerPlayer player = ctx.getSource().getPlayerOrException();
+                            PlayerReverseTechniqueData.setLearned(player, true);
+                            player.sendSystemMessage(Component.literal("已习得反转术式（当前为作弊获取）。"));
+                            return 1;
+                        }));
+    }
+
+    /** 作弊设置咒力总量：{@code /jjkz cursedEnergy set <值>} */
+    private static LiteralArgumentBuilder<CommandSourceStack> buildCursedEnergyCheatBranch()
+    {
+        return Commands.literal("cursedEnergy")
+                .requires(source -> source.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                .then(Commands.literal("set")
+                        .then(Commands.argument("value", IntegerArgumentType.integer(0))
+                                .executes(ctx ->
+                                {
+                                    ServerPlayer player = ctx.getSource().getPlayerOrException();
+                                    int value = IntegerArgumentType.getInteger(ctx, "value");
+                                    PlayerCursedEnergyData.setBaseMaxForCheat(player, value);
+                                    CursedGradeBonuses.applyAll(player);
+                                    if (PlayerCursedEnergyData.isHeavenlyRestricted(player))
+                                    {
+                                        HeavenlyRestrictionAdvancements.grant(player);
+                                    }
+                                    player.sendSystemMessage(Component.literal(
+                                            "咒力总量已设为 " + PlayerCursedEnergyData.getMax(player)
+                                                    + "（剩余：" + PlayerCursedEnergyData.getCurrent(player) + "）"));
+                                    return 1;
+                                })))
+                // 作弊填满咒力：将当前咒力设置为总量，并同步到客户端更新GUI
+                .then(Commands.literal("fill")
+                        .executes(ctx ->
+                        {
+                            ServerPlayer player = ctx.getSource().getPlayerOrException();
+                            int max = PlayerCursedEnergyData.getMax(player);
+                            PlayerCursedEnergyData.setCurrent(player, max);
+                            ModNetwork.sendCursedEnergySync(player, max, max);
+                            player.sendSystemMessage(Component.literal("咒力已填满至 " + max + "。"));
+                            return 1;
+                        }));
+    }
+
+    /** 作弊增加术式情报：{@code /jjkz techniqueIntel add <数量>} */
+    private static LiteralArgumentBuilder<CommandSourceStack> buildTechniqueIntelCheatBranch()
+    {
+        return Commands.literal("techniqueIntel")
+                .requires(source -> source.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                .then(Commands.literal("add")
+                        .then(Commands.argument("amount", IntegerArgumentType.integer(1))
+                                .executes(ctx ->
+                                {
+                                    ServerPlayer player = ctx.getSource().getPlayerOrException();
+                                    int amount = IntegerArgumentType.getInteger(ctx, "amount");
+                                    return executeTechniqueIntelAdd(player, amount);
+                                })))
+                .then(Commands.literal("get")
+                        .executes(ctx -> executeTechniqueIntelGet(ctx.getSource().getPlayerOrException())));
+    }
+
+    private static int executeTechniqueIntelAdd(ServerPlayer player, int amount)
+    {
+        String techniqueId = PlayerTechniqueData.getInnateTechnique(player);
+        if (techniqueId.isBlank() || PlayerTechniqueData.TECHNIQUE_NONE.equals(techniqueId))
+        {
+            player.sendSystemMessage(Component.literal("当前未选择生得术式，无法增加术式情报。"));
+            return 0;
+        }
+        PlayerTechniqueIntelData.addIntel(player, techniqueId, amount);
+        int total = PlayerTechniqueIntelData.getIntel(player, techniqueId);
+        player.sendSystemMessage(Component.literal(
+                "已为术式【" + techniqueId + "】增加 " + amount + " 点术式情报（当前：" + total + "）。"));
+        return 1;
+    }
+
+    private static int executeTechniqueIntelGet(ServerPlayer player)
+    {
+        String techniqueId = PlayerTechniqueData.getInnateTechnique(player);
+        if (techniqueId.isBlank() || PlayerTechniqueData.TECHNIQUE_NONE.equals(techniqueId))
+        {
+            player.sendSystemMessage(Component.literal("当前未选择生得术式。"));
+            return 0;
+        }
+        int total = PlayerTechniqueIntelData.getIntel(player, techniqueId);
+        player.sendSystemMessage(Component.literal(
+                "术式【" + techniqueId + "】术式情报：" + total));
+        return 1;
+    }
+
+    /** 召唤伏魔神龛：{@code /jjkz summonDemonSubduingShrine} */
+    private static LiteralArgumentBuilder<CommandSourceStack> buildDemonSubduingShrineBranch()
+    {
+        return Commands.literal("summonDemonSubduingShrine")
+                .requires(source -> source.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                .executes(ctx ->
+                {
+                    CommandSourceStack source = ctx.getSource();
+                    ServerLevel level = source.getLevel();
+                    Vec3 pos = source.getPosition();
+
+                    DemonSubduingShrineEntity entity = ModEntities.DEMON_SUBDUING_SHRINE.get().create(level);
+                    if (entity == null)
+                    {
+                        source.sendFailure(Component.literal("召唤失败：伏魔神龛实体创建失败。"));
+                        return 0;
+                    }
+
+                    entity.moveTo(pos.x, pos.y, pos.z, source.getRotation().y, 0.0F);
+                    level.addFreshEntity(entity);
+                    source.sendSuccess(() -> Component.literal("已召唤伏魔神龛。"), true);
+                    return 1;
+                });
+    }
+
+    /** 召唤特殊效果实体：{@code /jjkz summonSpecialEffect} */
+    private static LiteralArgumentBuilder<CommandSourceStack> buildSpecialEffectBranch()
+    {
+        return Commands.literal("summonSpecialEffect")
+                .requires(source -> source.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                .executes(ctx ->
+                {
+                    CommandSourceStack source = ctx.getSource();
+                    ServerLevel level = source.getLevel();
+                    Vec3 pos = source.getPosition();
+
+                    SpecialEffectEntity entity = ModEntities.SPECIAL_EFFECT_ENTITY.get().create(level);
+                    if (entity == null)
+                    {
+                        source.sendFailure(Component.literal("召唤失败：实体创建失败。"));
+                        return 0;
+                    }
+
+                    entity.moveTo(pos.x, pos.y, pos.z, source.getRotation().y, 0.0F);
+                    level.addFreshEntity(entity);
+                        source.sendSuccess(() -> Component.literal("已召唤 SpecialEffectEntity。"), true);
+                    return 1;
+                });
+    }
+
+    /** 生成阵营楔：{@code /jjkz wedge <咒术师|诅咒师|咒灵>} */
+    private static LiteralArgumentBuilder<CommandSourceStack> buildWedgeSpawnBranch()
+    {
+        LiteralArgumentBuilder<CommandSourceStack> wedge = Commands.literal("wedge")
+                .requires(source -> source.hasPermission(Commands.LEVEL_GAMEMASTERS));
+        wedge.then(wedgeFactionLiteral("sorcerer", PlayerFactionData.FACTION_SORCERER));
+        wedge.then(wedgeFactionLiteral("咒术师", PlayerFactionData.FACTION_SORCERER));
+        wedge.then(wedgeFactionLiteral("curse_user", PlayerFactionData.FACTION_CURSE_USER));
+        wedge.then(wedgeFactionLiteral("诅咒师", PlayerFactionData.FACTION_CURSE_USER));
+        wedge.then(wedgeFactionLiteral("curse_spirit", PlayerFactionData.FACTION_CURSE_SPIRIT));
+        wedge.then(wedgeFactionLiteral("咒灵", PlayerFactionData.FACTION_CURSE_SPIRIT));
+        return wedge;
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> wedgeFactionLiteral(String literal, String factionId)
+    {
+        return Commands.literal(literal).executes(ctx -> executeSpawnWedge(ctx.getSource(), factionId));
+    }
+
+    private static int executeSpawnWedge(CommandSourceStack source, String factionId)
+    {
+        ServerLevel level = source.getLevel();
+        WedgeEntity existing = WedgeEntity.findInFaction(level, factionId);
+        if (existing != null)
+        {
+            existing.kill();
+        }
+
+        WedgeEntity wedge = ModEntities.WEDGE.get().create(level);
+        if (wedge == null)
+        {
+            source.sendFailure(Component.literal("楔生成失败：实体创建失败。"));
+            return 0;
+        }
+
+        wedge.setFactionId(factionId);
+        Vec3 pos = source.getPosition();
+        wedge.moveTo(pos.x, pos.y, pos.z, source.getRotation().y, 0.0F);
+        wedge.setHealth(wedge.getMaxHealth());
+        if (!level.addFreshEntity(wedge))
+        {
+            source.sendFailure(Component.literal("楔生成失败：无法加入世界（该阵营在本维度可能已有楔）。"));
+            return 0;
+        }
+
+        String factionName = PlayerFactionData.getDisplayName(factionId);
+        source.sendSuccess(() -> Component.literal("已生成【" + factionName + "】之楔。"), true);
+        return 1;
+    }
+
+    /** 咒灵刷新点：{@code /jjkz curseSpiritSpawn set <三级|二级|一级|特级>} */
+    private static LiteralArgumentBuilder<CommandSourceStack> buildCurseSpiritSpawnBranch()
+    {
+        LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal("curseSpiritSpawn")
+                .requires(source -> source.hasPermission(Commands.LEVEL_GAMEMASTERS));
+        LiteralArgumentBuilder<CommandSourceStack> set = Commands.literal("set");
+        set.then(curseSpiritSpawnGradeLiteral("三级", CurseSpiritSpawnGrade.GRADE_3));
+        set.then(curseSpiritSpawnGradeLiteral("二级", CurseSpiritSpawnGrade.GRADE_2));
+        set.then(curseSpiritSpawnGradeLiteral("一级", CurseSpiritSpawnGrade.GRADE_1));
+        set.then(curseSpiritSpawnGradeLiteral("特级", CurseSpiritSpawnGrade.SPECIAL));
+        set.then(curseSpiritSpawnGradeLiteral("grade_3", CurseSpiritSpawnGrade.GRADE_3));
+        set.then(curseSpiritSpawnGradeLiteral("grade_2", CurseSpiritSpawnGrade.GRADE_2));
+        set.then(curseSpiritSpawnGradeLiteral("grade_1", CurseSpiritSpawnGrade.GRADE_1));
+        set.then(curseSpiritSpawnGradeLiteral("special", CurseSpiritSpawnGrade.SPECIAL));
+        root.then(set);
+        return root;
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> curseSpiritSpawnGradeLiteral(
+            String literal,
+            CurseSpiritSpawnGrade grade)
+    {
+        return Commands.literal(literal).executes(ctx -> executeSetCurseSpiritSpawn(ctx.getSource(), grade));
+    }
+
+    private static int executeSetCurseSpiritSpawn(CommandSourceStack source, CurseSpiritSpawnGrade grade)
+    {
+        if (!(source.getEntity() instanceof ServerPlayer player))
+        {
+            source.sendFailure(Component.literal("咒灵刷新点须由玩家设置。"));
+            return 0;
+        }
+
+        TengenWedgeBarrierLogic.TengenWedgeBarrier barrier = TengenWedgeBarrierLogic.findOwnedBarrierInside(player);
+        if (barrier == null)
+        {
+            source.sendFailure(Component.literal("须站在已构建完成的天元之楔结界内（setup 执行者）。"));
+            return 0;
+        }
+
+        Vec3 pos = source.getPosition();
+        if (!TengenWedgeCurseSpiritSpawns.addSpawnPoint(barrier, pos, grade))
+        {
+            source.sendFailure(Component.literal("刷新点位置不在结界内。"));
+            return 0;
+        }
+
+        int total = TengenWedgeCurseSpiritSpawns.countForBarrier(barrier);
+        source.sendSuccess(
+                () -> Component.literal("已设置【" + grade.getDisplayName() + "】咒灵刷新点（当前共 "
+                        + total + " 个，至少需 " + TengenWedgeCurseSpiritSpawns.MIN_REQUIRED + " 个）。"),
+                true);
+        return 1;
+    }
+
+    /** 天元之楔结界部署：{@code /jjkz tengen_wedge setup|close} */
+    private static LiteralArgumentBuilder<CommandSourceStack> buildTengenWedgeBranch()
+    {
+        return Commands.literal("tengen_wedge")
+                .requires(source -> source.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                .then(Commands.literal("setup")
+                        .executes(ctx ->
+                        {
+                            CommandSourceStack source = ctx.getSource();
+                            if (!(source.getEntity() instanceof ServerPlayer player))
+                            {
+                                source.sendFailure(Component.literal("天元之楔结界须由玩家执行 setup。"));
+                                return 0;
+                            }
+                            ServerLevel level = source.getLevel();
+                            BlockPos center = BlockPos.containing(source.getPosition());
+
+                            if (!TengenWedgeBarrierLogic.setup(level, center, player))
+                            {
+                                source.sendFailure(Component.literal("天元之楔结界部署失败。"));
+                                return 0;
+                            }
+
+                            source.sendSuccess(
+                                    () -> Component.literal("已开始构建天元之楔结界（半径 "
+                                            + TengenWedgeBarrierLogic.BARRIER_RADIUS + "，中心 "
+                                            + center.getX() + ", " + center.getY() + ", " + center.getZ() + "）"),
+                                    true);
+                            return 1;
+                        }))
+                .then(Commands.literal("close")
+                        .executes(ctx ->
+                        {
+                            CommandSourceStack source = ctx.getSource();
+                            if (!(source.getEntity() instanceof ServerPlayer player))
+                            {
+                                source.sendFailure(Component.literal("天元之楔结界须由 setup 执行者关闭。"));
+                                return 0;
+                            }
+                            if (!TengenWedgeBarrierLogic.close(player))
+                            {
+                                source.sendFailure(Component.literal("未找到你在当前维度部署的天元之楔结界。"));
+                                return 0;
+                            }
+                            source.sendSuccess(() -> Component.literal("已关闭天元之楔结界，结界壁已清除并复原方块。"), true);
+                            return 1;
+                        }))
+                .then(Commands.literal("start")
+                        .executes(ctx ->
+                        {
+                            CommandSourceStack source = ctx.getSource();
+                            if (!(source.getEntity() instanceof ServerPlayer player))
+                            {
+                                source.sendFailure(Component.literal("天元之楔须由 setup 执行者开始。"));
+                                return 0;
+                            }
+                            TengenWedgeStartResult result = TengenWedgeBarrierLogic.start(player);
+                            if (!result.isSuccess())
+                            {
+                                Component message = result.failureMessage();
+                                source.sendFailure(message != null ? message : Component.literal("无法开始天元之楔。"));
+                                return 0;
+                            }
+                            source.sendSuccess(() -> Component.literal("天元之楔已开始，状态：进行中。"), true);
+                            return 1;
+                        }));
+    }
+
+    /**
+     * <p>
+     * 业务意图：通过命令快速验证“方块在白层下、生物在白层上”的视觉关系。
+     */
+    private static LiteralArgumentBuilder<CommandSourceStack> buildWhiteOverlayBranch()
+    {
+        return Commands.literal("whiteOverlay")
+                .requires(source -> source.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                .then(Commands.literal("on")
+                        .executes(ctx -> executeWhiteOverlaySet(ctx.getSource().getPlayerOrException(), true, 0.4F)))
+                .then(Commands.literal("off")
+                        .executes(ctx -> executeWhiteOverlaySet(ctx.getSource().getPlayerOrException(), false, 0.0F)))
+                .then(Commands.literal("alpha")
+                        .then(Commands.argument("value", IntegerArgumentType.integer(0, 100))
+                                .executes(ctx ->
+                                {
+                                    ServerPlayer player = ctx.getSource().getPlayerOrException();
+                                    int value = IntegerArgumentType.getInteger(ctx, "value");
+                                    return executeWhiteOverlaySet(player, true, value / 100.0F);
+                                })));
+    }
+
+    private static int executeWhiteOverlaySet(ServerPlayer player, boolean enabled, float alpha)
+    {
+        ModNetwork.sendWhiteOverlaySync(player, enabled, alpha);
+        if (!enabled)
+        {
+            player.sendSystemMessage(Component.literal("白色滤镜已关闭。"));
+            return 1;
+        }
+        int alphaPercent = Math.round(alpha * 100.0F);
+        player.sendSystemMessage(Component.literal("白色滤镜已开启，透明度：" + alphaPercent + "%。"));
+        return 1;
+    }
+
+    /** 作弊设置降灵术等级：{@code /jjkz seanceTechnique set <等级>} */
+    private static LiteralArgumentBuilder<CommandSourceStack> buildSeanceTechniqueCheatBranch()
+    {
+        return Commands.literal("seanceTechnique")
+                .requires(source -> source.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                .then(Commands.literal("set")
+                        .then(seanceTechniqueLevelLiteral("unlearned", "未习得", SeanceTechniqueLevel.UNLEARNED))
+                        .then(seanceTechniqueLevelLiteral("beginner", "初习", SeanceTechniqueLevel.BEGINNER))
+                        .then(seanceTechniqueLevelLiteral("mastered", "掌握", SeanceTechniqueLevel.MASTERED))
+                        .then(seanceTechniqueLevelLiteral("complete", "完全掌握", SeanceTechniqueLevel.COMPLETE)))
+                .then(Commands.literal("get")
+                        .executes(ctx ->
+                        {
+                            ServerPlayer player = ctx.getSource().getPlayerOrException();
+                            SeanceTechniqueLevel level = PlayerSeanceTechniqueData.getLevel(player);
+                            int reductionPercent = (int) (level.getMaintainCostReduction() * 100);
+                            player.sendSystemMessage(Component.literal("当前降灵术等级：" + getSeanceLevelDisplayName(level) + "（维持消耗减免：" + reductionPercent + "%）"));
+                            return 1;
+                        }));
+    }
+
+    /** 作弊设置结界术等级：{@code /jjkz barrierTechnique set <等级>} */
+    private static LiteralArgumentBuilder<CommandSourceStack> buildBarrierTechniqueCheatBranch()
+    {
+        return Commands.literal("barrierTechnique")
+                .requires(source -> source.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                .then(Commands.literal("set")
+                        .then(barrierTechniqueLevelLiteral("unlearned", "未习得", BarrierTechniqueLevel.UNLEARNED))
+                        .then(barrierTechniqueLevelLiteral("beginner", "初习", BarrierTechniqueLevel.BEGINNER))
+                        .then(barrierTechniqueLevelLiteral("mastered", "掌握", BarrierTechniqueLevel.MASTERED))
+                        .then(barrierTechniqueLevelLiteral("complete", "完全掌握", BarrierTechniqueLevel.COMPLETE)))
+                .then(Commands.literal("get")
+                        .executes(ctx ->
+                        {
+                            ServerPlayer player = ctx.getSource().getPlayerOrException();
+                            BarrierTechniqueLevel level = PlayerBarrierTechniqueData.getLevel(player);
+                            int reductionPercent = (int) (level.getMaintainCostReduction() * 100);
+                            player.sendSystemMessage(Component.literal("当前结界术等级：" + getBarrierLevelDisplayName(level) + "（维持消耗减免：" + reductionPercent + "%）"));
+                            return 1;
+                        }));
+    }
+
+    /**
+     * 作弊解锁/撤销领域展开：{@code /jjkz domainExpansion grant|revoke}
+     * <p>
+     * 设置领域名称：{@code /jjkz domainExpansion setName <名称>}
+     */
+    private static LiteralArgumentBuilder<CommandSourceStack> buildDomainExpansionCheatBranch()
+    {
+        return Commands.literal("domainExpansion")
+                .requires(source -> source.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                .then(Commands.literal("grant")
+                        .executes(ctx ->
+                        {
+                            ServerPlayer player = ctx.getSource().getPlayerOrException();
+                            DomainExpansionServerLogic logic = DomainExpansionServerLogic.getInstance();
+                            if (logic.hasLearnedDomainExpansion(player))
+                            {
+                                player.sendSystemMessage(Component.literal("你已经习得了领域展开。"));
+                                return 0;
+                            }
+                            // 前置条件：需要先习得结界术
+                            if (!PlayerBarrierTechniqueData.hasLearned(player))
+                            {
+                                player.sendSystemMessage(Component.literal("需要先习得结界术才能解锁领域展开。"));
+                                return 0;
+                            }
+                            logic.setLearnedDomainExpansion(player, true);
+                            player.sendSystemMessage(Component.literal("已习得领域展开（当前为作弊获取）。"));
+                            return 1;
+                        }))
+                .then(Commands.literal("revoke")
+                        .executes(ctx ->
+                        {
+                            ServerPlayer player = ctx.getSource().getPlayerOrException();
+                            DomainExpansionServerLogic logic = DomainExpansionServerLogic.getInstance();
+                            if (!logic.hasLearnedDomainExpansion(player))
+                            {
+                                player.sendSystemMessage(Component.literal("你尚未习得领域展开。"));
+                                return 0;
+                            }
+                            logic.setLearnedDomainExpansion(player, false);
+                            player.sendSystemMessage(Component.literal("已撤销领域展开。"));
+                            return 1;
+                        }))
+                .then(Commands.literal("setName")
+                        .then(Commands.argument("name", StringArgumentType.greedyString())
+                                .executes(ctx ->
+                                {
+                                    ServerPlayer player = ctx.getSource().getPlayerOrException();
+                                    String name = StringArgumentType.getString(ctx, "name");
+                                    DomainExpansionServerLogic logic = DomainExpansionServerLogic.getInstance();
+                                    logic.setDomainName(name);
+                                    player.sendSystemMessage(Component.literal("领域名称已设为：「" + name + "」"));
+                                    return 1;
+                                })))
+                .then(Commands.literal("setCost")
+                        .then(Commands.argument("value", IntegerArgumentType.integer(0))
+                                .executes(ctx ->
+                                {
+                                    ServerPlayer player = ctx.getSource().getPlayerOrException();
+                                    int cost = IntegerArgumentType.getInteger(ctx, "value");
+                                    DomainExpansionServerLogic logic = DomainExpansionServerLogic.getInstance();
+                                    logic.setDomainExpansionCost(cost);
+                                    player.sendSystemMessage(Component.literal("领域展开消耗咒力已设为：" + cost));
+                                    return 1;
+                                })))
+                .then(Commands.literal("setMaintainCost")
+                        .then(Commands.argument("value", IntegerArgumentType.integer(0))
+                                .executes(ctx ->
+                                {
+                                    ServerPlayer player = ctx.getSource().getPlayerOrException();
+                                    int cost = IntegerArgumentType.getInteger(ctx, "value");
+                                    DomainExpansionServerLogic logic = DomainExpansionServerLogic.getInstance();
+                                    logic.setDomainMaintainCost(cost);
+                                    player.sendSystemMessage(Component.literal("维持领域消耗咒力已设为：" + cost));
+                                    return 1;
+                                })))
+                .then(Commands.literal("get")
+                        .executes(ctx ->
+                        {
+                            ServerPlayer player = ctx.getSource().getPlayerOrException();
+                            DomainExpansionServerLogic logic = DomainExpansionServerLogic.getInstance();
+                            boolean learned = logic.hasLearnedDomainExpansion(player);
+                            String name = logic.getDomainName();
+                            int expandCost = logic.getDomainExpansionCost();
+                            int maintainCost = logic.getDomainMaintainCost();
+                            player.sendSystemMessage(Component.literal("========== 领域展开 =========="));
+                            player.sendSystemMessage(Component.literal("习得状态: " + (learned ? "已习得" : "未习得")));
+                            player.sendSystemMessage(Component.literal("领域名称: " + (name.isEmpty() ? "（未设置）" : "「" + name + "」")));
+                            player.sendSystemMessage(Component.literal("展开消耗咒力: " + expandCost));
+                            player.sendSystemMessage(Component.literal("维持消耗咒力: " + maintainCost + "/秒"));
+                            return 1;
+                        }));
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> seanceTechniqueLevelLiteral(String literal, String displayName, SeanceTechniqueLevel level)
+    {
+        return Commands.literal(literal).executes(ctx -> executeSeanceTechniqueSet(ctx.getSource().getPlayerOrException(), displayName, level));
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> barrierTechniqueLevelLiteral(String literal, String displayName, BarrierTechniqueLevel level)
+    {
+        return Commands.literal(literal).executes(ctx -> executeBarrierTechniqueSet(ctx.getSource().getPlayerOrException(), displayName, level));
+    }
+
+    private static int executeSeanceTechniqueSet(ServerPlayer player, String displayName, SeanceTechniqueLevel level)
+    {
+        PlayerSeanceTechniqueData.setLevel(player, level);
+        int reductionPercent = (int) (level.getMaintainCostReduction() * 100);
+        player.sendSystemMessage(Component.literal("降灵术等级已设为：" + displayName + "（维持消耗减免：" + reductionPercent + "%）"));
+        return 1;
+    }
+
+    private static int executeBarrierTechniqueSet(ServerPlayer player, String displayName, BarrierTechniqueLevel level)
+    {
+        PlayerBarrierTechniqueData.setLevel(player, level);
+        int reductionPercent = (int) (level.getMaintainCostReduction() * 100);
+        player.sendSystemMessage(Component.literal("结界术等级已设为：" + displayName + "（维持消耗减免：" + reductionPercent + "%）"));
+        return 1;
+    }
+
+    private static String getBarrierLevelDisplayName(BarrierTechniqueLevel level)
+    {
+        return switch (level)
+        {
+            case UNLEARNED -> "未习得";
+            case BEGINNER -> "初习";
+            case MASTERED -> "掌握";
+            case COMPLETE -> "完全掌握";
+        };
+    }
+
+    private static String getSeanceLevelDisplayName(SeanceTechniqueLevel level)
+    {
+        return switch (level)
+        {
+            case UNLEARNED -> "未习得";
+            case BEGINNER -> "初习";
+            case MASTERED -> "掌握";
+            case COMPLETE -> "完全掌握";
+        };
+    }
+
+    /**
+     * 模组文字教程：{@code /jjkz ask <分类> <主题>}，按 Tab 选择分类与主题后在聊天栏显示说明。
+     */
+    private static LiteralArgumentBuilder<CommandSourceStack> buildAskBranch()
+    {
+        LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal("ask")
+                .executes(ctx ->
+                {
+                    ServerPlayer player = ctx.getSource().getPlayerOrException();
+                    player.sendSystemMessage(Component.literal(
+                            "【JJKZ 教程】输入分类名以查看主题，按 Tab 选择。可用分类：" + String.join("、", ASK_CATEGORIES.keySet())));
+                    return 1;
+                });
+        for (Map.Entry<String, Map<String, String>> categoryEntry : ASK_CATEGORIES.entrySet())
+        {
+            root.then(buildAskCategoryBranch(categoryEntry.getKey(), categoryEntry.getValue()));
+        }
+        return root;
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> buildAskCategoryBranch(
+            String category, Map<String, String> topics)
+    {
+        LiteralArgumentBuilder<CommandSourceStack> categoryNode = Commands.literal(category)
+                .executes(ctx ->
+                {
+                    ServerPlayer player = ctx.getSource().getPlayerOrException();
+                    player.sendSystemMessage(Component.literal(
+                            "【" + category + "】按 Tab 选择主题：" + String.join("、", topics.keySet())));
+                    return 1;
+                });
+        for (Map.Entry<String, String> topicEntry : topics.entrySet())
+        {
+            String topic = topicEntry.getKey();
+            String answer = topicEntry.getValue();
+            categoryNode.then(Commands.literal(topic).executes(ctx ->
+            {
+                ServerPlayer player = ctx.getSource().getPlayerOrException();
+                return executeAsk(player, category, topic, answer);
+            }));
+        }
+        return categoryNode;
+    }
+
+    private static int executeAsk(ServerPlayer player, String category, String topic, String answer)
+    {
+        player.sendSystemMessage(Component.literal("【" + category + " · " + topic + "】"));
+        for (String line : answer.split("\n"))
+        {
+            if (!line.isBlank())
+            {
+                player.sendSystemMessage(Component.literal(line.strip()));
+            }
+        }
+        return 1;
+    }
+
+    /** 作弊获取 Rush Into The ZONE 最高潮：{@code /jjkz rushIntoTheZoneClimax} */
+    private static LiteralArgumentBuilder<CommandSourceStack> buildRushIntoTheZoneClimaxBranch()
+    {
+        return Commands.literal("rushIntoTheZoneClimax")
+                .requires(source -> source.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                .executes(ctx ->
+                {
+                    ServerPlayer player = ctx.getSource().getPlayerOrException();
+                    RushIntoTheZoneClimaxEffect.grant(player);
+                    player.sendSystemMessage(Component.literal(
+                            "已获得 Rush Into The ZONE 最高潮：ZONE III + 下一次体术攻击必定黑闪。"));
+                    return 1;
+                });
+    }
+}

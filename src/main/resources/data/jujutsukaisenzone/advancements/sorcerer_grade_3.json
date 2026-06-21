@@ -1,0 +1,28 @@
+{
+  "parent": "jujutsukaisenzone:sorcerer_grade_4",
+  "criteria": {
+    "join": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "display": {
+    "announce_to_chat": true,
+    "description": {
+      "translate": "advancements.jujutsukaisenzone.sorcerer_grade_3.description"
+    },
+    "frame": "task",
+    "hidden": false,
+    "icon": {
+      "item": "minecraft:iron_ingot"
+    },
+    "show_toast": true,
+    "title": {
+      "translate": "advancements.jujutsukaisenzone.sorcerer_grade_3.title"
+    }
+  },
+  "requirements": [
+    [
+      "join"
+    ]
+  ]
+}

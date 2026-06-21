@@ -1,0 +1,18 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.lowdragmc.lowdraglib.forge.core.mixins",
+  "compatibilityLevel": "JAVA_17",
+  "plugin": "com.lowdragmc.lowdraglib.forge.core.mixins.LDLibForgeMixinPlugin",
+  "client": [
+    "BlockRenderDispatcherMixin",
+    "ModelBakerImplMixin"
+  ],
+  "mixins": [
+    "kjs.SlotWidgetMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "refmap": "ldlib-forge-1.20.1-ldlib-forge-refmap.json"
+}

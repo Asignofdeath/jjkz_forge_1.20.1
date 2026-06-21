@@ -1,0 +1,28 @@
+{
+  "parent": "jujutsukaisenzone:curse_user_grade_2",
+  "criteria": {
+    "join": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "display": {
+    "announce_to_chat": true,
+    "description": {
+      "translate": "advancements.jujutsukaisenzone.curse_user_grade_1.description"
+    },
+    "frame": "goal",
+    "hidden": false,
+    "icon": {
+      "item": "minecraft:diamond"
+    },
+    "show_toast": true,
+    "title": {
+      "translate": "advancements.jujutsukaisenzone.curse_user_grade_1.title"
+    }
+  },
+  "requirements": [
+    [
+      "join"
+    ]
+  ]
+}

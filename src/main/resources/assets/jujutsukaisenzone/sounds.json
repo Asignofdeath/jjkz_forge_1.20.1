@@ -1,0 +1,222 @@
+{
+  "jutsushiki.limitless.blue_inhale": {
+    "subtitle": "subtitles.jujutsukaisenzone.jutsushiki.limitless.blue_inhale",
+    "sounds": [
+      {
+        "name": "jujutsukaisenzone:jutsushiki/limitless/blue_inhale"
+      }
+    ]
+  },
+  "jutsushiki.limitless.aka_short_charge": {
+    "subtitle": "subtitles.jujutsukaisenzone.jutsushiki.limitless.aka_short_charge",
+    "sounds": [
+      {
+        "name": "jujutsukaisenzone:jutsushiki/limitless/aka_short_charge"
+      }
+    ]
+  },
+  "jutsushiki.limitless.murasaki_mini": {
+    "subtitle": "subtitles.jujutsukaisenzone.jutsushiki.limitless.murasaki_mini",
+    "sounds": [
+      {
+        "name": "jujutsukaisenzone:jutsushiki/limitless/murasaki_mini"
+      }
+    ]
+  },
+  "jutsushiki.limitless.remote_murasaki": {
+    "sounds": [
+      {
+        "name": "jujutsukaisenzone:jutsushiki/limitless/remote_murasaki"
+      }
+    ]
+  },
+  "domain.limitless_domain_expantion": {
+    "subtitle": "subtitles.jujutsukaisenzone.domain.limitless_domain_expantion",
+    "sounds": [
+      {
+        "name": "jujutsukaisenzone:domain/limitless_domain_expantion"
+      }
+    ]
+  },
+  "domain.limitless_domain_sound": {
+    "subtitle": "subtitles.jujutsukaisenzone.domain.limitless_domain_sound",
+    "sounds": [
+      {
+        "name": "jujutsukaisenzone:domain/limitless_domain_sound",
+        "stream": true,
+        "attenuation_distance": 64
+      }
+    ]
+  },
+  "sound_effects.iron_sound": {
+    "subtitle": "subtitles.jujutsukaisenzone.sound_effects.iron_sound",
+    "sounds": [
+      {
+        "name": "jujutsukaisenzone:sound_effects/iron_sound"
+      }
+    ]
+  },
+  "domain.limitless_domain_perfect": {
+    "subtitle": "subtitles.jujutsukaisenzone.domain.limitless_domain_perfect",
+    "sounds": [
+      {
+        "name": "jujutsukaisenzone:domain/limitless_domain_perfect",
+        "attenuation_distance": 64
+      }
+    ]
+  },
+  "domain.shrine_domain_expension": {
+    "subtitle": "subtitles.jujutsukaisenzone.domain.shrine_domain_expension",
+    "sounds": [
+      {
+        "name": "jujutsukaisenzone:domain/shrine_domain_expension"
+      }
+    ]
+  },
+  "domain.shrine_slash": {
+    "subtitle": "subtitles.jujutsukaisenzone.domain.shrine_slash",
+    "sounds": [
+      {
+        "name": "jujutsukaisenzone:domain/shrine_slash"
+      }
+    ]
+  },
+  "domain.shrine_slash_power": {
+    "subtitle": "subtitles.jujutsukaisenzone.domain.shrine_slash_power",
+    "sounds": [
+      {
+        "name": "jujutsukaisenzone:domain/shrine_slash_power"
+      }
+    ]
+  },
+  "domain.slash_kill": {
+    "subtitle": "subtitles.jujutsukaisenzone.domain.slash_kill",
+    "sounds": [
+      {
+        "name": "jujutsukaisenzone:domain/slash_kill"
+      }
+    ]
+  },
+  "domain.shrine_perfect": {
+    "subtitle": "subtitles.jujutsukaisenzone.domain.shrine_perfect",
+    "sounds": [
+      {
+        "name": "jujutsukaisenzone:domain/shrine_perfect",
+        "attenuation_distance": 64
+      }
+    ]
+  },
+  "jutsushiki.shrine.slash_kai_1_fire": {
+    "subtitle": "subtitles.jujutsukaisenzone.jutsushiki.shrine.slash_kai_1_fire",
+    "sounds": [
+      {
+        "name": "jujutsukaisenzone:jutsushiki/shrine/slash_kai_1_fire"
+      }
+    ]
+  },
+  "jutsushiki.shrine.slash_kai_1_hit": {
+    "subtitle": "subtitles.jujutsukaisenzone.jutsushiki.shrine.slash_kai_1_hit",
+    "sounds": [
+      {
+        "name": "jujutsukaisenzone:jutsushiki/shrine/slash_kai_1_hit"
+      }
+    ]
+  },
+  "jutsushiki.shrine.slash_kai_2_fire": {
+    "subtitle": "subtitles.jujutsukaisenzone.jutsushiki.shrine.slash_kai_2_fire",
+    "sounds": [
+      {
+        "name": "jujutsukaisenzone:jutsushiki/shrine/slash_kai_2_fire"
+      }
+    ]
+  },
+  "jutsushiki.shrine.slash_kai_2_hit": {
+    "subtitle": "subtitles.jujutsukaisenzone.jutsushiki.shrine.slash_kai_2_hit",
+    "sounds": [
+      {
+        "name": "jujutsukaisenzone:jutsushiki/shrine/slash_kai_2_hit"
+      }
+    ]
+  },
+  "jutsushiki.shrine.slash_kai_flyobj": {
+    "subtitle": "subtitles.jujutsukaisenzone.jutsushiki.shrine.slash_kai_flyobj",
+    "sounds": [
+      {
+        "name": "jujutsukaisenzone:jutsushiki/shrine/slash_kai_flyobj"
+      }
+    ]
+  },
+  "jutsushiki.shrine.slash_hachi": {
+    "subtitle": "subtitles.jujutsukaisenzone.jutsushiki.shrine.slash_hachi",
+    "sounds": [
+      {
+        "name": "jujutsukaisenzone:jutsushiki/shrine/slash_hachi"
+      }
+    ]
+  },
+  "jutsushiki.shrine.fuga_start": {
+    "subtitle": "subtitles.jujutsukaisenzone.jutsushiki.shrine.fuga_start",
+    "sounds": [
+      {
+        "name": "jujutsukaisenzone:jutsushiki/shrine/fuga_start"
+      }
+    ]
+  },
+  "jutsushiki.shrine.fuga_fire": {
+    "subtitle": "subtitles.jujutsukaisenzone.jutsushiki.shrine.fuga_fire",
+    "sounds": [
+      {
+        "name": "jujutsukaisenzone:jutsushiki/shrine/fuga_fire"
+      }
+    ]
+  },
+  "jutsushiki.shrine.fuga_boom": {
+    "subtitle": "subtitles.jujutsukaisenzone.jutsushiki.shrine.fuga_boom",
+    "sounds": [
+      {
+        "name": "jujutsukaisenzone:jutsushiki/shrine/fuga_boom",
+        "attenuation_distance": 55
+      }
+    ]
+  },
+  "sound_effects.black_flash": {
+    "subtitle": "subtitles.jujutsukaisenzone.sound_effects.black_flash",
+    "sounds": [
+      {
+        "name": "jujutsukaisenzone:sound_effects/black_flash"
+      }
+    ]
+  },
+  "character.sukuna.hmph": {
+    "subtitle": "subtitles.jujutsukaisenzone.character.sukuna.hmph",
+    "sounds": [
+      {
+        "name": "jujutsukaisenzone:character/sukuna/hmph"
+      }
+    ]
+  },
+  "character.sukuna.kai": {
+    "subtitle": "subtitles.jujutsukaisenzone.character.sukuna.kai",
+    "sounds": [
+      {
+        "name": "jujutsukaisenzone:character/sukuna/kai"
+      }
+    ]
+  },
+  "character.sukuna.fuga": {
+    "subtitle": "subtitles.jujutsukaisenzone.character.sukuna.fuga",
+    "sounds": [
+      {
+        "name": "jujutsukaisenzone:character/sukuna/fuga"
+      }
+    ]
+  },
+  "character.sukuna.zongai_tanoshimeta": {
+    "subtitle": "subtitles.jujutsukaisenzone.character.sukuna.zongai_tanoshimeta",
+    "sounds": [
+      {
+        "name": "jujutsukaisenzone:character/sukuna/zongai_tanoshimeta"
+      }
+    ]
+  }
+}

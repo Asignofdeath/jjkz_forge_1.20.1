@@ -1,0 +1,28 @@
+{
+  "parent": "jujutsukaisenzone:sorcerer_special",
+  "criteria": {
+    "perfect_suppression": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "display": {
+    "announce_to_chat": true,
+    "description": {
+      "translate": "advancements.jujutsukaisenzone.perfect_suppression.description"
+    },
+    "frame": "task",
+    "hidden": false,
+    "icon": {
+      "item": "jujutsukaisenzone:slash_technique_sukuna"
+    },
+    "show_toast": true,
+    "title": {
+      "translate": "advancements.jujutsukaisenzone.perfect_suppression.title"
+    }
+  },
+  "requirements": [
+    [
+      "perfect_suppression"
+    ]
+  ]
+}
