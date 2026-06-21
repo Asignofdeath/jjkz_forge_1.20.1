@@ -7,7 +7,8 @@
   "plugin": "",
   "mixins": [],
   "client": [
-    "client.AbstractClientPlayerMixin"
+    "client.AbstractClientPlayerMixin",
+    "client.CreativeModeInventoryScreenMixin"
   ],
   "server": []
 }
