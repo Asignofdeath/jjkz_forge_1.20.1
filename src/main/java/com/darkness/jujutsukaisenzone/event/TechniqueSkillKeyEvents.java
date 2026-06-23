@@ -11,6 +11,7 @@ import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
 import com.darkness.jujutsukaisenzone.technique.skillset.IInnateTechniqueSkillSet;
 import com.darkness.jujutsukaisenzone.technique.skillset.LimitlessTechniqueSkillSet;
 import com.darkness.jujutsukaisenzone.technique.skillset.SpecialMoveInput;
+import com.darkness.jujutsukaisenzone.technique.skillset.TechniqueSkill;
 import com.darkness.jujutsukaisenzone.technique.skillset.TechniqueSkillSetRegistry;
 import net.minecraft.client.Minecraft;
 import net.minecraftforge.api.distmarker.Dist;
@@ -215,7 +216,7 @@ public final class TechniqueSkillKeyEvents
                 // 通过客户端缓存查快捷栏位映射的 skillId，再按 skillId 判断是否支持最大输出。
                 // 玩家可在 SkillBarConfigScreen 中任意配置各栏位对应的技能。
                 String techniqueId = PlayerTechniqueData.getInnateTechnique(minecraft.player);
-                String skillId = ClientSkillBarCache.getSkillId(techniqueId, slot);
+                String skillId = resolveConfiguredSkillId(techniqueId, slot, setOpt);
                 int holdReleaseChargeTicks = skillId.isEmpty()
                         ? 0
                         : setOpt.map(s -> s.getHoldReleaseChargeTicksBySkill(minecraft.player, skillId)).orElse(0);
@@ -430,6 +431,27 @@ public final class TechniqueSkillKeyEvents
         SLOT_CHARGE_REQUIRED_TICKS[hotkeyIndex] = 0;
         SLOT_HOLD_RELEASE_MODE[hotkeyIndex] = false;
         SLOT_HOLD_RELEASE_COMPLETED[hotkeyIndex] = false;
+    }
+
+    /**
+     * 优先读客户端快捷栏缓存；生产环境登录时包可能晚到，回退到技能默认槽位映射，
+     * 避免蓄力逻辑与进度条因缓存未就绪而失效。
+     */
+    private static String resolveConfiguredSkillId(
+            String techniqueId,
+            int slot,
+            Optional<IInnateTechniqueSkillSet> setOpt)
+    {
+        String skillId = ClientSkillBarCache.getSkillId(techniqueId, slot);
+        if (!skillId.isEmpty())
+        {
+            return skillId;
+        }
+        return setOpt.flatMap(set -> set.getConfigurableSkills().stream()
+                        .filter(skill -> skill.defaultSlot() == slot)
+                        .map(TechniqueSkill::skillId)
+                        .findFirst())
+                .orElse("");
     }
 
     private static String resolveSkillChargeLabel(Optional<IInnateTechniqueSkillSet> setOpt, String skillId)

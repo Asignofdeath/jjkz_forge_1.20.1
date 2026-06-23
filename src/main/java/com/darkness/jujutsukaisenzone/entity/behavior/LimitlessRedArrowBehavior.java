@@ -2,6 +2,7 @@ package com.darkness.jujutsukaisenzone.entity.behavior;
 
 import com.darkness.jujutsukaisenzone.entity.SpecialEffectEntity;
 import com.darkness.jujutsukaisenzone.entity.data.LimitlessRedConfig;
+import com.darkness.jujutsukaisenzone.technique.config.SkillCombatConfigRegistry;
 import com.darkness.jujutsukaisenzone.technique.scaling.LimitlessRedSkillGrowth;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.particles.ParticleTypes;
@@ -156,10 +157,11 @@ public class LimitlessRedArrowBehavior extends EffectBehavior
     private void applyKnockback(SpecialEffectEntity entity)
     {
         LivingEntity owner = resolveOwner(entity, this.ownerUuid);
+        double knockbackRadius = LimitlessRedSkillGrowth.knockbackRadius(owner);
         double cx = entity.getX();
         double cy = entity.getY();
         double cz = entity.getZ();
-        AABB area = new AABB(cx, cy, cz, cx, cy, cz).inflate(LimitlessRedConfig.ARROW_KNOCKBACK_RADIUS);
+        AABB area = new AABB(cx, cy, cz, cx, cy, cz).inflate(knockbackRadius);
         for (LivingEntity target : entity.level().getEntitiesOfClass(LivingEntity.class, area))
         {
             if (!target.isAlive() || (!this.allowOwnerKnockback && owner != null && target.getUUID().equals(owner.getUUID())))
@@ -167,9 +169,9 @@ public class LimitlessRedArrowBehavior extends EffectBehavior
             Vec3 targetCenter = target.position().add(0.0D, target.getBbHeight() * 0.5D, 0.0D);
             Vec3 offset = targetCenter.subtract(cx, cy, cz);
             double dist = offset.length();
-            if (dist < 1.0E-3D || dist > LimitlessRedConfig.ARROW_KNOCKBACK_RADIUS) continue;
+            if (dist < 1.0E-3D || dist > knockbackRadius) continue;
             Vec3 dir = offset.scale(1.0D / dist);
-            double falloff = 1.0D - dist / LimitlessRedConfig.ARROW_KNOCKBACK_RADIUS;
+            double falloff = 1.0D - dist / knockbackRadius;
             double strength = LimitlessRedConfig.ARROW_KNOCKBACK_BASE * (falloff * falloff + 0.35D);
             Vec3 impulse = new Vec3(dir.x * strength, LimitlessRedConfig.ARROW_KNOCKBACK_UP * (falloff * falloff + 0.4D), dir.z * strength);
             target.setDeltaMovement(target.getDeltaMovement().add(impulse));

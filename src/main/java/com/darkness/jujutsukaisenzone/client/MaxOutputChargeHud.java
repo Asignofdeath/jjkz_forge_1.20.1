@@ -6,8 +6,8 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.util.Mth;
 import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.client.event.RenderGuiEvent;
-import net.minecraftforge.client.gui.overlay.ForgeGui;
+import net.minecraftforge.client.event.RenderGuiOverlayEvent;
+import net.minecraftforge.client.gui.overlay.VanillaGuiOverlay;
 import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -94,9 +94,9 @@ public final class MaxOutputChargeHud
         }
 
         @SubscribeEvent(priority = EventPriority.LOWEST)
-        public static void onRenderGui(RenderGuiEvent.Post event)
+        public static void onRenderGuiOverlay(RenderGuiOverlayEvent.Post event)
         {
-            if (!visible)
+            if (!visible || !event.getOverlay().equals(VanillaGuiOverlay.HOTBAR.type()))
             {
                 return;
             }
@@ -106,22 +106,19 @@ public final class MaxOutputChargeHud
             {
                 return;
             }
-            if (!(minecraft.gui instanceof ForgeGui forgeGui))
-            {
-                return;
-            }
 
-            float partialTick = event.getPartialTick();
+            float partialTick = minecraft.getFrameTime();
             float ratio = getProgress(partialTick);
             int screenWidth = event.getWindow().getGuiScaledWidth();
             int screenHeight = event.getWindow().getGuiScaledHeight();
             Vec2i pos = ClientConfig.getChargingBarPosition(screenWidth, screenHeight);
             GuiGraphics graphics = event.getGuiGraphics();
 
-            forgeGui.setupOverlayRenderState(true, false);
+            RenderSystem.enableBlend();
             RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
             graphics.blit(EntityUI.BATTLE_ICON, pos.x, pos.y, 1, 71, 238, 13, 255, 255);
             graphics.blit(EntityUI.BATTLE_ICON, pos.x, pos.y, 1, 57, (int) (238 * ratio), 13, 255, 255);
+            RenderSystem.disableBlend();
 
             int stringWidth = minecraft.font.width(label);
             graphics.drawString(minecraft.font, label, pos.x + 120 - stringWidth / 2, pos.y - 12, 16777215, true);

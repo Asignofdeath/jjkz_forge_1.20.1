@@ -39,6 +39,9 @@ import net.minecraftforge.event.server.ServerStartingEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.client.ConfigScreenHandler;
+import net.minecraftforge.fml.DistExecutor;
 import net.minecraftforge.fml.config.ModConfig;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
@@ -93,6 +96,11 @@ public class JuJutsuKaisenZone
 
         // Register our mod's ForgeConfigSpec so that Forge can create and load the config file for us
         context.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
+
+        DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> context.registerExtensionPoint(
+                ConfigScreenHandler.ConfigScreenFactory.class,
+                () -> new ConfigScreenHandler.ConfigScreenFactory(
+                        (mc, parent) -> com.darkness.jujutsukaisenzone.client.gui.JjkzModConfigScreen.create(parent))));
     }
 
     private void commonSetup(final FMLCommonSetupEvent event)

@@ -22,6 +22,7 @@ import com.darkness.jujutsukaisenzone.player.PlayerTechniqueIntelData;
 import com.darkness.jujutsukaisenzone.player.BarrierTechniqueLevel;
 import com.darkness.jujutsukaisenzone.player.PlayerBarrierTechniqueData;
 import com.darkness.jujutsukaisenzone.player.PlayerSeanceTechniqueData;
+import com.darkness.jujutsukaisenzone.player.PlayerSkillNoCooldownData;
 import com.darkness.jujutsukaisenzone.player.SeanceTechniqueLevel;
 import com.darkness.jujutsukaisenzone.technique.DomainExpansionServerLogic;
 import com.darkness.jujutsukaisenzone.network.ModNetwork;
@@ -133,6 +134,7 @@ public final class JjkzCommands
                         .then(buildCurseSpiritSpawnBranch())
                         .then(buildWhiteOverlayBranch())
                         .then(buildRushIntoTheZoneClimaxBranch())
+                        .then(buildSkillNoCooldownBranch())
         );
     }
 
@@ -895,6 +897,38 @@ public final class JjkzCommands
             }
         }
         return 1;
+    }
+
+    /** 作弊：术式技能无冷却 {@code /jjkz 技能无冷却 [on|off|开启|关闭]} */
+    private static LiteralArgumentBuilder<CommandSourceStack> buildSkillNoCooldownBranch()
+    {
+        LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal("技能无冷却")
+                .requires(source -> source.hasPermission(Commands.LEVEL_GAMEMASTERS));
+        root.then(skillNoCooldownLiteral("on", true));
+        root.then(skillNoCooldownLiteral("off", false));
+        root.then(skillNoCooldownLiteral("开启", true));
+        root.then(skillNoCooldownLiteral("关闭", false));
+        root.executes(ctx ->
+        {
+            ServerPlayer player = ctx.getSource().getPlayerOrException();
+            boolean enabled = PlayerSkillNoCooldownData.isEnabled(player);
+            ctx.getSource().sendSuccess(() -> Component.literal(
+                    "术式技能无冷却：" + (enabled ? "已开启" : "已关闭")), false);
+            return 1;
+        });
+        return root;
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> skillNoCooldownLiteral(String literal, boolean enabled)
+    {
+        return Commands.literal(literal).executes(ctx ->
+        {
+            ServerPlayer player = ctx.getSource().getPlayerOrException();
+            PlayerSkillNoCooldownData.setEnabled(player, enabled);
+            ctx.getSource().sendSuccess(() -> Component.literal(
+                    "术式技能无冷却：" + (enabled ? "已开启" : "已关闭")), true);
+            return 1;
+        });
     }
 
     /** 作弊获取 Rush Into The ZONE 最高潮：{@code /jjkz rushIntoTheZoneClimax} */

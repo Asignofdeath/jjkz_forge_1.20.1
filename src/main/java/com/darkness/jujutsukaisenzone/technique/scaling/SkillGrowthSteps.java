@@ -14,13 +14,19 @@ public final class SkillGrowthSteps
     {
     }
 
-    /** 高于四级基准的咒术等级档位数（四级 = 0 档加成）。 */
-    public static int stepsAboveBaseline(@Nullable LivingEntity owner)
+    /** 高于指定基准咒术等级的档位数（基准档 = 0 档加成）。 */
+    public static int stepsAboveBaseline(@Nullable LivingEntity owner, int baselineGrade)
     {
         if (!(owner instanceof Player player))
         {
             return 0;
         }
-        return Math.max(0, PlayerCursedGradeData.getRank(player) - PlayerCursedGradeData.RANK_GRADE_4);
+        return Math.max(0, PlayerCursedGradeData.getRank(player) - baselineGrade);
+    }
+
+    /** 高于四级基准的咒术等级档位数（四级 = 0 档加成）。 */
+    public static int stepsAboveBaseline(@Nullable LivingEntity owner)
+    {
+        return stepsAboveBaseline(owner, PlayerCursedGradeData.RANK_GRADE_4);
     }
 }

@@ -210,7 +210,7 @@ public final class LimitlessTechniqueSkillSet extends AbstractInnateTechniqueSki
             return;
         }
         long now = player.level().getGameTime();
-        if (!player.isCreative())
+        if (usesSkillCooldown(player))
         {
             int remain = getRemainingSkillCooldownTicks(player, skill, now);
             if (remain > 0)
@@ -218,6 +218,9 @@ public final class LimitlessTechniqueSkillSet extends AbstractInnateTechniqueSki
                 player.sendSystemMessage(Component.literal("招式冷却中：" + formatCooldownSeconds(remain) + " 秒"));
                 return;
             }
+        }
+        if (!player.isCreative())
+        {
             if (skill.cost() > 0 && PlayerCursedEnergyData.getCurrent(player) < skill.cost())
             {
                 player.sendSystemMessage(Component.literal("咒力不足，无法释放该招式。"));
@@ -308,7 +311,7 @@ public final class LimitlessTechniqueSkillSet extends AbstractInnateTechniqueSki
             discardRemoteMurasakiChargeEntity(player, entityUuid);
             return;
         }
-        if (!player.isCreative())
+        if (usesSkillCooldown(player))
         {
             int remain = getRemainingSkillCooldownTicks(player, skill, now);
             if (remain > 0)
@@ -317,12 +320,18 @@ public final class LimitlessTechniqueSkillSet extends AbstractInnateTechniqueSki
                 discardRemoteMurasakiChargeEntity(player, entityUuid);
                 return;
             }
+        }
+        if (!player.isCreative())
+        {
             if (skill.cost() > 0 && !PlayerCursedEnergyData.tryConsume(player, skill.cost()))
             {
                 player.sendSystemMessage(Component.literal("咒力不足，未能完成释放。"));
                 discardRemoteMurasakiChargeEntity(player, entityUuid);
                 return;
             }
+        }
+        if (usesSkillCooldown(player))
+        {
             setSkillCooldown(player, skill, now + skill.cooldownTicks());
         }
         launchRemoteMurasakiHoldRelease(player, entityUuid);

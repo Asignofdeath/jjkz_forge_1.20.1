@@ -161,7 +161,7 @@ public class ShrineKaiFlyobjBehavior extends EffectBehavior
             if (!target.isAlive()) continue;
             if (!GeometryUtils.aabbIntersectsSphere(sample.x, sample.y, sample.z, rSqr, target.getBoundingBox())) continue;
             if (owner != null && target.getUUID().equals(owner.getUUID())) continue;
-            if (target.hurt(entity.damageSources().magic(), ShrineSkillGrowth.kaiColumnDamage(owner)))
+            if (target.hurt(entity.damageSources().magic(), ShrineSkillGrowth.kaiFlyobjColumnDamage(owner)))
             {
                 level.playSound(null, entity.getX(), entity.getY(), entity.getZ(),
                         ModSounds.SHRINE_SLASH_KAI_2_HIT.get(), SoundSource.PLAYERS, 1.0F, 1.0F);

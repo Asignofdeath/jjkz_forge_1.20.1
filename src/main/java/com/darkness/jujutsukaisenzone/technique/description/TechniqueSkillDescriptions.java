@@ -7,6 +7,7 @@ import com.darkness.jujutsukaisenzone.entity.data.LimitlessRemoteMurasakiConfig;
 import com.darkness.jujutsukaisenzone.entity.data.ShrineFugaConfig;
 import com.darkness.jujutsukaisenzone.entity.data.ShrineHachiConfig;
 import com.darkness.jujutsukaisenzone.entity.data.ShrineKaiConfig;
+import com.darkness.jujutsukaisenzone.technique.config.SkillCombatConfigRegistry;
 import com.darkness.jujutsukaisenzone.technique.scaling.LimitlessBlueSkillGrowth;
 import com.darkness.jujutsukaisenzone.technique.scaling.LimitlessPurpleSkillGrowth;
 import com.darkness.jujutsukaisenzone.technique.scaling.LimitlessRedSkillGrowth;
@@ -114,7 +115,10 @@ public final class TechniqueSkillDescriptions
                                 LimitlessRemoteMurasakiConfig.HOLD_RELEASE_CHARGE_TICKS),
                         TechniqueSkillStatFormat.formatNumber(LimitlessRemoteMurasakiConfig.ARROW_BLOCK_ERASE_RADIUS),
                         TechniqueSkillStatFormat.formatNumber(LimitlessRemoteMurasakiConfig.ARROW_SPHERE_DAMAGE_PER_TICK),
-                        Integer.toString(LimitlessRemoteMurasakiConfig.MAX_FLIGHT_CHUNK_COUNT)
+                        Integer.toString(SkillCombatConfigRegistry.resolveInt(
+                                SkillCombatConfigRegistry.SKILL_LIMITLESS_REMOTE_PURPLE,
+                                "max_flight_chunks",
+                                player))
                 });
     }
 
@@ -132,7 +136,7 @@ public final class TechniqueSkillDescriptions
                 (player, techniqueId, skill) -> new Object[] {
                         TechniqueSkillStatFormat.formatNumber(ShrineKaiConfig.FLYOBJ_MAX_RANGE),
                         TechniqueSkillStatFormat.formatNumber(ShrineKaiConfig.COLUMN_RADIUS),
-                        TechniqueSkillStatFormat.formatNumber(ShrineSkillGrowth.kaiColumnDamage(player))
+                        TechniqueSkillStatFormat.formatNumber(ShrineSkillGrowth.kaiFlyobjColumnDamage(player))
                 });
 
         TechniqueSkillDescriptionRegistry.register(

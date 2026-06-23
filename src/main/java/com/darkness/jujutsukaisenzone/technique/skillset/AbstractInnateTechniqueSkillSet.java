@@ -3,6 +3,7 @@ package com.darkness.jujutsukaisenzone.technique.skillset;
 import com.darkness.jujutsukaisenzone.compat.EpicFightCompat;
 import com.darkness.jujutsukaisenzone.player.PlayerCursedEnergyData;
 import com.darkness.jujutsukaisenzone.player.PlayerMaxOutputChargeData;
+import com.darkness.jujutsukaisenzone.player.PlayerSkillNoCooldownData;
 import com.darkness.jujutsukaisenzone.technique.development.SkillUnlockLogic;
 import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
 import net.minecraft.network.chat.Component;
@@ -117,7 +118,7 @@ public abstract class AbstractInnateTechniqueSkillSet implements IInnateTechniqu
             return;
         }
         long now = player.level().getGameTime();
-        if (!player.isCreative())
+        if (usesSkillCooldown(player))
         {
             int remain = getRemainingCooldownTicks(player, slot, now);
             if (remain > 0)
@@ -125,6 +126,9 @@ public abstract class AbstractInnateTechniqueSkillSet implements IInnateTechniqu
                 player.sendSystemMessage(Component.literal("招式冷却中：" + formatCooldownSeconds(remain) + " 秒"));
                 return;
             }
+        }
+        if (!player.isCreative())
+        {
             int need = getSlotCost(slot) * getMaxOutputCursedEnergyMultiplier();
             if (need > 0 && PlayerCursedEnergyData.getCurrent(player) < need)
             {
@@ -174,7 +178,7 @@ public abstract class AbstractInnateTechniqueSkillSet implements IInnateTechniqu
         {
             return;
         }
-        if (!player.isCreative())
+        if (usesSkillCooldown(player))
         {
             int remain = getRemainingCooldownTicks(player, slot, now);
             if (remain > 0)
@@ -182,12 +186,18 @@ public abstract class AbstractInnateTechniqueSkillSet implements IInnateTechniqu
                 player.sendSystemMessage(Component.literal("招式冷却中，最大输出未能完成。"));
                 return;
             }
+        }
+        if (!player.isCreative())
+        {
             int need = getSlotCost(slot) * getMaxOutputCursedEnergyMultiplier();
             if (need > 0 && !PlayerCursedEnergyData.tryConsume(player, need))
             {
                 player.sendSystemMessage(Component.literal("咒力不足，最大输出未能完成。"));
                 return;
             }
+        }
+        if (usesSkillCooldown(player))
+        {
             setSlotCooldown(player, slot, now + getSlotCooldownTicks(player, slot));
         }
 
@@ -231,21 +241,27 @@ public abstract class AbstractInnateTechniqueSkillSet implements IInnateTechniqu
             player.sendSystemMessage(Component.literal("该招式等级异常，无法释放。"));
             return;
         }
-        if (!player.isCreative())
+        long now = player.level().getGameTime();
+        if (usesSkillCooldown(player))
         {
-            long now = player.level().getGameTime();
             int remain = getRemainingCooldownTicks(player, slot, now);
             if (remain > 0)
             {
                 player.sendSystemMessage(Component.literal("招式冷却中：" + formatCooldownSeconds(remain) + " 秒"));
                 return;
             }
+        }
+        if (!player.isCreative())
+        {
             int cost = getSlotCost(slot);
             if (cost > 0 && !PlayerCursedEnergyData.tryConsume(player, cost))
             {
                 player.sendSystemMessage(Component.literal("咒力不足，无法释放该招式。"));
                 return;
             }
+        }
+        if (usesSkillCooldown(player))
+        {
             setSlotCooldown(player, slot, now + getSlotCooldownTicks(player, slot));
         }
 
@@ -338,7 +354,7 @@ public abstract class AbstractInnateTechniqueSkillSet implements IInnateTechniqu
             return;
         }
         long now = player.level().getGameTime();
-        if (!player.isCreative())
+        if (usesSkillCooldown(player))
         {
             int remain = getRemainingSkillCooldownTicks(player, skill, now);
             if (remain > 0)
@@ -346,6 +362,9 @@ public abstract class AbstractInnateTechniqueSkillSet implements IInnateTechniqu
                 player.sendSystemMessage(Component.literal("招式冷却中：" + formatCooldownSeconds(remain) + " 秒"));
                 return;
             }
+        }
+        if (!player.isCreative())
+        {
             int need = skill.cost() * getMaxOutputCursedEnergyMultiplier();
             if (need > 0 && PlayerCursedEnergyData.getCurrent(player) < need)
             {
@@ -369,7 +388,7 @@ public abstract class AbstractInnateTechniqueSkillSet implements IInnateTechniqu
         if (skill.maxOutputChargeTicks() <= 0 || heldTicks < skill.maxOutputChargeTicks()) return;
         if (!isSkillUnlocked(player, skill)) return;
         if (getSkillLevel(player, skill) <= 0) return;
-        if (!player.isCreative())
+        if (usesSkillCooldown(player))
         {
             int remain = getRemainingSkillCooldownTicks(player, skill, now);
             if (remain > 0)
@@ -377,12 +396,18 @@ public abstract class AbstractInnateTechniqueSkillSet implements IInnateTechniqu
                 player.sendSystemMessage(Component.literal("招式冷却中，最大输出未能完成。"));
                 return;
             }
+        }
+        if (!player.isCreative())
+        {
             int need = skill.cost() * getMaxOutputCursedEnergyMultiplier();
             if (need > 0 && !PlayerCursedEnergyData.tryConsume(player, need))
             {
                 player.sendSystemMessage(Component.literal("咒力不足，最大输出未能完成。"));
                 return;
             }
+        }
+        if (usesSkillCooldown(player))
+        {
             setSkillCooldown(player, skill, now + getSkillCooldownTicks(player, skill));
         }
         castSkill(player, skillId);
@@ -401,21 +426,27 @@ public abstract class AbstractInnateTechniqueSkillSet implements IInnateTechniqu
             player.sendSystemMessage(Component.literal("该招式等级异常，无法释放。"));
             return;
         }
-        if (!player.isCreative())
+        long now = player.level().getGameTime();
+        if (usesSkillCooldown(player))
         {
-            long now = player.level().getGameTime();
             int remain = getRemainingSkillCooldownTicks(player, skill, now);
             if (remain > 0)
             {
                 player.sendSystemMessage(Component.literal("招式冷却中：" + formatCooldownSeconds(remain) + " 秒"));
                 return;
             }
+        }
+        if (!player.isCreative())
+        {
             int cost = skill.cost();
             if (cost > 0 && !PlayerCursedEnergyData.tryConsume(player, cost))
             {
                 player.sendSystemMessage(Component.literal("咒力不足，无法释放该招式。"));
                 return;
             }
+        }
+        if (usesSkillCooldown(player))
+        {
             setSkillCooldown(player, skill, now + getSkillCooldownTicks(player, skill));
         }
         cast.run();
@@ -495,6 +526,11 @@ public abstract class AbstractInnateTechniqueSkillSet implements IInnateTechniqu
         {
             player.getPersistentData().putLong(key, expireTick);
         }
+    }
+
+    protected static boolean usesSkillCooldown(Player player)
+    {
+        return !player.isCreative() && !PlayerSkillNoCooldownData.isEnabled(player);
     }
 
     private static String formatCooldownSeconds(int ticks)

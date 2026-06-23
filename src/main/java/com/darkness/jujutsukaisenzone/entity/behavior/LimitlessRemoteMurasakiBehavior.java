@@ -9,6 +9,7 @@ import com.darkness.jujutsukaisenzone.entity.util.GeometryUtils;
 import com.darkness.jujutsukaisenzone.entity.util.SpecialEffectChunkForce;
 import com.darkness.jujutsukaisenzone.network.ModNetwork;
 import com.darkness.jujutsukaisenzone.registry.ModEntities;
+import com.darkness.jujutsukaisenzone.technique.config.SkillCombatConfigRegistry;
 import com.darkness.jujutsukaisenzone.technique.skillset.LimitlessTechniqueSkillSet;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.BlockPos;
@@ -55,6 +56,7 @@ public class LimitlessRemoteMurasakiBehavior extends EffectBehavior
     private UUID redOrbUuid;
     private int flightScreenShakeTicks;
     private boolean purpleOverlaySent;
+    private double maxFlightDistance = SkillCombatConfigRegistry.resolveRemoteMurasakiMaxFlightDistance(null);
 
     @Override
     public String id()
@@ -91,6 +93,7 @@ public class LimitlessRemoteMurasakiBehavior extends EffectBehavior
         this.redOrbUuid = null;
         this.flightScreenShakeTicks = 0;
         this.purpleOverlaySent = false;
+        this.maxFlightDistance = SkillCombatConfigRegistry.resolveRemoteMurasakiMaxFlightDistance(owner);
         if (owner instanceof ServerPlayer serverPlayer)
         {
             EpicFightCompat.playRemoteMurasakiStartAnimation(serverPlayer);
@@ -311,6 +314,7 @@ public class LimitlessRemoteMurasakiBehavior extends EffectBehavior
 
         this.launchPos = entity.position();
         this.velocity = look.scale(LimitlessRemoteMurasakiConfig.ARROW_SPEED);
+        this.maxFlightDistance = SkillCombatConfigRegistry.resolveRemoteMurasakiMaxFlightDistance(owner);
         this.phase = PHASE_PROJECTILE;
         this.ownerUuid = owner.getUUID();
         this.flightScreenShakeTicks = 0;
@@ -320,7 +324,7 @@ public class LimitlessRemoteMurasakiBehavior extends EffectBehavior
     private void tickProjectilePhase(SpecialEffectEntity entity, ServerLevel level)
     {
         if (SpecialEffectChunkForce.hasExceededDistance(
-                this.launchPos, entity.position(), LimitlessRemoteMurasakiConfig.MAX_FLIGHT_DISTANCE))
+                this.launchPos, entity.position(), this.maxFlightDistance))
         {
             endProjectile(entity, level);
             return;

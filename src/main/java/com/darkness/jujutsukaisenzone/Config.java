@@ -1,5 +1,6 @@
 package com.darkness.jujutsukaisenzone;
 
+import com.darkness.jujutsukaisenzone.technique.config.SkillCombatConfigRegistry;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
 import net.minecraftforge.common.ForgeConfigSpec;
@@ -140,6 +141,79 @@ public class Config
             .comment("击杀原版生物获得的经验上限")
             .defineInRange("killExpMaxFromMob", 20, 1, 100);
 
+    // ======== 技能战斗数值（玩家可在 config/jujutsukaisenzone-common.toml 修改） ========
+
+    private static final ForgeConfigSpec.IntValue SKILL_COMBAT_BASELINE_GRADE = BUILDER
+            .comment("技能数值成长基准咒术等级（1=四级，2=三级，依此类推）")
+            .defineInRange("skillCombat.baselineGrade", 1, 1, 10);
+
+    private static final ForgeConfigSpec.DoubleValue LIMITLESS_BLUE_DAMAGE_BASELINE = BUILDER
+            .comment("苍：伤害基准值")
+            .defineInRange("skillCombat.limitlessBlue.damageBaseline", 8.0D, 0.0D, 10000.0D);
+    private static final ForgeConfigSpec.DoubleValue LIMITLESS_BLUE_DAMAGE_PER_RANK = BUILDER
+            .comment("苍：伤害每升一级咒术等级的增量")
+            .defineInRange("skillCombat.limitlessBlue.damagePerRank", 2.0D, 0.0D, 10000.0D);
+    private static final ForgeConfigSpec.DoubleValue LIMITLESS_BLUE_PULL_RADIUS_BASELINE = BUILDER
+            .comment("苍：吸附半径基准值（格）")
+            .defineInRange("skillCombat.limitlessBlue.pullRadiusBaseline", 20.0D, 0.0D, 10000.0D);
+    private static final ForgeConfigSpec.DoubleValue LIMITLESS_BLUE_PULL_RADIUS_PER_RANK = BUILDER
+            .comment("苍：吸附半径每升一级咒术等级的增量")
+            .defineInRange("skillCombat.limitlessBlue.pullRadiusPerRank", 1.0D, 0.0D, 10000.0D);
+
+    private static final ForgeConfigSpec.DoubleValue LIMITLESS_RED_EXPLOSION_POWER_BASELINE = BUILDER
+            .comment("赫：爆炸威力基准值")
+            .defineInRange("skillCombat.limitlessRed.explosionPowerBaseline", 14.0D, 0.0D, 10000.0D);
+    private static final ForgeConfigSpec.DoubleValue LIMITLESS_RED_EXPLOSION_POWER_PER_RANK = BUILDER
+            .comment("赫：爆炸威力每升一级咒术等级的增量")
+            .defineInRange("skillCombat.limitlessRed.explosionPowerPerRank", 2.0D, 0.0D, 10000.0D);
+    private static final ForgeConfigSpec.DoubleValue LIMITLESS_RED_KNOCKBACK_RADIUS_BASELINE = BUILDER
+            .comment("赫：击飞范围基准值（格）")
+            .defineInRange("skillCombat.limitlessRed.knockbackRadiusBaseline", 18.0D, 0.0D, 10000.0D);
+    private static final ForgeConfigSpec.DoubleValue LIMITLESS_RED_KNOCKBACK_RADIUS_PER_RANK = BUILDER
+            .comment("赫：击飞范围每升一级咒术等级的增量")
+            .defineInRange("skillCombat.limitlessRed.knockbackRadiusPerRank", 0.0D, 0.0D, 10000.0D);
+
+    private static final ForgeConfigSpec.DoubleValue LIMITLESS_REMOTE_MURASAKI_MAX_FLIGHT_CHUNKS_BASELINE = BUILDER
+            .comment("超远程虚式茈：最大飞行距离基准值（区块数）")
+            .defineInRange("skillCombat.limitlessRemoteMurasaki.maxFlightChunksBaseline", 64.0D, 1.0D, 10000.0D);
+    private static final ForgeConfigSpec.DoubleValue LIMITLESS_REMOTE_MURASAKI_MAX_FLIGHT_CHUNKS_PER_RANK = BUILDER
+            .comment("超远程虚式茈：最大飞行距离每升一级咒术等级的增量（区块数）")
+            .defineInRange("skillCombat.limitlessRemoteMurasaki.maxFlightChunksPerRank", 0.0D, 0.0D, 10000.0D);
+
+    private static final ForgeConfigSpec.DoubleValue SHRINE_KAI_DAMAGE_BASELINE = BUILDER
+            .comment("解挥砍：伤害基准值")
+            .defineInRange("skillCombat.shrineKai.damageBaseline", 10.0D, 0.0D, 10000.0D);
+    private static final ForgeConfigSpec.DoubleValue SHRINE_KAI_DAMAGE_PER_RANK = BUILDER
+            .comment("解挥砍：伤害每升一级咒术等级的增量")
+            .defineInRange("skillCombat.shrineKai.damagePerRank", 2.0D, 0.0D, 10000.0D);
+
+    private static final ForgeConfigSpec.DoubleValue SHRINE_KAI_FLYOBJ_DAMAGE_BASELINE = BUILDER
+            .comment("解切割：伤害基准值")
+            .defineInRange("skillCombat.shrineKaiFlyobj.damageBaseline", 10.0D, 0.0D, 10000.0D);
+    private static final ForgeConfigSpec.DoubleValue SHRINE_KAI_FLYOBJ_DAMAGE_PER_RANK = BUILDER
+            .comment("解切割：伤害每升一级咒术等级的增量")
+            .defineInRange("skillCombat.shrineKaiFlyobj.damagePerRank", 2.0D, 0.0D, 10000.0D);
+
+    private static final ForgeConfigSpec.DoubleValue SHRINE_HACHI_DAMAGE_BASELINE = BUILDER
+            .comment("捌：伤害基准值")
+            .defineInRange("skillCombat.shrineHachi.damageBaseline", 5.0D, 0.0D, 10000.0D);
+    private static final ForgeConfigSpec.DoubleValue SHRINE_HACHI_DAMAGE_PER_RANK = BUILDER
+            .comment("捌：伤害每升一级咒术等级的增量")
+            .defineInRange("skillCombat.shrineHachi.damagePerRank", 2.0D, 0.0D, 10000.0D);
+
+    private static final ForgeConfigSpec.DoubleValue SHRINE_DOMAIN_SLASH_DAMAGE_BASELINE = BUILDER
+            .comment("伏魔神龛：斩击伤害基准值")
+            .defineInRange("skillCombat.shrineDomain.slashDamageBaseline", 3.0D, 0.0D, 10000.0D);
+    private static final ForgeConfigSpec.DoubleValue SHRINE_DOMAIN_SLASH_DAMAGE_PER_RANK = BUILDER
+            .comment("伏魔神龛：斩击伤害每升一级咒术等级的增量")
+            .defineInRange("skillCombat.shrineDomain.slashDamagePerRank", 5.0D, 0.0D, 10000.0D);
+    private static final ForgeConfigSpec.DoubleValue SHRINE_DOMAIN_POWER_SLASH_DAMAGE_BASELINE = BUILDER
+            .comment("伏魔神龛：强力斩击伤害基准值")
+            .defineInRange("skillCombat.shrineDomain.powerSlashDamageBaseline", 6.0D, 0.0D, 10000.0D);
+    private static final ForgeConfigSpec.DoubleValue SHRINE_DOMAIN_POWER_SLASH_DAMAGE_PER_RANK = BUILDER
+            .comment("伏魔神龛：强力斩击伤害每升一级咒术等级的增量")
+            .defineInRange("skillCombat.shrineDomain.powerSlashDamagePerRank", 10.0D, 0.0D, 10000.0D);
+
     static final ForgeConfigSpec SPEC = BUILDER.build();
 
     public static boolean logDirtBlock;
@@ -179,6 +253,29 @@ public class Config
     public static double killExpNearbyRatio;
     public static int killExpMaxFromMob;
 
+    // ======== 技能战斗数值（从 SPEC 加载） ========
+    public static int skillCombatBaselineGrade;
+    public static double limitlessBlueDamageBaseline;
+    public static double limitlessBlueDamagePerRank;
+    public static double limitlessBluePullRadiusBaseline;
+    public static double limitlessBluePullRadiusPerRank;
+    public static double limitlessRedExplosionPowerBaseline;
+    public static double limitlessRedExplosionPowerPerRank;
+    public static double limitlessRedKnockbackRadiusBaseline;
+    public static double limitlessRedKnockbackRadiusPerRank;
+    public static double limitlessRemoteMurasakiMaxFlightChunksBaseline;
+    public static double limitlessRemoteMurasakiMaxFlightChunksPerRank;
+    public static double shrineKaiDamageBaseline;
+    public static double shrineKaiDamagePerRank;
+    public static double shrineKaiFlyobjDamageBaseline;
+    public static double shrineKaiFlyobjDamagePerRank;
+    public static double shrineHachiDamageBaseline;
+    public static double shrineHachiDamagePerRank;
+    public static double shrineDomainSlashDamageBaseline;
+    public static double shrineDomainSlashDamagePerRank;
+    public static double shrineDomainPowerSlashDamageBaseline;
+    public static double shrineDomainPowerSlashDamagePerRank;
+
     private static boolean validateItemName(final Object obj)
     {
         return obj instanceof final String itemName && ForgeRegistries.ITEMS.containsKey(ResourceLocation.tryParse(itemName));
@@ -187,6 +284,11 @@ public class Config
     @SubscribeEvent
     static void onLoad(final ModConfigEvent event)
     {
+        if (event.getConfig().getSpec() != SPEC)
+        {
+            return;
+        }
+
         logDirtBlock = LOG_DIRT_BLOCK.get();
         magicNumber = MAGIC_NUMBER.get();
         magicNumberIntroduction = MAGIC_NUMBER_INTRODUCTION.get();
@@ -227,5 +329,29 @@ public class Config
         killExpLastHitRatio = KILL_EXP_LAST_HIT_RATIO.get();
         killExpNearbyRatio = KILL_EXP_NEARBY_RATIO.get();
         killExpMaxFromMob = KILL_EXP_MAX_FROM_MOB.get();
+
+        skillCombatBaselineGrade = SKILL_COMBAT_BASELINE_GRADE.get();
+        limitlessBlueDamageBaseline = LIMITLESS_BLUE_DAMAGE_BASELINE.get();
+        limitlessBlueDamagePerRank = LIMITLESS_BLUE_DAMAGE_PER_RANK.get();
+        limitlessBluePullRadiusBaseline = LIMITLESS_BLUE_PULL_RADIUS_BASELINE.get();
+        limitlessBluePullRadiusPerRank = LIMITLESS_BLUE_PULL_RADIUS_PER_RANK.get();
+        limitlessRedExplosionPowerBaseline = LIMITLESS_RED_EXPLOSION_POWER_BASELINE.get();
+        limitlessRedExplosionPowerPerRank = LIMITLESS_RED_EXPLOSION_POWER_PER_RANK.get();
+        limitlessRedKnockbackRadiusBaseline = LIMITLESS_RED_KNOCKBACK_RADIUS_BASELINE.get();
+        limitlessRedKnockbackRadiusPerRank = LIMITLESS_RED_KNOCKBACK_RADIUS_PER_RANK.get();
+        limitlessRemoteMurasakiMaxFlightChunksBaseline = LIMITLESS_REMOTE_MURASAKI_MAX_FLIGHT_CHUNKS_BASELINE.get();
+        limitlessRemoteMurasakiMaxFlightChunksPerRank = LIMITLESS_REMOTE_MURASAKI_MAX_FLIGHT_CHUNKS_PER_RANK.get();
+        shrineKaiDamageBaseline = SHRINE_KAI_DAMAGE_BASELINE.get();
+        shrineKaiDamagePerRank = SHRINE_KAI_DAMAGE_PER_RANK.get();
+        shrineKaiFlyobjDamageBaseline = SHRINE_KAI_FLYOBJ_DAMAGE_BASELINE.get();
+        shrineKaiFlyobjDamagePerRank = SHRINE_KAI_FLYOBJ_DAMAGE_PER_RANK.get();
+        shrineHachiDamageBaseline = SHRINE_HACHI_DAMAGE_BASELINE.get();
+        shrineHachiDamagePerRank = SHRINE_HACHI_DAMAGE_PER_RANK.get();
+        shrineDomainSlashDamageBaseline = SHRINE_DOMAIN_SLASH_DAMAGE_BASELINE.get();
+        shrineDomainSlashDamagePerRank = SHRINE_DOMAIN_SLASH_DAMAGE_PER_RANK.get();
+        shrineDomainPowerSlashDamageBaseline = SHRINE_DOMAIN_POWER_SLASH_DAMAGE_BASELINE.get();
+        shrineDomainPowerSlashDamagePerRank = SHRINE_DOMAIN_POWER_SLASH_DAMAGE_PER_RANK.get();
+
+        SkillCombatConfigRegistry.reloadFromForgeConfig();
     }
 }
