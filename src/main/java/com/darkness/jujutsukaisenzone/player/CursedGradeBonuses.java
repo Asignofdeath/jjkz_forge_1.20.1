@@ -127,6 +127,7 @@ public final class CursedGradeBonuses
             applyAttribute(player, Attributes.ARMOR, ARMOR_UUID, "jjkz_grade_armor", 4.0 * rank, AttributeModifier.Operation.ADDITION);
         }
 
+        StrengthenTechniqueBonuses.applyActiveModifiers(player);
         PlayerHealthData.scaleHealthAfterMaxChange(player, oldMax, oldHealth);
     }
 

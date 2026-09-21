@@ -3,12 +3,14 @@ package com.darkness.jujutsukaisenzone.technique;
 import com.darkness.jujutsukaisenzone.player.BarrierTechniqueLevel;
 import com.darkness.jujutsukaisenzone.player.PlayerBarrierTechniqueData;
 import com.darkness.jujutsukaisenzone.player.PlayerSeanceTechniqueData;
+import com.darkness.jujutsukaisenzone.player.PlayerStrengthenTechniqueData;
 import com.darkness.jujutsukaisenzone.player.SeanceTechniqueLevel;
+import com.darkness.jujutsukaisenzone.player.StrengthenTechniqueLevel;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 
 /**
- * 结界术 / 降灵术：每次使用 +1% 日终升级概率（上限 8%），世界自然过日后 Roll 升级并清零。
+ * 结界术 / 降灵术 / 强化术：每次使用 +1% 日终升级概率（上限 8%），世界自然过日后 Roll 升级并清零。
  */
 public final class TechniqueDailyUpgradeLogic
 {
@@ -37,6 +39,15 @@ public final class TechniqueDailyUpgradeLogic
         incrementSeanceUpgradeChance(player);
     }
 
+    public static void onStrengthenTechniqueUsed(ServerPlayer player)
+    {
+        if (!PlayerStrengthenTechniqueData.hasLearned(player))
+        {
+            return;
+        }
+        incrementStrengthenUpgradeChance(player);
+    }
+
     public static void checkGameDayEnd(ServerPlayer player)
     {
         long currentDay = player.server.overworld().getDayTime() / 24000L;
@@ -53,7 +64,66 @@ public final class TechniqueDailyUpgradeLogic
 
         resolveBarrierDayEnd(player);
         resolveSeanceDayEnd(player);
+        resolveStrengthenDayEnd(player);
         PlayerBarrierTechniqueData.setLastProcessedGameDay(player, currentDay);
+    }
+
+    private static void incrementStrengthenUpgradeChance(ServerPlayer player)
+    {
+        if (PlayerStrengthenTechniqueData.getLevel(player) == StrengthenTechniqueLevel.COMPLETE)
+        {
+            return;
+        }
+        int current = PlayerStrengthenTechniqueData.getUpgradeChancePercent(player);
+        if (current >= MAX_UPGRADE_CHANCE_PERCENT)
+        {
+            return;
+        }
+        PlayerStrengthenTechniqueData.setUpgradeChancePercent(player, current + CHANCE_PER_USE_PERCENT);
+    }
+
+    private static void resolveStrengthenDayEnd(ServerPlayer player)
+    {
+        int chance = PlayerStrengthenTechniqueData.getUpgradeChancePercent(player);
+        PlayerStrengthenTechniqueData.setUpgradeChancePercent(player, 0);
+        if (chance <= 0 || !PlayerStrengthenTechniqueData.hasLearned(player))
+        {
+            return;
+        }
+        if (player.getRandom().nextInt(100) >= chance)
+        {
+            return;
+        }
+        StrengthenTechniqueLevel next = nextStrengthenLevel(PlayerStrengthenTechniqueData.getLevel(player));
+        if (next == null)
+        {
+            return;
+        }
+        PlayerStrengthenTechniqueData.setLevel(player, next);
+        player.sendSystemMessage(Component.translatable(
+                "message.jujutsukaisenzone.strengthen_technique.upgraded",
+                getStrengthenLevelDisplayName(next)));
+    }
+
+    private static StrengthenTechniqueLevel nextStrengthenLevel(StrengthenTechniqueLevel current)
+    {
+        return switch (current)
+        {
+            case BEGINNER -> StrengthenTechniqueLevel.MASTERED;
+            case MASTERED -> StrengthenTechniqueLevel.COMPLETE;
+            default -> null;
+        };
+    }
+
+    private static String getStrengthenLevelDisplayName(StrengthenTechniqueLevel level)
+    {
+        return switch (level)
+        {
+            case BEGINNER -> "初习";
+            case MASTERED -> "掌握";
+            case COMPLETE -> "完全掌握";
+            default -> level.name();
+        };
     }
 
     private static void incrementBarrierUpgradeChance(ServerPlayer player)

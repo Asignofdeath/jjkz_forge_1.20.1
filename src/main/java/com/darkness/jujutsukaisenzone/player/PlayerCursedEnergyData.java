@@ -1,5 +1,6 @@
 package com.darkness.jujutsukaisenzone.player;
 
+import com.darkness.jujutsukaisenzone.effect.ConfiscationEffect;
 import com.darkness.jujutsukaisenzone.network.ModNetwork;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.RandomSource;
@@ -131,6 +132,10 @@ public final class PlayerCursedEnergyData
 
     public static boolean tryConsume(ServerPlayer player, int amount)
     {
+        if (amount > 0 && ConfiscationEffect.blockCursedEnergyUse(player))
+        {
+            return false;
+        }
         if (amount <= 0)
         {
             return true;

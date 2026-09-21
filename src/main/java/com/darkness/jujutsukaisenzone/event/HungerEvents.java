@@ -1,7 +1,7 @@
 package com.darkness.jujutsukaisenzone.event;
 
 import com.darkness.jujutsukaisenzone.JuJutsuKaisenZone;
-import com.darkness.jujutsukaisenzone.gameplay.HungerConsumptionSettings;
+import com.darkness.jujutsukaisenzone.gameplay.ModRules;
 import net.minecraft.world.entity.player.Player;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -36,7 +36,7 @@ public final class HungerEvents
         float previous = previousObj == null ? current : previousObj;
 
         float gained = current - previous;
-        float multiplier = HungerConsumptionSettings.getMode().multiplier();
+        float multiplier = ModRules.HungerConsumption.getMode().multiplier();
         if (gained > 0.0f && multiplier < 1.0f)
         {
             float target = previous + gained * multiplier;

@@ -2,6 +2,7 @@ package com.darkness.jujutsukaisenzone.player;
 
 import com.darkness.jujutsukaisenzone.advancement.GradeAdvancements;
 import com.darkness.jujutsukaisenzone.network.ModNetwork;
+import com.darkness.jujutsukaisenzone.technique.StrengthenTechniqueLearnLogic;
 import com.darkness.jujutsukaisenzone.player.mimicry.MimicryCharacterRegistry;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
@@ -53,6 +54,7 @@ public final class PlayerCursedGradeData
             CursedGradeBonuses.applyAll(serverPlayer);
             PlayerCursedEnergyData.recalculateAfterGradeChange(serverPlayer);
             PlayerHealthData.syncFromEntity(serverPlayer);
+            StrengthenTechniqueLearnLogic.tryUnlockForGrade(serverPlayer);
             return;
         }
         player.getPersistentData().putInt(TAG_EXPERIENCE, clamped);

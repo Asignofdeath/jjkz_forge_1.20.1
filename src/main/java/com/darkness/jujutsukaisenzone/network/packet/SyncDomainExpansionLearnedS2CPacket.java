@@ -37,6 +37,10 @@ public class SyncDomainExpansionLearnedS2CPacket
             if (player != null)
             {
                 PlayerDomainExpansionData.applyClientLearned(player, packet.learned);
+                if (packet.learned)
+                {
+                    com.darkness.jujutsukaisenzone.client.gui.technique.TechniqueDevelopmentCanvasWidget.refreshIfOpen();
+                }
             }
         });
         context.setPacketHandled(true);

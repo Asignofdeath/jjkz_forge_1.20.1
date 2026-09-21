@@ -6,12 +6,13 @@ import com.darkness.jujutsukaisenzone.advancement.HeavenlyRestrictionAdvancement
 import com.darkness.jujutsukaisenzone.entity.DemonSubduingShrineEntity;
 import com.darkness.jujutsukaisenzone.entity.SpecialEffectEntity;
 import com.darkness.jujutsukaisenzone.entity.WedgeEntity;
-import com.darkness.jujutsukaisenzone.gameplay.HungerConsumptionSettings;
+import com.darkness.jujutsukaisenzone.gameplay.ModRules;
 import com.darkness.jujutsukaisenzone.gameplay.CurseSpiritSpawnGrade;
 import com.darkness.jujutsukaisenzone.gameplay.TengenWedgeBarrierLogic;
 import com.darkness.jujutsukaisenzone.gameplay.TengenWedgeCurseSpiritSpawns;
 import com.darkness.jujutsukaisenzone.gameplay.TengenWedgeStartResult;
 import com.darkness.jujutsukaisenzone.player.CursedGradeBonuses;
+import com.darkness.jujutsukaisenzone.player.JjkzPlayerDataDisplay;
 import com.darkness.jujutsukaisenzone.player.PlayerCursedEnergyData;
 import com.darkness.jujutsukaisenzone.player.PlayerCursedGradeData;
 import com.darkness.jujutsukaisenzone.player.PlayerFactionData;
@@ -22,9 +23,11 @@ import com.darkness.jujutsukaisenzone.player.PlayerTechniqueIntelData;
 import com.darkness.jujutsukaisenzone.player.BarrierTechniqueLevel;
 import com.darkness.jujutsukaisenzone.player.PlayerBarrierTechniqueData;
 import com.darkness.jujutsukaisenzone.player.PlayerSeanceTechniqueData;
-import com.darkness.jujutsukaisenzone.player.PlayerSkillNoCooldownData;
+import com.darkness.jujutsukaisenzone.player.PlayerStrengthenTechniqueData;
 import com.darkness.jujutsukaisenzone.player.SeanceTechniqueLevel;
+import com.darkness.jujutsukaisenzone.player.StrengthenTechniqueLevel;
 import com.darkness.jujutsukaisenzone.technique.DomainExpansionServerLogic;
+import com.darkness.jujutsukaisenzone.technique.domain.JudgmentDomainTrialLogic;
 import com.darkness.jujutsukaisenzone.network.ModNetwork;
 import com.darkness.jujutsukaisenzone.registry.ModEntities;
 import com.mojang.brigadier.CommandDispatcher;
@@ -109,8 +112,19 @@ public final class JjkzCommands
                 Commands.literal("jjkz")
                         .then(Commands.literal("data")
                                 .executes(ctx -> executeShowPlayerData(ctx.getSource().getPlayerOrException())))
+                        .then(Commands.literal("domainTrial")
+                                .then(Commands.literal("start")
+                                        .executes(ctx ->
+                                        {
+                                            ServerPlayer player = ctx.getSource().getPlayerOrException();
+                                            if (!JudgmentDomainTrialLogic.tryStartTrial(player))
+                                            {
+                                                player.sendSystemMessage(Component.literal("当前无法开始审判。"));
+                                                return 0;
+                                            }
+                                            return 1;
+                                        })))
                         .then(buildAskBranch())
-                        .then(buildHungerConsumptionBranch())
                         .then(Commands.literal("select")
                                 .then(Commands.argument("faction", StringArgumentType.word())
                                         .executes(ctx ->
@@ -126,6 +140,7 @@ public final class JjkzCommands
                         .then(buildTechniqueIntelCheatBranch())
                         .then(buildBarrierTechniqueCheatBranch())
                         .then(buildSeanceTechniqueCheatBranch())
+                        .then(buildStrengthenTechniqueCheatBranch())
                         .then(buildDomainExpansionCheatBranch())
                         .then(buildSpecialEffectBranch())
                         .then(buildDemonSubduingShrineBranch())
@@ -134,7 +149,8 @@ public final class JjkzCommands
                         .then(buildCurseSpiritSpawnBranch())
                         .then(buildWhiteOverlayBranch())
                         .then(buildRushIntoTheZoneClimaxBranch())
-                        .then(buildSkillNoCooldownBranch())
+                        .then(buildModRulesBranch())
+                        .then(buildDomainSphereDebugBranch())
         );
     }
 
@@ -161,75 +177,8 @@ public final class JjkzCommands
      */
     private static int executeShowPlayerData(ServerPlayer player)
     {
-        int current = PlayerCursedEnergyData.getCurrent(player);
-        int max = PlayerCursedEnergyData.getMax(player);
-        int experience = PlayerCursedGradeData.getExperience(player);
-        int rank = PlayerCursedGradeData.getRank(player);
-        String factionId = PlayerFactionData.getFactionId(player);
-        String factionDisplay = factionId.isEmpty() ? "未选择" : PlayerFactionData.getDisplayName(factionId) + " (" + factionId + ")";
-        boolean reverseTechniqueLearned = PlayerReverseTechniqueData.hasReverseTechnique(player);
-        String innateTechnique = PlayerTechniqueData.getInnateTechnique(player);
-        boolean heavenlyRestricted = PlayerCursedEnergyData.isHeavenlyRestricted(player);
-        BarrierTechniqueLevel barrierLevel = PlayerBarrierTechniqueData.getLevel(player);
-        SeanceTechniqueLevel seanceLevel = PlayerSeanceTechniqueData.getLevel(player);
-
-        player.sendSystemMessage(Component.literal("========== JJKZ 玩家数据 =========="));
-        player.sendSystemMessage(Component.literal("阵营: " + factionDisplay));
-        player.sendSystemMessage(Component.literal("生得术式: " + innateTechnique));
-        player.sendSystemMessage(Component.literal("反转术式: " + (reverseTechniqueLearned ? "已习得" : "未习得")));
-        player.sendSystemMessage(Component.literal("结界术等级: " + getBarrierLevelDisplayName(barrierLevel) + "（维持减免：" + (int)(barrierLevel.getMaintainCostReduction() * 100) + "%）"));
-        player.sendSystemMessage(Component.literal("降灵术等级: " + getSeanceLevelDisplayName(seanceLevel) + "（维持减免：" + (int)(seanceLevel.getMaintainCostReduction() * 100) + "%）"));
-        player.sendSystemMessage(Component.literal("咒术经验: " + experience + "（等级: " + PlayerCursedGradeData.getRankDisplayName(rank) + "）"));
-        player.sendSystemMessage(Component.literal("咒力: " + current + "/" + max));
-        float health = player.getHealth();
-        float healthMax = PlayerHealthData.getMax(player);
-        double healthBonus = PlayerHealthData.getBonus(player);
-        player.sendSystemMessage(Component.literal(String.format(
-                "生命值: %.1f/%.1f（基础%.0f + 加成%.0f）",
-                health,
-                healthMax,
-                CursedGradeBonuses.BASE_MAX_HEALTH,
-                healthBonus
-        )));
-        player.sendSystemMessage(Component.literal("天与咒缚: " + (heavenlyRestricted ? "是" : "否")));
-        DomainExpansionServerLogic domainLogic = DomainExpansionServerLogic.getInstance();
-        boolean hasDomain = domainLogic.hasLearnedDomainExpansion(player);
-        String domainName = domainLogic.getDomainName();
-        player.sendSystemMessage(Component.literal("领域展开: " + (hasDomain ? "已习得" : "未习得") + (domainName.isEmpty() ? "" : "（" + domainName + "）")));
+        JjkzPlayerDataDisplay.sendToViewer(player, player);
         return 1;
-    }
-
-    /**
-     * 全局饥饿消耗倍率（无需作弊）：不消耗 / 0.1倍 / 原版。
-     */
-    private static LiteralArgumentBuilder<CommandSourceStack> buildHungerConsumptionBranch()
-    {
-        LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal("hunger");
-        LiteralArgumentBuilder<CommandSourceStack> set = Commands.literal("set");
-        set.then(hungerModeLiteral("none", HungerConsumptionSettings.Mode.NONE));
-        set.then(hungerModeLiteral("low", HungerConsumptionSettings.Mode.LOW));
-        set.then(hungerModeLiteral("vanilla", HungerConsumptionSettings.Mode.VANILLA));
-        set.then(hungerModeLiteral("不消耗", HungerConsumptionSettings.Mode.NONE));
-        set.then(hungerModeLiteral("0.1倍", HungerConsumptionSettings.Mode.LOW));
-        set.then(hungerModeLiteral("原版", HungerConsumptionSettings.Mode.VANILLA));
-        root.then(set);
-        root.then(Commands.literal("get").executes(ctx ->
-        {
-            HungerConsumptionSettings.Mode mode = HungerConsumptionSettings.getMode();
-            ctx.getSource().sendSuccess(() -> Component.literal("当前全局饥饿消耗倍率：" + mode.zhLabel()), false);
-            return 1;
-        }));
-        return root;
-    }
-
-    private static LiteralArgumentBuilder<CommandSourceStack> hungerModeLiteral(String literal, HungerConsumptionSettings.Mode mode)
-    {
-        return Commands.literal(literal).executes(ctx ->
-        {
-            HungerConsumptionSettings.setMode(mode);
-            ctx.getSource().sendSuccess(() -> Component.literal("已将全局饥饿消耗倍率设置为：" + mode.zhLabel()), true);
-            return 1;
-        });
     }
 
     /**
@@ -398,6 +347,38 @@ public final class JjkzCommands
         player.sendSystemMessage(Component.literal(
                 "术式【" + techniqueId + "】术式情报：" + total));
         return 1;
+    }
+
+    /** 调试领域天空盒：{@code /jjkz domainSphere place <天空盒路径>} / {@code place <半径> <天空盒路径>} / {@code close} */
+    private static LiteralArgumentBuilder<CommandSourceStack> buildDomainSphereDebugBranch()
+    {
+        LiteralArgumentBuilder<CommandSourceStack> place = Commands.literal("place")
+                .then(Commands.argument("radius", IntegerArgumentType.integer(4, 64))
+                        .then(Commands.argument("skybox", StringArgumentType.greedyString())
+                                .executes(ctx ->
+                                {
+                                    ServerPlayer player = ctx.getSource().getPlayerOrException();
+                                    int radius = IntegerArgumentType.getInteger(ctx, "radius");
+                                    String skybox = StringArgumentType.getString(ctx, "skybox");
+                                    return DomainSphereDebugLogic.place(player, skybox, radius) ? 1 : 0;
+                                })))
+                .then(Commands.argument("skybox", StringArgumentType.greedyString())
+                        .executes(ctx ->
+                        {
+                            ServerPlayer player = ctx.getSource().getPlayerOrException();
+                            String skybox = StringArgumentType.getString(ctx, "skybox");
+                            return DomainSphereDebugLogic.place(player, skybox, DomainSphereDebugLogic.defaultRadius()) ? 1 : 0;
+                        }));
+
+        return Commands.literal("domainSphere")
+                .requires(source -> source.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                .then(place)
+                .then(Commands.literal("close")
+                        .executes(ctx ->
+                        {
+                            ServerPlayer player = ctx.getSource().getPlayerOrException();
+                            return DomainSphereDebugLogic.close(player) ? 1 : 0;
+                        }));
     }
 
     /** 召唤伏魔神龛：{@code /jjkz summonDemonSubduingShrine} */
@@ -679,6 +660,26 @@ public final class JjkzCommands
                         }));
     }
 
+    /** 作弊设置强化术等级：{@code /jjkz strengthenTechnique set <等级>} */
+    private static LiteralArgumentBuilder<CommandSourceStack> buildStrengthenTechniqueCheatBranch()
+    {
+        return Commands.literal("strengthenTechnique")
+                .requires(source -> source.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                .then(Commands.literal("set")
+                        .then(strengthenTechniqueLevelLiteral("unlearned", "未习得", StrengthenTechniqueLevel.UNLEARNED))
+                        .then(strengthenTechniqueLevelLiteral("beginner", "初习", StrengthenTechniqueLevel.BEGINNER))
+                        .then(strengthenTechniqueLevelLiteral("mastered", "掌握", StrengthenTechniqueLevel.MASTERED))
+                        .then(strengthenTechniqueLevelLiteral("complete", "完全掌握", StrengthenTechniqueLevel.COMPLETE)))
+                .then(Commands.literal("get")
+                        .executes(ctx ->
+                        {
+                            ServerPlayer player = ctx.getSource().getPlayerOrException();
+                            StrengthenTechniqueLevel level = PlayerStrengthenTechniqueData.getLevel(player);
+                            player.sendSystemMessage(Component.literal("当前强化术等级：" + getStrengthenLevelDisplayName(level)));
+                            return 1;
+                        }));
+    }
+
     /** 作弊设置结界术等级：{@code /jjkz barrierTechnique set <等级>} */
     private static LiteralArgumentBuilder<CommandSourceStack> buildBarrierTechniqueCheatBranch()
     {
@@ -794,6 +795,32 @@ public final class JjkzCommands
                         }));
     }
 
+    private static LiteralArgumentBuilder<CommandSourceStack> strengthenTechniqueLevelLiteral(
+            String literal,
+            String displayName,
+            StrengthenTechniqueLevel level)
+    {
+        return Commands.literal(literal).executes(ctx -> executeStrengthenTechniqueSet(ctx.getSource().getPlayerOrException(), displayName, level));
+    }
+
+    private static int executeStrengthenTechniqueSet(ServerPlayer player, String displayName, StrengthenTechniqueLevel level)
+    {
+        PlayerStrengthenTechniqueData.setLevel(player, level);
+        player.sendSystemMessage(Component.literal("强化术等级已设为：" + displayName));
+        return 1;
+    }
+
+    private static String getStrengthenLevelDisplayName(StrengthenTechniqueLevel level)
+    {
+        return switch (level)
+        {
+            case UNLEARNED -> "未习得";
+            case BEGINNER -> "初习";
+            case MASTERED -> "掌握";
+            case COMPLETE -> "完全掌握";
+        };
+    }
+
     private static LiteralArgumentBuilder<CommandSourceStack> seanceTechniqueLevelLiteral(String literal, String displayName, SeanceTechniqueLevel level)
     {
         return Commands.literal(literal).executes(ctx -> executeSeanceTechniqueSet(ctx.getSource().getPlayerOrException(), displayName, level));
@@ -899,34 +926,159 @@ public final class JjkzCommands
         return 1;
     }
 
-    /** 作弊：术式技能无冷却 {@code /jjkz 技能无冷却 [on|off|开启|关闭]} */
-    private static LiteralArgumentBuilder<CommandSourceStack> buildSkillNoCooldownBranch()
+    /**
+     * 模组规则（全服生效）：{@code /jjkz modRules ...}
+     * <ul>
+     *   <li>{@code aerialCombat} — 空战开关与模组检测</li>
+     *   <li>{@code skillNoCooldown} / {@code 技能无冷却} — 术式技能无冷却</li>
+     *   <li>{@code hungerConsumption} / {@code 饱食度} — 全局饱食度消耗倍率</li>
+     * </ul>
+     */
+    private static LiteralArgumentBuilder<CommandSourceStack> buildModRulesBranch()
     {
-        LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal("技能无冷却")
+        LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal("modRules")
+                .executes(ctx ->
+                {
+                    CommandSourceStack source = ctx.getSource();
+                    source.sendSuccess(() -> Component.literal("========== 模组规则（全服） =========="), false);
+                    source.sendSuccess(() -> Component.literal(
+                            "空战：" + (ModRules.AerialCombat.isEnabled() ? "已开启" : "已关闭")), false);
+                    source.sendSuccess(() -> Component.literal(ModRules.AerialCombat.serverStatusLine()), false);
+                    source.sendSuccess(() -> Component.literal(
+                            "术式技能无冷却：" + (ModRules.SkillNoCooldown.isEnabled() ? "已开启" : "已关闭")), false);
+                    source.sendSuccess(() -> Component.literal(
+                            "饱食度消耗倍率：" + ModRules.HungerConsumption.getMode().zhLabel()), false);
+                    return 1;
+                });
+        root.then(buildModRulesAerialCombatBranch("aerialCombat"));
+        root.then(buildModRulesAerialCombatBranch("空战"));
+        root.then(buildModRulesSkillNoCooldownBranch("skillNoCooldown"));
+        root.then(buildModRulesSkillNoCooldownBranch("技能无冷却"));
+        root.then(buildModRulesHungerConsumptionBranch("hungerConsumption"));
+        root.then(buildModRulesHungerConsumptionBranch("饱食度"));
+        return root;
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> buildModRulesAerialCombatBranch(String literal)
+    {
+        LiteralArgumentBuilder<CommandSourceStack> aerial = Commands.literal(literal)
                 .requires(source -> source.hasPermission(Commands.LEVEL_GAMEMASTERS));
-        root.then(skillNoCooldownLiteral("on", true));
-        root.then(skillNoCooldownLiteral("off", false));
-        root.then(skillNoCooldownLiteral("开启", true));
-        root.then(skillNoCooldownLiteral("关闭", false));
+        aerial.then(buildModRulesAerialCombatSetBranch());
+        aerial.then(Commands.literal("check")
+                .executes(ctx -> executeModRulesAerialCombatCheck(ctx.getSource().getPlayerOrException())));
+        aerial.executes(ctx -> executeModRulesAerialCombatGet(ctx.getSource().getPlayerOrException()));
+        return aerial;
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> buildModRulesAerialCombatSetBranch()
+    {
+        LiteralArgumentBuilder<CommandSourceStack> set = Commands.literal("set");
+        set.then(modRulesAerialCombatLiteral("on", true));
+        set.then(modRulesAerialCombatLiteral("off", false));
+        set.then(modRulesAerialCombatLiteral("开启", true));
+        set.then(modRulesAerialCombatLiteral("关闭", false));
+        return set;
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> modRulesAerialCombatLiteral(String literal, boolean enabled)
+    {
+        return Commands.literal(literal).executes(ctx -> executeModRulesAerialCombatSet(ctx.getSource(), enabled));
+    }
+
+    private static int executeModRulesAerialCombatSet(CommandSourceStack source, boolean enabled)
+    {
+        String failure = ModRules.AerialCombat.trySetEnabled(enabled);
+        if (failure != null)
+        {
+            source.sendFailure(Component.literal(failure));
+            return 0;
+        }
+        source.sendSuccess(() -> Component.literal("空战：" + (enabled ? "已开启" : "已关闭")), true);
+        return 1;
+    }
+
+    private static int executeModRulesAerialCombatGet(ServerPlayer player)
+    {
+        player.sendSystemMessage(Component.literal("空战：" + (ModRules.AerialCombat.isEnabled() ? "已开启" : "已关闭")));
+        player.sendSystemMessage(Component.literal(ModRules.AerialCombat.serverStatusLine()));
+        player.sendSystemMessage(Component.literal(ModRules.AerialCombat.playerStatusLine(player)));
+        if (ModRules.AerialCombat.isEnabled() && !ModRules.AerialCombat.hasPlayerMods(player))
+        {
+            player.sendSystemMessage(Component.literal("提示：你已开启空战，但客户端未安装全部所需模组，空战功能可能无法正常使用。"));
+        }
+        return 1;
+    }
+
+    private static int executeModRulesAerialCombatCheck(ServerPlayer player)
+    {
+        player.sendSystemMessage(Component.literal("========== 空战模组检测 =========="));
+        player.sendSystemMessage(Component.literal(ModRules.AerialCombat.serverStatusLine()));
+        player.sendSystemMessage(Component.literal(ModRules.AerialCombat.playerStatusLine(player)));
+        boolean ready = ModRules.AerialCombat.isServerReady() && ModRules.AerialCombat.hasPlayerMods(player);
+        player.sendSystemMessage(Component.literal("空战可用：" + (ready ? "是" : "否")));
+        return 1;
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> buildModRulesSkillNoCooldownBranch(String literal)
+    {
+        LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal(literal)
+                .requires(source -> source.hasPermission(Commands.LEVEL_GAMEMASTERS));
+        root.then(modRulesSkillNoCooldownLiteral("on", true));
+        root.then(modRulesSkillNoCooldownLiteral("off", false));
+        root.then(modRulesSkillNoCooldownLiteral("开启", true));
+        root.then(modRulesSkillNoCooldownLiteral("关闭", false));
         root.executes(ctx ->
         {
-            ServerPlayer player = ctx.getSource().getPlayerOrException();
-            boolean enabled = PlayerSkillNoCooldownData.isEnabled(player);
+            boolean enabled = ModRules.SkillNoCooldown.isEnabled();
             ctx.getSource().sendSuccess(() -> Component.literal(
-                    "术式技能无冷却：" + (enabled ? "已开启" : "已关闭")), false);
+                    "术式技能无冷却（全服）：" + (enabled ? "已开启" : "已关闭")), false);
             return 1;
         });
         return root;
     }
 
-    private static LiteralArgumentBuilder<CommandSourceStack> skillNoCooldownLiteral(String literal, boolean enabled)
+    private static LiteralArgumentBuilder<CommandSourceStack> modRulesSkillNoCooldownLiteral(String literal, boolean enabled)
     {
         return Commands.literal(literal).executes(ctx ->
         {
-            ServerPlayer player = ctx.getSource().getPlayerOrException();
-            PlayerSkillNoCooldownData.setEnabled(player, enabled);
+            ModRules.SkillNoCooldown.setEnabled(enabled);
             ctx.getSource().sendSuccess(() -> Component.literal(
-                    "术式技能无冷却：" + (enabled ? "已开启" : "已关闭")), true);
+                    "术式技能无冷却（全服）：" + (enabled ? "已开启" : "已关闭")), true);
+            return 1;
+        });
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> buildModRulesHungerConsumptionBranch(String literal)
+    {
+        LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal(literal)
+                .requires(source -> source.hasPermission(Commands.LEVEL_GAMEMASTERS));
+        LiteralArgumentBuilder<CommandSourceStack> set = Commands.literal("set");
+        set.then(modRulesHungerModeLiteral("none", ModRules.HungerConsumption.Mode.NONE));
+        set.then(modRulesHungerModeLiteral("low", ModRules.HungerConsumption.Mode.LOW));
+        set.then(modRulesHungerModeLiteral("vanilla", ModRules.HungerConsumption.Mode.VANILLA));
+        set.then(modRulesHungerModeLiteral("不消耗", ModRules.HungerConsumption.Mode.NONE));
+        set.then(modRulesHungerModeLiteral("0.1倍", ModRules.HungerConsumption.Mode.LOW));
+        set.then(modRulesHungerModeLiteral("原版", ModRules.HungerConsumption.Mode.VANILLA));
+        root.then(set);
+        root.executes(ctx ->
+        {
+            ModRules.HungerConsumption.Mode mode = ModRules.HungerConsumption.getMode();
+            ctx.getSource().sendSuccess(() -> Component.literal(
+                    "饱食度消耗倍率（全服）：" + mode.zhLabel()), false);
+            return 1;
+        });
+        return root;
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> modRulesHungerModeLiteral(
+            String literal,
+            ModRules.HungerConsumption.Mode mode)
+    {
+        return Commands.literal(literal).executes(ctx ->
+        {
+            ModRules.HungerConsumption.setMode(mode);
+            ctx.getSource().sendSuccess(() -> Component.literal(
+                    "饱食度消耗倍率（全服）：" + mode.zhLabel()), true);
             return 1;
         });
     }

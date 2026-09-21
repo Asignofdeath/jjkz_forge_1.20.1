@@ -1,5 +1,6 @@
 package com.darkness.jujutsukaisenzone.technique.description;
 
+import com.darkness.jujutsukaisenzone.entity.GavelProjectileEntity;
 import com.darkness.jujutsukaisenzone.entity.data.LimitlessBlueConfig;
 import com.darkness.jujutsukaisenzone.entity.data.LimitlessPurpleConfig;
 import com.darkness.jujutsukaisenzone.entity.data.LimitlessRedConfig;
@@ -11,11 +12,22 @@ import com.darkness.jujutsukaisenzone.technique.config.SkillCombatConfigRegistry
 import com.darkness.jujutsukaisenzone.technique.scaling.LimitlessBlueSkillGrowth;
 import com.darkness.jujutsukaisenzone.technique.scaling.LimitlessPurpleSkillGrowth;
 import com.darkness.jujutsukaisenzone.technique.scaling.LimitlessRedSkillGrowth;
+import com.darkness.jujutsukaisenzone.player.JudgmentTrialTargetData;
+import com.darkness.jujutsukaisenzone.technique.skill.JudgmentAccuseSkillLogic;
+import com.darkness.jujutsukaisenzone.technique.skill.JudgmentTrialSkillLogic;
+import com.darkness.jujutsukaisenzone.technique.skill.JudgmentWeaponLogic;
+import com.darkness.jujutsukaisenzone.technique.skillset.JudgmentTechniqueSkillSet;
 import com.darkness.jujutsukaisenzone.technique.skillset.LimitlessTechniqueSkillSet;
 import com.darkness.jujutsukaisenzone.technique.scaling.ShrineSkillGrowth;
 import com.darkness.jujutsukaisenzone.technique.skillset.ShrineTechniqueSkillSet;
 import com.darkness.jujutsukaisenzone.technique.skillset.TechniqueSkill;
+import com.darkness.jujutsukaisenzone.technique.commonskill.CommonTechniqueSkillRegistry;
+import com.darkness.jujutsukaisenzone.technique.aerial.AerialCombatSkills;
+import com.darkness.jujutsukaisenzone.technique.StrengthenTechniqueServerLogic;
+import com.darkness.jujutsukaisenzone.player.PlayerStrengthenTechniqueData;
 import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
+import com.darkness.jujutsukaisenzone.player.StrengthenTechniqueBonuses;
+import com.darkness.jujutsukaisenzone.player.StrengthenTechniqueLevel;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Player;
 
@@ -32,6 +44,9 @@ public final class TechniqueSkillDescriptions
     {
         registerLimitlessSkills();
         registerShrineSkills();
+        registerJudgmentSkills();
+        registerCommonSkills();
+        registerAerialSkills();
     }
 
     /**
@@ -51,6 +66,15 @@ public final class TechniqueSkillDescriptions
         String skillId = skill.skillId();
         Object[] args = resolveDescriptionArgs(player, techniqueId, skill);
         Component description = Component.translatable(TechniqueSkillDescriptionKeys.description(skillId), args);
+        if (CommonTechniqueSkillRegistry.STRENGTHEN_TECHNIQUE_ID.equals(skillId))
+        {
+            return new TechniqueSkillDescriptionView(
+                    skill.displayName(),
+                    StrengthenTechniqueServerLogic.getMaintainCostPerSecond(player),
+                    0,
+                    description,
+                    true);
+        }
         return new TechniqueSkillDescriptionView(
                 skill.displayName(),
                 skill.cost(),
@@ -155,5 +179,71 @@ public final class TechniqueSkillDescriptions
                         TechniqueSkillStatFormat.formatSecondsFromTicks(ShrineFugaConfig.BOOM_LIFETIME_TICKS),
                         TechniqueSkillStatFormat.formatNumber(ShrineFugaConfig.BOOM_DAMAGE_PER_TICK)
                 });
+    }
+
+    private static void registerJudgmentSkills()
+    {
+        TechniqueSkillDescriptionRegistry.register(
+                JudgmentTechniqueSkillSet.SKILL_GAVEL,
+                (player, techniqueId, skill) -> new Object[] {
+                        TechniqueSkillStatFormat.formatNumber(GavelProjectileEntity.BASE_DAMAGE),
+                        TechniqueSkillStatFormat.formatNumber(GavelProjectileEntity.IMPACT_EXPLOSION_POWER),
+                        TechniqueSkillStatFormat.formatNumber(
+                                (JudgmentWeaponLogic.SINFUL_ONE_DAMAGE_MULTIPLIER - 1.0F) * 100.0F)
+                });
+
+        TechniqueSkillDescriptionRegistry.register(
+                JudgmentTechniqueSkillSet.SKILL_TRIAL,
+                (player, techniqueId, skill) -> new Object[] {
+                        TechniqueSkillStatFormat.formatSecondsFromTicks(JudgmentTrialSkillLogic.LOCK_CHARGE_TICKS),
+                        TechniqueSkillStatFormat.formatNumber(JudgmentTrialSkillLogic.BASE_GUILTY_CHANCE_PERCENT),
+                        TechniqueSkillStatFormat.formatNumber(JudgmentTrialTargetData.GUILTY_BONUS_PER_TRIAL_PERCENT),
+                        TechniqueSkillStatFormat.formatNumber(JudgmentTrialTargetData.MAX_GUILTY_BONUS_PERCENT),
+                        TechniqueSkillStatFormat.formatNumber(JudgmentTrialSkillLogic.DEATH_SENTENCE_CHANCE_PERCENT),
+                        TechniqueSkillStatFormat.formatNumber(
+                                JudgmentTrialSkillLogic.DEATH_SENTENCE_WITH_CONFISCATION_CHANCE_PERCENT),
+                        TechniqueSkillStatFormat.formatNumber(
+                                JudgmentTrialSkillLogic.DEATH_SENTENCE_BONUS_PER_DEBUFF_PERCENT),
+                        TechniqueSkillStatFormat.formatNumber(
+                                JudgmentTrialSkillLogic.MAX_DEATH_SENTENCE_DEBUFF_BONUS_PERCENT)
+                });
+
+        TechniqueSkillDescriptionRegistry.register(
+                JudgmentTechniqueSkillSet.SKILL_ACCUSE,
+                (player, techniqueId, skill) -> new Object[] {
+                        TechniqueSkillStatFormat.formatSecondsFromTicks(JudgmentAccuseSkillLogic.CHOICE_WINDOW_TICKS),
+                        TechniqueSkillStatFormat.formatNumber(JudgmentAccuseSkillLogic.EVIDENCE_CONFIRMED_CHANCE_PERCENT),
+                        TechniqueSkillStatFormat.formatNumber(JudgmentTrialTargetData.GUILTY_BONUS_PER_TRIAL_PERCENT),
+                        TechniqueSkillStatFormat.formatNumber(JudgmentTrialTargetData.MAX_GUILTY_BONUS_PERCENT),
+                        TechniqueSkillStatFormat.formatNumber(JudgmentTrialSkillLogic.DEATH_SENTENCE_CHANCE_PERCENT),
+                        TechniqueSkillStatFormat.formatNumber(
+                                JudgmentTrialSkillLogic.DEATH_SENTENCE_BONUS_PER_DEBUFF_PERCENT),
+                        TechniqueSkillStatFormat.formatNumber(
+                                JudgmentTrialSkillLogic.MAX_DEATH_SENTENCE_DEBUFF_BONUS_PERCENT)
+                });
+    }
+
+    private static void registerCommonSkills()
+    {
+        TechniqueSkillDescriptionRegistry.register(
+                CommonTechniqueSkillRegistry.STRENGTHEN_TECHNIQUE_ID,
+                (player, techniqueId, skill) -> {
+                    StrengthenTechniqueLevel level = PlayerStrengthenTechniqueData.getLevel(player);
+                    return new Object[] {
+                            TechniqueSkillStatFormat.formatNumber(level.getActiveHealthBonusMultiplier() * 100.0D),
+                            TechniqueSkillStatFormat.formatNumber(StrengthenTechniqueBonuses.ACTIVE_SPEED_BONUS * 100.0D),
+                            TechniqueSkillStatFormat.formatNumber(StrengthenTechniqueBonuses.ACTIVE_ATTACK_BONUS * 100.0D),
+                            TechniqueSkillStatFormat.formatNumber(StrengthenTechniqueBonuses.resolveJumpHeightBlocks(level)),
+                            TechniqueSkillStatFormat.formatNumber(StrengthenTechniqueServerLogic.MAINTAIN_COST_PER_SECOND),
+                            Integer.toString(StrengthenTechniqueServerLogic.getMaintainCostPerSecond(player))
+                    };
+                });
+    }
+
+    private static void registerAerialSkills()
+    {
+        TechniqueSkillDescriptionRegistry.register(
+                AerialCombatSkills.SKILL_CURSE_LEVITATION,
+                (player, techniqueId, skill) -> new Object[0]);
     }
 }

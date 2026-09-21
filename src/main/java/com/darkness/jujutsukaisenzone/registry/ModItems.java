@@ -7,8 +7,10 @@ import com.darkness.jujutsukaisenzone.item.LimitlessTechniqueBinderItem;
 import com.darkness.jujutsukaisenzone.item.DomainStudybookItem;
 import com.darkness.jujutsukaisenzone.item.ReverseStudybookItem;
 import com.darkness.jujutsukaisenzone.item.SlashTechniqueSukunaBinderItem;
+import com.darkness.jujutsukaisenzone.item.SmGavelWeaponItem;
 import com.darkness.jujutsukaisenzone.item.SoulStudybookItem;
 import com.darkness.jujutsukaisenzone.item.TechniqueIntelligenceItem;
+import com.darkness.jujutsukaisenzone.item.TrialTechniqueBinderItem;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraftforge.eventbus.api.IEventBus;
@@ -36,6 +38,24 @@ public final class ModItems
     public static final RegistryObject<Item> SLASH_TECHNIQUE_SUKUNA = ITEMS.register(
             "slash_technique_sukuna",
             () -> new SlashTechniqueSukunaBinderItem(new Item.Properties().stacksTo(1))
+    );
+
+    /** 审判 */
+    public static final RegistryObject<Item> TRIAL_TECHNIQUE = ITEMS.register(
+            "trial_technique",
+            () -> new TrialTechniqueBinderItem(new Item.Properties().stacksTo(1))
+    );
+
+    /** 法槌（Epic Fight 武器） */
+    public static final RegistryObject<Item> SM_GAVEL_WEAPON = ITEMS.register(
+            "sm_gavel_weapon",
+            () -> new SmGavelWeaponItem(new Item.Properties().stacksTo(1))
+    );
+
+    /** 处刑人之剑（Epic Fight 武器） */
+    public static final RegistryObject<Item> EXECUTIONERS_SWORD = ITEMS.register(
+            "executioners_sword",
+            () -> new Item(new Item.Properties().stacksTo(1))
     );
 
     /** 咒力流动反转理论 */

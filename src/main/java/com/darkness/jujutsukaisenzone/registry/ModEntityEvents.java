@@ -1,7 +1,11 @@
 package com.darkness.jujutsukaisenzone.registry;
 
 import com.darkness.jujutsukaisenzone.JuJutsuKaisenZone;
+import com.darkness.jujutsukaisenzone.client.renderer.entity.GavelProjectileRenderer;
+import com.darkness.jujutsukaisenzone.client.renderer.entity.ChubukushishiRenderer;
+import com.darkness.jujutsukaisenzone.client.renderer.entity.CourtSeatRenderer;
 import com.darkness.jujutsukaisenzone.client.renderer.entity.DemonSubduingShrineRenderer;
+import com.darkness.jujutsukaisenzone.client.renderer.entity.JudgeRenderer;
 import com.darkness.jujutsukaisenzone.client.renderer.entity.WedgeRenderer;
 import com.darkness.jujutsukaisenzone.entity.SpecialEffectEntity;
 import com.darkness.jujutsukaisenzone.entity.WedgeEntity;
@@ -38,6 +42,10 @@ public final class ModEntityEvents
         {
             event.registerEntityRenderer(ModEntities.SPECIAL_EFFECT_ENTITY.get(), ChickenRenderer::new);
             event.registerEntityRenderer(ModEntities.DEMON_SUBDUING_SHRINE.get(), DemonSubduingShrineRenderer::new);
+            event.registerEntityRenderer(ModEntities.JUDGE.get(), JudgeRenderer::new);
+            event.registerEntityRenderer(ModEntities.COURT_SEAT.get(), CourtSeatRenderer::new);
+            event.registerEntityRenderer(ModEntities.EXECUTION_SCAFFOLD_CIRCLE.get(), ChubukushishiRenderer::new);
+            event.registerEntityRenderer(ModEntities.GAVEL_PROJECTILE.get(), GavelProjectileRenderer::new);
             event.registerEntityRenderer(ModEntities.WEDGE.get(), WedgeRenderer::new);
         }
     }

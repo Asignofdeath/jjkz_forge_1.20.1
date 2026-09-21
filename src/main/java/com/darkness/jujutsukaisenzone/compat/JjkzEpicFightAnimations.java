@@ -34,6 +34,10 @@ public final class JjkzEpicFightAnimations
     public static AnimationAccessor<JjkzTechniqueCastAnimation> REMOTE_MURASAKI_START;
     /** {@code assets/jujutsukaisenzone/animmodels/animations/remote_murasaki_fire.json}，超远程虚式茈发射 */
     public static AnimationAccessor<JjkzTechniqueCastAnimation> REMOTE_MURASAKI_FIRE;
+    /** {@code assets/jujutsukaisenzone/animmodels/animations/lookdown.json}，诛伏赐死领域构建完成 */
+    public static AnimationAccessor<JjkzTechniqueCastAnimation> JUDGMENT_DOMAIN_LOOKDOWN;
+    /** {@code assets/jujutsukaisenzone/animmodels/animations/swing_the_gavel.json}，开庭敲槌 */
+    public static AnimationAccessor<JjkzTechniqueCastAnimation> SWING_THE_GAVEL;
 
     private JjkzEpicFightAnimations()
     {
@@ -73,6 +77,12 @@ public final class JjkzEpicFightAnimations
                 accessor -> new JjkzTechniqueCastAnimation(accessor, Armatures.BIPED));
         REMOTE_MURASAKI_FIRE = builder.nextAccessor(
                 "remote_murasaki_fire",
+                accessor -> new JjkzTechniqueCastAnimation(accessor, Armatures.BIPED));
+        JUDGMENT_DOMAIN_LOOKDOWN = builder.nextAccessor(
+                "lookdown",
+                accessor -> new JjkzTechniqueCastAnimation(accessor, Armatures.BIPED));
+        SWING_THE_GAVEL = builder.nextAccessor(
+                "swing_the_gavel",
                 accessor -> new JjkzTechniqueCastAnimation(accessor, Armatures.BIPED));
     }
 }

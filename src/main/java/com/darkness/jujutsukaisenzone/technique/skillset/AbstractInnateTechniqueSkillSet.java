@@ -3,7 +3,7 @@ package com.darkness.jujutsukaisenzone.technique.skillset;
 import com.darkness.jujutsukaisenzone.compat.EpicFightCompat;
 import com.darkness.jujutsukaisenzone.player.PlayerCursedEnergyData;
 import com.darkness.jujutsukaisenzone.player.PlayerMaxOutputChargeData;
-import com.darkness.jujutsukaisenzone.player.PlayerSkillNoCooldownData;
+import com.darkness.jujutsukaisenzone.gameplay.ModRules;
 import com.darkness.jujutsukaisenzone.technique.development.SkillUnlockLogic;
 import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
 import net.minecraft.network.chat.Component;
@@ -530,7 +530,7 @@ public abstract class AbstractInnateTechniqueSkillSet implements IInnateTechniqu
 
     protected static boolean usesSkillCooldown(Player player)
     {
-        return !player.isCreative() && !PlayerSkillNoCooldownData.isEnabled(player);
+        return !player.isCreative() && !ModRules.SkillNoCooldown.isEnabled();
     }
 
     private static String formatCooldownSeconds(int ticks)

@@ -1,7 +1,9 @@
 package com.darkness.jujutsukaisenzone.technique.skillset;
 
 import com.darkness.jujutsukaisenzone.effect.TechniqueMeltdownEffect;
+import com.darkness.jujutsukaisenzone.technique.commonskill.CommonTechniqueSkillRegistry;
 import com.darkness.jujutsukaisenzone.network.ModNetwork;
+import com.darkness.jujutsukaisenzone.technique.domain.JudgmentDomainExpansion;
 import com.darkness.jujutsukaisenzone.technique.development.SkillUnlockLogic;
 import com.darkness.jujutsukaisenzone.technique.development.TechniqueSkillTreeRegistry;
 import com.darkness.jujutsukaisenzone.player.PlayerHoldReleaseChargeData;
@@ -63,7 +65,7 @@ public final class TechniqueSkillSetRegistry
      */
     public static void useSkillSlot(ServerPlayer player, int slot)
     {
-        if (TechniqueMeltdownEffect.blockTechniqueSkillUse(player))
+        if (isTechniqueSkillUseBlocked(player))
         {
             return;
         }
@@ -83,6 +85,17 @@ public final class TechniqueSkillSetRegistry
         String skillId = PlayerSkillBarConfig.getSkillId(player, techniqueId, slot);
         if (skillId.isEmpty())
         {
+            return;
+        }
+        if (CommonTechniqueSkillRegistry.isRegistered(skillId))
+        {
+            if (!SkillUnlockLogic.findSkillDefinition(techniqueId, skillId)
+                    .filter(skill -> CommonTechniqueSkillRegistry.isUnlocked(player, skill.skillId()))
+                    .isPresent())
+            {
+                return;
+            }
+            CommonTechniqueSkillRegistry.useSkill(player, skillId);
             return;
         }
         get(techniqueId).ifPresent(set ->
@@ -107,7 +120,7 @@ public final class TechniqueSkillSetRegistry
      */
     public static void useSpecialMove(ServerPlayer player, SpecialMoveInput input)
     {
-        if (TechniqueMeltdownEffect.blockTechniqueSkillUse(player))
+        if (isTechniqueSkillUseBlocked(player))
         {
             return;
         }
@@ -135,7 +148,7 @@ public final class TechniqueSkillSetRegistry
     /** 最大输出蓄力开始：查快捷栏配置判定该栏位技能是否支持蓄力，支持则开始计时。 */
     public static void beginMaxOutputCharge(ServerPlayer player, int slot)
     {
-        if (TechniqueMeltdownEffect.blockTechniqueSkillUse(player))
+        if (isTechniqueSkillUseBlocked(player))
         {
             return;
         }
@@ -150,7 +163,7 @@ public final class TechniqueSkillSetRegistry
 
     public static void beginHoldReleaseCharge(ServerPlayer player, int slot)
     {
-        if (TechniqueMeltdownEffect.blockTechniqueSkillUse(player))
+        if (isTechniqueSkillUseBlocked(player))
         {
             return;
         }
@@ -197,7 +210,7 @@ public final class TechniqueSkillSetRegistry
 
     public static void releaseHoldReleaseCharge(ServerPlayer player, int slot)
     {
-        if (TechniqueMeltdownEffect.blockTechniqueSkillUse(player))
+        if (isTechniqueSkillUseBlocked(player))
         {
             return;
         }
@@ -218,7 +231,7 @@ public final class TechniqueSkillSetRegistry
     /** 最大输出释放：蓄力满后查快捷栏配置获取 skillId，调用 skillId 驱动的最大输出释放。 */
     public static void castMaxOutput(ServerPlayer player, int slot)
     {
-        if (TechniqueMeltdownEffect.blockTechniqueSkillUse(player))
+        if (isTechniqueSkillUseBlocked(player))
         {
             return;
         }
@@ -316,5 +329,11 @@ public final class TechniqueSkillSetRegistry
             skillIds[i] = PlayerSkillBarConfig.getSkillId(player, techniqueId, i + 1);
         }
         ModNetwork.sendSkillBarConfigSync(player, techniqueId, skillIds);
+    }
+
+    private static boolean isTechniqueSkillUseBlocked(ServerPlayer player)
+    {
+        return TechniqueMeltdownEffect.blockTechniqueSkillUse(player)
+                || JudgmentDomainExpansion.blockTechniqueSkillUse(player);
     }
 }

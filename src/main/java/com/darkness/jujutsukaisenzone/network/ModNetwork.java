@@ -2,14 +2,24 @@ package com.darkness.jujutsukaisenzone.network;
 
 import com.darkness.jujutsukaisenzone.JuJutsuKaisenZone;
 import com.darkness.jujutsukaisenzone.network.packet.AdjustCastRangeTierC2SPacket;
+import com.darkness.jujutsukaisenzone.network.packet.AerialMultiJumpC2SPacket;
 import com.darkness.jujutsukaisenzone.network.packet.AdjustBarrierRadiusTierC2SPacket;
 import com.darkness.jujutsukaisenzone.network.packet.BarrierTechniqueCastC2SPacket;
 import com.darkness.jujutsukaisenzone.network.packet.DomainExpansionCastC2SPacket;
 import com.darkness.jujutsukaisenzone.network.packet.RepairBarrierC2SPacket;
 import com.darkness.jujutsukaisenzone.network.packet.ReverseTechniqueTickC2SPacket;
-import com.darkness.jujutsukaisenzone.network.packet.ShrineDomainCmdCamSetupS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.ShrineDomainTeleportC2SPacket;
+import com.darkness.jujutsukaisenzone.network.packet.JudgmentTrialOpeningPerformanceS2CPacket;
+import com.darkness.jujutsukaisenzone.network.packet.JudgmentJudgeAngryPerformanceS2CPacket;
+import com.darkness.jujutsukaisenzone.network.packet.JudgmentDomainCmdCamSetupS2CPacket;
+import com.darkness.jujutsukaisenzone.network.packet.SyncJudgmentDomainColorCycleOverlayS2CPacket;
+import com.darkness.jujutsukaisenzone.network.packet.JudgmentAccuseChoiceC2SPacket;
+import com.darkness.jujutsukaisenzone.network.packet.JudgmentTrialLockOnC2SPacket;
+import com.darkness.jujutsukaisenzone.network.packet.ShrineDomainCmdCamSetupS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.ShrineDomainLockOnC2SPacket;
+import com.darkness.jujutsukaisenzone.network.packet.SyncJudgmentAccuseChoiceS2CPacket;
+import com.darkness.jujutsukaisenzone.network.packet.SyncJudgmentTrialActiveS2CPacket;
+import com.darkness.jujutsukaisenzone.network.packet.SyncJudgmentTrialChargeS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncShrineDomainActiveS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncShrinePowerSlashChargeS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncShrineSlashLoopSoundStartS2CPacket;
@@ -25,6 +35,7 @@ import com.darkness.jujutsukaisenzone.network.packet.SyncBlackFlashScreenShakeS2
 import com.darkness.jujutsukaisenzone.network.packet.SyncFugaBoomScreenShakeS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncCursedEnergyS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncCursedGradeS2CPacket;
+import com.darkness.jujutsukaisenzone.network.packet.SyncExecutionersSwordActivationS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncFactionS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncPlayerInputLockS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncReverseTechniqueS2CPacket;
@@ -59,6 +70,7 @@ import com.darkness.jujutsukaisenzone.network.packet.UnlockSkillC2SPacket;
 import com.darkness.jujutsukaisenzone.network.packet.UnlockSkillS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncMimicryS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncSeanceTechniqueLearnedS2CPacket;
+import com.darkness.jujutsukaisenzone.network.packet.SyncStrengthenTechniqueLearnedS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.EmotionalReleaseC2SPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncEmotionalReleaseStateS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.ToggleMimicryC2SPacket;
@@ -337,6 +349,11 @@ public final class ModNetwork
                 .decoder(SyncSeanceTechniqueLearnedS2CPacket::decode)
                 .consumerMainThread(SyncSeanceTechniqueLearnedS2CPacket::handle)
                 .add();
+        CHANNEL.messageBuilder(SyncStrengthenTechniqueLearnedS2CPacket.class, packetId++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(SyncStrengthenTechniqueLearnedS2CPacket::encode)
+                .decoder(SyncStrengthenTechniqueLearnedS2CPacket::decode)
+                .consumerMainThread(SyncStrengthenTechniqueLearnedS2CPacket::handle)
+                .add();
         CHANNEL.messageBuilder(EmotionalReleaseC2SPacket.class, packetId++, NetworkDirection.PLAY_TO_SERVER)
                 .encoder(EmotionalReleaseC2SPacket::encode)
                 .decoder(EmotionalReleaseC2SPacket::decode)
@@ -382,6 +399,61 @@ public final class ModNetwork
                 .decoder(SyncShrineBlackFlashMilestoneS2CPacket::decode)
                 .consumerMainThread(SyncShrineBlackFlashMilestoneS2CPacket::handle)
                 .add();
+        CHANNEL.messageBuilder(JudgmentTrialLockOnC2SPacket.class, packetId++, NetworkDirection.PLAY_TO_SERVER)
+                .encoder(JudgmentTrialLockOnC2SPacket::encode)
+                .decoder(JudgmentTrialLockOnC2SPacket::decode)
+                .consumerMainThread(JudgmentTrialLockOnC2SPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(SyncJudgmentTrialActiveS2CPacket.class, packetId++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(SyncJudgmentTrialActiveS2CPacket::encode)
+                .decoder(SyncJudgmentTrialActiveS2CPacket::decode)
+                .consumerMainThread(SyncJudgmentTrialActiveS2CPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(SyncJudgmentTrialChargeS2CPacket.class, packetId++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(SyncJudgmentTrialChargeS2CPacket::encode)
+                .decoder(SyncJudgmentTrialChargeS2CPacket::decode)
+                .consumerMainThread(SyncJudgmentTrialChargeS2CPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(SyncJudgmentAccuseChoiceS2CPacket.class, packetId++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(SyncJudgmentAccuseChoiceS2CPacket::encode)
+                .decoder(SyncJudgmentAccuseChoiceS2CPacket::decode)
+                .consumerMainThread(SyncJudgmentAccuseChoiceS2CPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(JudgmentAccuseChoiceC2SPacket.class, packetId++, NetworkDirection.PLAY_TO_SERVER)
+                .encoder(JudgmentAccuseChoiceC2SPacket::encode)
+                .decoder(JudgmentAccuseChoiceC2SPacket::decode)
+                .consumerMainThread(JudgmentAccuseChoiceC2SPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(JudgmentDomainCmdCamSetupS2CPacket.class, packetId++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(JudgmentDomainCmdCamSetupS2CPacket::encode)
+                .decoder(JudgmentDomainCmdCamSetupS2CPacket::decode)
+                .consumerMainThread(JudgmentDomainCmdCamSetupS2CPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(SyncJudgmentDomainColorCycleOverlayS2CPacket.class, packetId++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(SyncJudgmentDomainColorCycleOverlayS2CPacket::encode)
+                .decoder(SyncJudgmentDomainColorCycleOverlayS2CPacket::decode)
+                .consumerMainThread(SyncJudgmentDomainColorCycleOverlayS2CPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(JudgmentTrialOpeningPerformanceS2CPacket.class, packetId++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(JudgmentTrialOpeningPerformanceS2CPacket::encode)
+                .decoder(JudgmentTrialOpeningPerformanceS2CPacket::decode)
+                .consumerMainThread(JudgmentTrialOpeningPerformanceS2CPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(JudgmentJudgeAngryPerformanceS2CPacket.class, packetId++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(JudgmentJudgeAngryPerformanceS2CPacket::encode)
+                .decoder(JudgmentJudgeAngryPerformanceS2CPacket::decode)
+                .consumerMainThread(JudgmentJudgeAngryPerformanceS2CPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(SyncExecutionersSwordActivationS2CPacket.class, packetId++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(SyncExecutionersSwordActivationS2CPacket::encode)
+                .decoder(SyncExecutionersSwordActivationS2CPacket::decode)
+                .consumerMainThread(SyncExecutionersSwordActivationS2CPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(AerialMultiJumpC2SPacket.class, packetId++, NetworkDirection.PLAY_TO_SERVER)
+                .encoder(AerialMultiJumpC2SPacket::encode)
+                .decoder(AerialMultiJumpC2SPacket::decode)
+                .consumerMainThread(AerialMultiJumpC2SPacket::handle)
+                .add();
     }
 
     public static void sendCursedEnergySync(ServerPlayer player, int current, int max)
@@ -419,6 +491,12 @@ public final class ModNetwork
         CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new SyncSeanceTechniqueLearnedS2CPacket(learned, tier));
     }
 
+    public static void sendStrengthenTechniqueLearnedSync(ServerPlayer player, boolean learned, int tier, boolean active)
+    {
+        CHANNEL.send(PacketDistributor.PLAYER.with(() -> player),
+                new SyncStrengthenTechniqueLearnedS2CPacket(learned, tier, active));
+    }
+
     public static void sendTechniqueSync(ServerPlayer player, String techniqueId)
     {
         CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new SyncTechniqueS2CPacket(techniqueId == null ? "" : techniqueId));
@@ -437,6 +515,11 @@ public final class ModNetwork
     public static void sendUnlockSkillRequest(String techniqueId, String nodeId)
     {
         CHANNEL.send(PacketDistributor.SERVER.noArg(), new UnlockSkillC2SPacket(techniqueId, nodeId));
+    }
+
+    public static void sendAerialMultiJumpRequest()
+    {
+        CHANNEL.send(PacketDistributor.SERVER.noArg(), new AerialMultiJumpC2SPacket());
     }
 
     public static void sendUnlockSkillResult(
@@ -609,6 +692,85 @@ public final class ModNetwork
         );
     }
 
+    public static void sendJudgmentTrialLockOnToServer(boolean locking, java.util.UUID targetUuid)
+    {
+        CHANNEL.send(PacketDistributor.SERVER.noArg(), new JudgmentTrialLockOnC2SPacket(locking, targetUuid));
+    }
+
+    public static void sendJudgmentTrialActiveSync(ServerPlayer player, boolean active)
+    {
+        CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new SyncJudgmentTrialActiveS2CPacket(active));
+    }
+
+    public static void sendJudgmentTrialChargeSync(ServerPlayer player, boolean visible, float progress)
+    {
+        CHANNEL.send(
+                PacketDistributor.PLAYER.with(() -> player),
+                new SyncJudgmentTrialChargeS2CPacket(visible, progress)
+        );
+    }
+
+    public static void sendJudgmentAccuseChoiceSync(
+            ServerPlayer player,
+            boolean active,
+            int remainingTicks,
+            String crimeChinese,
+            String crimeEnglish)
+    {
+        CHANNEL.send(
+                PacketDistributor.PLAYER.with(() -> player),
+                new SyncJudgmentAccuseChoiceS2CPacket(active, remainingTicks, crimeChinese, crimeEnglish)
+        );
+    }
+
+    public static void sendJudgmentAccuseChoiceToServer(int responseId)
+    {
+        CHANNEL.send(PacketDistributor.SERVER.noArg(), new JudgmentAccuseChoiceC2SPacket(responseId));
+    }
+
+    /**
+     * 诛伏赐死领域结界构建完成瞬间：仅施法者客户端在领域中心上方编排 CMDCam 镜头演出。
+     */
+    public static void sendJudgmentDomainCmdCamSetup(ServerPlayer caster, net.minecraft.core.BlockPos domainCenter)
+    {
+        CHANNEL.send(
+                PacketDistributor.PLAYER.with(() -> caster),
+                new JudgmentDomainCmdCamSetupS2CPacket(domainCenter)
+        );
+    }
+
+    /** 诛伏赐死：结界完成第 4 秒向领域内玩家同步红黄青循环闪现世界层滤镜。 */
+    public static void sendJudgmentDomainColorCycleOverlaySync(ServerPlayer player)
+    {
+        CHANNEL.send(
+                PacketDistributor.PLAYER.with(() -> player),
+                new SyncJudgmentDomainColorCycleOverlayS2CPacket()
+        );
+    }
+
+    /** 「开始审判」开庭演出：施法者客户端 CMDCam + 服务端已同步触发动画。 */
+    public static void sendJudgmentTrialOpeningPerformance(ServerPlayer caster, float playerYRot)
+    {
+        CHANNEL.send(
+                PacketDistributor.PLAYER.with(() -> caster),
+                new JudgmentTrialOpeningPerformanceS2CPacket(caster.position(), playerYRot)
+        );
+    }
+
+    /** 审判者愤怒演出：施法者客户端播放审判者正脸 CMDCam 镜头（2 秒）。 */
+    public static void sendJudgmentJudgeAngryPerformance(ServerPlayer caster, double judgeX, double judgeY, double judgeZ, float judgeYRot)
+    {
+        CHANNEL.send(
+                PacketDistributor.PLAYER.with(() -> caster),
+                new JudgmentJudgeAngryPerformanceS2CPacket(new net.minecraft.world.phys.Vec3(judgeX, judgeY, judgeZ), judgeYRot)
+        );
+    }
+
+    public static void sendExecutionersSwordActivationSync(ServerPlayer player)
+    {
+        CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new SyncExecutionersSwordActivationS2CPacket());
+    }
+
     public static void sendWhiteOverlaySync(ServerPlayer player, boolean enabled, float alpha)
     {
         CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new SyncWhiteOverlayS2CPacket(enabled, alpha));
@@ -686,9 +848,8 @@ public final class ModNetwork
         );
     }
 
-
     /**
-     * 伏魔神龛领域构建完成瞬间：仅施法者客户端执行 CMDCam 镜头路径编排（玩家实体坐标与朝向由服务端采样）。
+     * 伏魔神龛结界构建完成瞬间：仅施法者客户端执行 CMDCam 镜头路径编排（玩家实体坐标与朝向由服务端采样）。
      */
     public static void sendShrineDomainCmdCamSetup(ServerPlayer caster, Vec3 playerPos, float playerYRot)
     {
@@ -697,7 +858,6 @@ public final class ModNetwork
                 new ShrineDomainCmdCamSetupS2CPacket(playerPos, playerYRot)
         );
     }
-
 
     public static void sendShrineCastFilterSync(ServerPlayer player, boolean enabled)
     {

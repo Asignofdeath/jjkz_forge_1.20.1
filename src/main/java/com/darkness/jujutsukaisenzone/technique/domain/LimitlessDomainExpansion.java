@@ -213,6 +213,12 @@ public final class LimitlessDomainExpansion extends AbstractTechniqueDomain
     }
 
     @Override
+    public ResourceLocation resolveInnateDomainSkyboxTexture(ServerPlayer player)
+    {
+        return LIMITLESS_DOMAIN_SKYBOX_TEXTURE_AFTER_280;
+    }
+
+    @Override
     protected double getMaintainCostReduction(ServerPlayer player)
     {
         return LimitlessDomainSkillGrowth.maintainCostReduction(player);

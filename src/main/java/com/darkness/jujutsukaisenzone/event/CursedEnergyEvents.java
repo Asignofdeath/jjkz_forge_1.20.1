@@ -17,16 +17,25 @@ import com.darkness.jujutsukaisenzone.player.PlayerSkillBarConfig;
 import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
 import com.darkness.jujutsukaisenzone.player.PlayerTechniqueIntelData;
 import com.darkness.jujutsukaisenzone.player.PlayerSeanceTechniqueData;
+import com.darkness.jujutsukaisenzone.player.PlayerStrengthenTechniqueData;
+import com.darkness.jujutsukaisenzone.technique.StrengthenTechniqueLearnLogic;
 import com.darkness.jujutsukaisenzone.technique.development.SkillUnlockLogic;
 import com.darkness.jujutsukaisenzone.technique.TechniqueDailyUpgradeLogic;
 import com.darkness.jujutsukaisenzone.technique.BarrierTechniqueServerLogic;
 import com.darkness.jujutsukaisenzone.technique.skillset.TechniqueSkillSetRegistry;
 import com.darkness.jujutsukaisenzone.technique.SeanceTechniqueServerLogic;
+import com.darkness.jujutsukaisenzone.technique.StrengthenTechniqueServerLogic;
 import com.darkness.jujutsukaisenzone.technique.domain.DomainExpansionRouter;
+import com.darkness.jujutsukaisenzone.technique.skill.JudgmentAccuseSkillLogic;
+import com.darkness.jujutsukaisenzone.technique.skill.JudgmentJudgeEntityLogic;
+import com.darkness.jujutsukaisenzone.technique.skill.JudgmentSoundLogic;
+import com.darkness.jujutsukaisenzone.technique.skill.JudgmentTrialSkillLogic;
+import com.darkness.jujutsukaisenzone.technique.skill.JudgmentTrialStackVisuals;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
+import net.minecraftforge.event.entity.player.PlayerEvent.PlayerChangedDimensionEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent.PlayerLoggedInEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent.PlayerRespawnEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -83,6 +92,21 @@ public final class CursedEnergyEvents
     }
 
     @SubscribeEvent
+    public static void onPlayerChangedDimension(PlayerChangedDimensionEvent event)
+    {
+        if (!(event.getEntity() instanceof ServerPlayer serverPlayer))
+        {
+            return;
+        }
+        // 跨维度时客户端 LocalPlayer 会重建，PersistentData 清空；必须重新同步，
+        // 否则客户端会把玩家当成无术式状态（术式、技能栏、阵营等全部丢失显示）。
+        PlayerCursedEnergyData.initializeIfAbsent(serverPlayer);
+        syncPlayerState(serverPlayer);
+        // 下一 tick 再同步一次，避开客户端 LocalPlayer 重建窗口期。
+        serverPlayer.server.execute(() -> syncPlayerState(serverPlayer));
+    }
+
+    @SubscribeEvent
     public static void onPlayerTick(TickEvent.PlayerTickEvent event)
     {
         if (event.phase != TickEvent.Phase.END || event.player.level().isClientSide)
@@ -101,8 +125,16 @@ public final class CursedEnergyEvents
             PlayerHealthData.syncFromEntity(serverPlayer);
             BarrierTechniqueServerLogic.staticTickMaintain(serverPlayer);
             SeanceTechniqueServerLogic.tickMaintain(serverPlayer);
+            StrengthenTechniqueServerLogic.tickMaintain(serverPlayer);
             TechniqueDailyUpgradeLogic.checkGameDayEnd(serverPlayer);
             DomainExpansionRouter.tickMaintainAll(serverPlayer);
+            JudgmentTrialSkillLogic.tickMaintain(serverPlayer);
+            JudgmentTrialSkillLogic.tickPendingVerdictTitles(serverPlayer);
+            JudgmentAccuseSkillLogic.tickMaintain(serverPlayer);
+            JudgmentAccuseSkillLogic.tickPendingJudgeDismiss(serverPlayer);
+            JudgmentJudgeEntityLogic.tickPendingAngryAnimation(serverPlayer);
+            JudgmentSoundLogic.tickPendingDeathPenalty(serverPlayer);
+            JudgmentTrialStackVisuals.tickForCaster(serverPlayer);
             if (BarrierRulesData.isAutoRepairBarrier(serverPlayer.getUUID()))
             {
                 BarrierTechniqueServerLogic.staticRepairBarrierGaps(serverPlayer);
@@ -143,6 +175,7 @@ public final class CursedEnergyEvents
         }
         ModNetwork.sendFactionSync(serverPlayer, PlayerFactionData.getFactionId(serverPlayer));
         ModNetwork.sendCursedGradeSync(serverPlayer, PlayerCursedGradeData.getExperience(serverPlayer));
+        StrengthenTechniqueLearnLogic.tryUnlockForGrade(serverPlayer);
         ModNetwork.sendReverseTechniqueSync(serverPlayer, PlayerReverseTechniqueData.hasReverseTechnique(serverPlayer));
         ModNetwork.sendBarrierTechniqueLearnedSync(serverPlayer, PlayerBarrierTechniqueData.hasLearned(serverPlayer));
         ModNetwork.sendDomainExpansionLearnedSync(serverPlayer, PlayerDomainExpansionData.hasLearned(serverPlayer));
@@ -150,6 +183,11 @@ public final class CursedEnergyEvents
                 serverPlayer,
                 PlayerSeanceTechniqueData.hasLearned(serverPlayer),
                 PlayerSeanceTechniqueData.getLevel(serverPlayer).getTier());
+        ModNetwork.sendStrengthenTechniqueLearnedSync(
+                serverPlayer,
+                PlayerStrengthenTechniqueData.hasLearned(serverPlayer),
+                PlayerStrengthenTechniqueData.getLevel(serverPlayer).getTier(),
+                PlayerStrengthenTechniqueData.isActive(serverPlayer));
         ModNetwork.sendTechniqueSync(serverPlayer, PlayerTechniqueData.getInnateTechnique(serverPlayer));
         PlayerTechniqueIntelData.syncToClient(serverPlayer);
         SkillUnlockLogic.syncToClient(serverPlayer);

@@ -1,6 +1,7 @@
 package com.darkness.jujutsukaisenzone.technique.development;
 
 import com.darkness.jujutsukaisenzone.player.PlayerCursedGradeData;
+import com.darkness.jujutsukaisenzone.player.PlayerDomainExpansionData;
 import com.darkness.jujutsukaisenzone.player.PlayerReverseTechniqueData;
 import com.darkness.jujutsukaisenzone.technique.commonskill.ReverseTechniqueCommonKeySkill;
 import net.minecraft.world.entity.player.Player;
@@ -21,6 +22,8 @@ public final class UnlockConditionEvaluator
             case HAS_REVERSE_TECHNIQUE -> PlayerReverseTechniqueData.hasReverseTechnique(player);
             case HAS_COMMON_SKILL -> evaluateCommonSkill(player, condition.arg());
             case MIN_CURSED_RANK -> PlayerCursedGradeData.getRank(player) >= parseInt(condition.arg(), 0);
+            case HAS_DOMAIN_EXPANSION -> PlayerDomainExpansionData.hasLearned(player);
+            case ALWAYS_VISIBLE -> true;
         };
     }
 

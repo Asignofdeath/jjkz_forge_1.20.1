@@ -30,6 +30,7 @@ public final class TechniqueSkillTreeViewHelper
     {
         REFERENCE_SATISFIED,
         REFERENCE_LOCKED,
+        INFO,
         SKILL_UNLOCKED,
         SKILL_CAN_UNLOCK,
         SKILL_LOCKED
@@ -41,6 +42,12 @@ public final class TechniqueSkillTreeViewHelper
 
     public static NodeVisualState getVisualState(Player player, String techniqueId, SkillTreeNodeDef node)
     {
+        if (node.isInfoNode())
+        {
+            return SkillUnlockLogic.isInfoNodeVisible(player, node)
+                    ? NodeVisualState.INFO
+                    : NodeVisualState.SKILL_LOCKED;
+        }
         if (node.isReferenceNode())
         {
             return SkillUnlockLogic.isReferenceSatisfied(player, node)
@@ -70,6 +77,7 @@ public final class TechniqueSkillTreeViewHelper
         return switch (state)
         {
             case REFERENCE_SATISFIED, SKILL_UNLOCKED -> 0xFF55FF55;
+            case INFO -> 0xFF88CCFF;
             case SKILL_CAN_UNLOCK -> 0xFFFFFF55;
             case REFERENCE_LOCKED, SKILL_LOCKED -> 0xFF888888;
         };
@@ -77,6 +85,10 @@ public final class TechniqueSkillTreeViewHelper
 
     public static Component getDisplayName(Player player, String techniqueId, SkillTreeNodeDef node)
     {
+        if (node.isInfoNode())
+        {
+            return Component.translatable(node.infoTitleKey());
+        }
         if (node.isReferenceNode())
         {
             if (node.referenceKind() == SkillTreeReferenceKind.COMMON_SKILL
@@ -113,6 +125,12 @@ public final class TechniqueSkillTreeViewHelper
 
     public static ResourceLocation getIconLocation(Player player, String techniqueId, SkillTreeNodeDef node)
     {
+        if (node.isInfoNode())
+        {
+            return node.infoIconPath() != null && !node.infoIconPath().isBlank()
+                    ? iconResource(node.infoIconPath())
+                    : null;
+        }
         if (!node.isSkillNode())
         {
             return null;
@@ -139,6 +157,10 @@ public final class TechniqueSkillTreeViewHelper
 
     public static String getSubtitle(Player player, String techniqueId, SkillTreeNodeDef node, NodeVisualState state)
     {
+        if (node.isInfoNode())
+        {
+            return Component.translatable("gui.jujutsukaisenzone.skill_tree.info").getString();
+        }
         if (node.isReferenceNode())
         {
             if (node.referenceKind() == SkillTreeReferenceKind.BLACK_FLASH_COUNT)
@@ -176,13 +198,34 @@ public final class TechniqueSkillTreeViewHelper
         return switch (state)
         {
             case SKILL_UNLOCKED -> "已解锁";
-            case SKILL_CAN_UNLOCK -> "可解锁 · " + node.intelCost() + " 情报";
-            case SKILL_LOCKED -> {
-                int have = PlayerTechniqueIntelData.getIntel(player, techniqueId);
-                yield "需 " + node.intelCost() + " 情报（" + have + "）";
-            }
+            case SKILL_CAN_UNLOCK -> getCanUnlockSubtitle(node);
+            case SKILL_LOCKED -> getLockedSubtitle(player, techniqueId, node);
             default -> "";
         };
+    }
+
+    private static String getCanUnlockSubtitle(SkillTreeNodeDef node)
+    {
+        if (node.vanillaXpLevelCost() > 0)
+        {
+            return Component.translatable(
+                    "gui.jujutsukaisenzone.skill_tree.can_unlock_xp",
+                    node.vanillaXpLevelCost()).getString();
+        }
+        return "可解锁 · " + node.intelCost() + " 情报";
+    }
+
+    private static String getLockedSubtitle(Player player, String techniqueId, SkillTreeNodeDef node)
+    {
+        if (node.vanillaXpLevelCost() > 0)
+        {
+            return Component.translatable(
+                    "gui.jujutsukaisenzone.skill_tree.need_xp",
+                    node.vanillaXpLevelCost(),
+                    player.experienceLevel).getString();
+        }
+        int have = PlayerTechniqueIntelData.getIntel(player, techniqueId);
+        return "需 " + node.intelCost() + " 情报（" + have + "）";
     }
 
     public static ResourceLocation iconResource(String path)

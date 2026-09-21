@@ -202,6 +202,8 @@ public final class LimitlessDomainCmdCamClient
                 return;
             }
             tickScheduledCamCommands();
+            ShrineDomainCmdCamClient.tickScheduledCamCommands();
+            JudgmentDomainCmdCamClient.tickScheduledCamCommands();
         }
     }
 }

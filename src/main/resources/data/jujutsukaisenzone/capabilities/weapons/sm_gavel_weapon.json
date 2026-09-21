@@ -1,0 +1,85 @@
+{
+  "variations": [
+    {
+      "condition": "epicfight:tag_value",
+      "predicate": {
+        "key": "CustomModelData",
+        "value": "0"
+      },
+      "type": "epicfight:axe",
+      "attributes": {
+        "common": {
+          "armor_negation": 5.0,
+          "impact": 1.4,
+          "max_strikes": 1,
+          "damage_bonus": 2.0,
+          "speed_bonus": 0.1
+        }
+      },
+      "collider": {
+        "number": 3,
+        "center": [0.0, 0.0, -0.8],
+        "size": [0.4, 0.4, 0.9]
+      }
+    },
+    {
+      "condition": "epicfight:tag_value",
+      "predicate": {
+        "key": "CustomModelData",
+        "value": "1"
+      },
+      "type": "epicfight:spear",
+      "attributes": {
+        "common": {
+          "armor_negation": 5.0,
+          "impact": 1.4,
+          "max_strikes": 1,
+          "damage_bonus": 2.0,
+          "speed_bonus": 0.0
+        }
+      },
+      "collider": {
+        "number": 3,
+        "center": [0.0, 0.0, -1.15],
+        "size": [0.45, 0.45, 1.15]
+      }
+    },
+    {
+      "condition": "epicfight:tag_value",
+      "predicate": {
+        "key": "CustomModelData",
+        "value": "2"
+      },
+      "type": "epicfight:greatsword",
+      "attributes": {
+        "common": {
+          "armor_negation": 5.0,
+          "impact": 2.0,
+          "max_strikes": 1,
+          "damage_bonus": 4.5,
+          "speed_bonus": -0.1
+        }
+      },
+      "collider": {
+        "number": 3,
+        "center": [0.0, 0.0, -0.65],
+        "size": [0.55, 0.55, 0.85]
+      }
+    }
+  ],
+  "type": "epicfight:axe",
+  "attributes": {
+    "common": {
+      "armor_negation": 5.0,
+      "impact": 1.4,
+      "max_strikes": 1,
+      "damage_bonus": 2.0,
+      "speed_bonus": 0.1
+    }
+  },
+  "collider": {
+    "number": 3,
+    "center": [0.0, 0.0, -0.8],
+    "size": [0.4, 0.4, 0.9]
+  }
+}

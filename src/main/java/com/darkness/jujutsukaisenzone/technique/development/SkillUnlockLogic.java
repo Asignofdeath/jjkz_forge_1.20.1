@@ -7,14 +7,18 @@ import com.darkness.jujutsukaisenzone.player.PlayerShrineBlackFlashMilestoneData
 import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
 import com.darkness.jujutsukaisenzone.player.PlayerTechniqueIntelData;
 import com.darkness.jujutsukaisenzone.player.SeanceTechniqueLevel;
-import com.darkness.jujutsukaisenzone.technique.skillset.IInnateTechniqueSkillSet;
+import com.darkness.jujutsukaisenzone.technique.aerial.AerialCombatSkillRegistry;
+import com.darkness.jujutsukaisenzone.technique.aerial.AerialCombatSkills;
+import com.darkness.jujutsukaisenzone.technique.commonskill.CommonTechniqueSkillRegistry;
 import com.darkness.jujutsukaisenzone.technique.commonskill.ReverseTechniqueCommonKeySkill;
+import com.darkness.jujutsukaisenzone.technique.skillset.IInnateTechniqueSkillSet;
 import com.darkness.jujutsukaisenzone.technique.skillset.TechniqueSkill;
 import com.darkness.jujutsukaisenzone.technique.skillset.TechniqueSkillSetRegistry;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -36,7 +40,21 @@ public final class SkillUnlockLogic
         {
             return isReferenceSatisfied(player, node);
         }
+        if (node.isInfoNode())
+        {
+            return isInfoNodeVisible(player, node);
+        }
         return isSkillNodeUnlocked(player, techniqueId, node);
+    }
+
+    /** 说明节点是否满足出现条件。 */
+    public static boolean isInfoNodeVisible(Player player, SkillTreeNodeDef node)
+    {
+        if (!node.isInfoNode())
+        {
+            return false;
+        }
+        return UnlockConditionEvaluator.evaluateAll(player, node.visibilityConditions());
     }
 
     public static boolean isReferenceSatisfied(Player player, SkillTreeNodeDef node)
@@ -83,6 +101,11 @@ public final class SkillUnlockLogic
 
     public static boolean isSkillUnlocked(Player player, String techniqueId, String skillId, TechniqueSkill skill)
     {
+        if (CommonTechniqueSkillRegistry.isRegistered(skillId))
+        {
+            return CommonTechniqueSkillRegistry.isUnlocked(player, skillId);
+        }
+
         Optional<TechniqueSkillTree> treeOpt = TechniqueSkillTreeRegistry.get(techniqueId);
         if (treeOpt.isEmpty())
         {
@@ -121,12 +144,17 @@ public final class SkillUnlockLogic
         {
             return false;
         }
+        if (node.vanillaXpLevelCost() > 0)
+        {
+            return player.experienceLevel >= node.vanillaXpLevelCost();
+        }
         return PlayerTechniqueIntelData.getIntel(player, techniqueId) >= node.intelCost();
     }
 
     public static SkillUnlockResult tryUnlockSkill(ServerPlayer player, String techniqueId, String nodeId)
     {
-        if (!techniqueId.equals(PlayerTechniqueData.getInnateTechnique(player)))
+        if (!AerialCombatSkills.TREE_ID.equals(techniqueId)
+                && !techniqueId.equals(PlayerTechniqueData.getInnateTechnique(player)))
         {
             return SkillUnlockResult.WRONG_TECHNIQUE;
         }
@@ -158,9 +186,21 @@ public final class SkillUnlockLogic
         {
             return SkillUnlockResult.CONDITIONS_NOT_MET;
         }
-        if (PlayerTechniqueIntelData.getIntel(player, techniqueId) < node.intelCost())
+        if (node.vanillaXpLevelCost() > 0)
+        {
+            if (player.experienceLevel < node.vanillaXpLevelCost())
+            {
+                return SkillUnlockResult.INSUFFICIENT_VANILLA_XP;
+            }
+        }
+        else if (PlayerTechniqueIntelData.getIntel(player, techniqueId) < node.intelCost())
         {
             return SkillUnlockResult.INSUFFICIENT_INTEL;
+        }
+
+        if (node.vanillaXpLevelCost() > 0)
+        {
+            player.giveExperienceLevels(-node.vanillaXpLevelCost());
         }
 
         setSkillUnlocked(player, techniqueId, node, true);
@@ -169,6 +209,16 @@ public final class SkillUnlockLogic
 
     public static Optional<TechniqueSkill> findSkillDefinition(String techniqueId, String skillId)
     {
+        Optional<TechniqueSkill> aerial = AerialCombatSkillRegistry.find(skillId);
+        if (aerial.isPresent())
+        {
+            return aerial;
+        }
+        Optional<TechniqueSkill> common = CommonTechniqueSkillRegistry.find(skillId);
+        if (common.isPresent())
+        {
+            return common;
+        }
         return TechniqueSkillSetRegistry.get(techniqueId)
                 .flatMap(set -> set.getConfigurableSkills().stream()
                         .filter(skill -> skill.skillId().equals(skillId))
@@ -182,11 +232,14 @@ public final class SkillUnlockLogic
         {
             return Collections.emptyList();
         }
-        return TechniqueSkillSetRegistry.get(techniqueId)
-                .map(set -> set.getConfigurableSkills().stream()
-                        .filter(skill -> isSkillBarEligible(player, techniqueId, skill, set))
-                        .toList())
-                .orElse(Collections.emptyList());
+        List<TechniqueSkill> result = new ArrayList<>();
+        TechniqueSkillSetRegistry.get(techniqueId).ifPresent(set -> set.getConfigurableSkills().stream()
+                .filter(skill -> isSkillBarEligible(player, techniqueId, skill, set))
+                .forEach(result::add));
+        CommonTechniqueSkillRegistry.getConfigurableSkills().stream()
+                .filter(skill -> CommonTechniqueSkillRegistry.isUnlocked(player, skill.skillId()))
+                .forEach(result::add);
+        return result;
     }
 
     /** 已解锁且满足快捷栏展示条件的技能。 */
@@ -238,6 +291,10 @@ public final class SkillUnlockLogic
         if (skillId == null || skillId.isBlank())
         {
             return "";
+        }
+        if (CommonTechniqueSkillRegistry.isRegistered(skillId))
+        {
+            return CommonTechniqueSkillRegistry.isUnlocked(player, skillId) ? skillId : "";
         }
         return TechniqueSkillSetRegistry.get(techniqueId)
                 .flatMap(set -> findSkillDefinition(techniqueId, skillId)

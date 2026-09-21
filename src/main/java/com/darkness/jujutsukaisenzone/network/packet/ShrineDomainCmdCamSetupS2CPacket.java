@@ -1,7 +1,7 @@
 package com.darkness.jujutsukaisenzone.network.packet;
 
+import com.darkness.jujutsukaisenzone.client.ShrineDomainChatHudSuppressor;
 import com.darkness.jujutsukaisenzone.client.ShrineDomainCmdCamClient;
-import net.minecraft.client.Minecraft;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.network.NetworkEvent;
@@ -9,7 +9,7 @@ import net.minecraftforge.network.NetworkEvent;
 import java.util.function.Supplier;
 
 /**
- * 伏魔神龛领域构建完成瞬间：通知施法者客户端按玩家实体坐标与朝向执行 CMDCam 镜头路径编排（仅 save，不播放）。
+ * 伏魔神龛结界构建完成瞬间：通知施法者客户端按<strong>玩家实体坐标与朝向</strong>执行 CMDCam 镜头路径编排。
  */
 public class ShrineDomainCmdCamSetupS2CPacket
 {
@@ -43,8 +43,8 @@ public class ShrineDomainCmdCamSetupS2CPacket
         Vec3 pos = packet.playerPos;
         float yRot = packet.playerYRot;
         context.enqueueWork(() -> {
-            Minecraft.getInstance().execute(() ->
-                    ShrineDomainCmdCamClient.applyCameraPathSetup(pos.x, pos.y, pos.z, yRot));
+            ShrineDomainChatHudSuppressor.startHideForShrineDomainComplete();
+            ShrineDomainCmdCamClient.applyCameraPathSetup(pos.x, pos.y, pos.z, yRot);
         });
         context.setPacketHandled(true);
     }

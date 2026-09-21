@@ -19,6 +19,7 @@ import java.util.List;
  *   <li>{@link DomainExpansionServerLogic} - 基础领域（无术式时）</li>
  *   <li>{@link LimitlessDomainExpansion} - 无下限术式领域「无量空处」</li>
  *   <li>{@link ShrineDomainExpansion} - 御厨子术式领域「伏魔神龛」</li>
+ *   <li>{@link JudgmentDomainExpansion} - 审判术式领域「诛伏赐死」</li>
  * </ul>
  */
 public final class DomainExpansionRouter
@@ -35,6 +36,7 @@ public final class DomainExpansionRouter
         ALL_DOMAINS.add(DomainExpansionServerLogic.getInstance());
         ALL_DOMAINS.add(LimitlessDomainExpansion.getInstance());
         ALL_DOMAINS.add(ShrineDomainExpansion.getInstance());
+        ALL_DOMAINS.add(JudgmentDomainExpansion.getInstance());
     }
 
     /**

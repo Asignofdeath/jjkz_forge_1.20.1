@@ -1,6 +1,8 @@
 package com.darkness.jujutsukaisenzone.technique;
 
 import com.darkness.jujutsukaisenzone.compat.EpicFightCompat;
+import com.darkness.jujutsukaisenzone.technique.aerial.AerialCombatSkillRegistry;
+import com.darkness.jujutsukaisenzone.technique.aerial.AerialCombatSkills;
 import com.darkness.jujutsukaisenzone.network.ModNetwork;
 import com.darkness.jujutsukaisenzone.player.PlayerCursedEnergyData;
 import com.darkness.jujutsukaisenzone.player.PlayerCursedGradeData;
@@ -10,6 +12,7 @@ import com.darkness.jujutsukaisenzone.player.PlayerMaxOutputChargeData;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * 释放情绪：按住 Z 蓄力恢复咒力，挂载阵营色 Photon FX，蓄满或打断后进入冷却。
@@ -99,6 +102,7 @@ public final class EmotionalReleaseServerLogic
             finishCharge(player, false);
             return;
         }
+        maintainAirSuspend(player);
         long startTick = PlayerEmotionalReleaseData.getChargeStartTick(player);
         long elapsed = gameTime - startTick;
         if (elapsed >= MAX_CHARGE_TICKS)
@@ -120,6 +124,7 @@ public final class EmotionalReleaseServerLogic
 
     private static void finishCharge(ServerPlayer player, boolean reachedMaxDuration)
     {
+        player.setNoGravity(false);
         String fxId = PlayerEmotionalReleaseData.getMountedFxId(player);
         if (!fxId.isEmpty())
         {
@@ -168,6 +173,25 @@ public final class EmotionalReleaseServerLogic
     private static boolean isMoving(ServerPlayer player)
     {
         return Math.abs(player.xxa) > 0.01F || Math.abs(player.zza) > 0.01F;
+    }
+
+    /** 空中蓄力时停滞；落地、创造飞行或鞘翅时不生效。需已解锁「咒力悬空」。 */
+    private static void maintainAirSuspend(ServerPlayer player)
+    {
+        if (!AerialCombatSkillRegistry.isUnlocked(player, AerialCombatSkills.SKILL_CURSE_LEVITATION))
+        {
+            player.setNoGravity(false);
+            return;
+        }
+        if (player.onGround() || player.getAbilities().flying || player.isFallFlying())
+        {
+            player.setNoGravity(false);
+            return;
+        }
+        player.setNoGravity(true);
+        player.setDeltaMovement(Vec3.ZERO);
+        player.fallDistance = 0.0F;
+        player.hurtMarked = true;
     }
 
     public static String resolveFxId(ServerPlayer player)

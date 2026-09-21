@@ -16,7 +16,7 @@ public final class JjkzCreativeTabLayout
     public static final int PLAYER_INVENTORY_OFFSET_Y = 112;
 
     public static final int TAB_HEIGHT = 20;
-    public static final int TAB_WIDTH = 80;
+    public static final int TAB_WIDTH = 50;
     public static final int TAB_GAP = 4;
 
     /** 仅覆盖原版创造物品格，不含玩家快捷栏 */

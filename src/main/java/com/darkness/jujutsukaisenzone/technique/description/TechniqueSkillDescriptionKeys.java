@@ -13,6 +13,8 @@ public final class TechniqueSkillDescriptionKeys
     private static final String SKILL_PREFIX = "skill." + JuJutsuKaisenZone.MODID + ".";
 
     public static final String COST = "gui." + JuJutsuKaisenZone.MODID + ".skill.cost";
+    public static final String MAINTAIN_COST = "gui." + JuJutsuKaisenZone.MODID + ".skill.maintain_cost";
+    public static final String TOGGLE = "gui." + JuJutsuKaisenZone.MODID + ".skill.toggle";
     public static final String COOLDOWN = "gui." + JuJutsuKaisenZone.MODID + ".skill.cooldown";
 
     private TechniqueSkillDescriptionKeys()

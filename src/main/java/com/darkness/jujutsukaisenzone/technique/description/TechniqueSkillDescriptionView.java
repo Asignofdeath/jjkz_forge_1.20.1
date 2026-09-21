@@ -9,6 +9,15 @@ public record TechniqueSkillDescriptionView(
         Component displayName,
         int cursedEnergyCost,
         int cooldownSeconds,
-        Component description)
+        Component description,
+        boolean maintainSkill)
 {
+    public TechniqueSkillDescriptionView(
+            Component displayName,
+            int cursedEnergyCost,
+            int cooldownSeconds,
+            Component description)
+    {
+        this(displayName, cursedEnergyCost, cooldownSeconds, description, false);
+    }
 }

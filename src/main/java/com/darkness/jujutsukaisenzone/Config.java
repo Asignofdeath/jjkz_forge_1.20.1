@@ -248,10 +248,10 @@ public class Config
     public static double blackFlashZoneDefenseBonus;
 
     // ======== 击杀获取咒术经验运行时配置 ========
-    public static int killExpRadius;
-    public static double killExpLastHitRatio;
-    public static double killExpNearbyRatio;
-    public static int killExpMaxFromMob;
+    public static int killExpRadius = 32;
+    public static double killExpLastHitRatio = 0.6D;
+    public static double killExpNearbyRatio = 0.4D;
+    public static int killExpMaxFromMob = 20;
 
     // ======== 技能战斗数值（从 SPEC 加载） ========
     public static int skillCombatBaselineGrade;

@@ -1997,4 +1997,10 @@ public final class ShrineDomainExpansion extends AbstractTechniqueDomain
     {
         return SHRINE_DOMAIN_INITIAL_SKYBOX_TEXTURE;
     }
+
+    @Override
+    public ResourceLocation resolveInnateDomainSkyboxTexture(ServerPlayer player)
+    {
+        return SHRINE_DOMAIN_SKYBOX_TEXTURE;
+    }
 }

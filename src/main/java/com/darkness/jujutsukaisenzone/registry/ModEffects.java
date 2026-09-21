@@ -1,7 +1,10 @@
 package com.darkness.jujutsukaisenzone.registry;
 
 import com.darkness.jujutsukaisenzone.JuJutsuKaisenZone;
+import com.darkness.jujutsukaisenzone.effect.ConfiscationEffect;
+import com.darkness.jujutsukaisenzone.effect.DeathSentenceEffect;
 import com.darkness.jujutsukaisenzone.effect.RushIntoTheZoneClimaxEffect;
+import com.darkness.jujutsukaisenzone.effect.SinfulOneEffect;
 import com.darkness.jujutsukaisenzone.effect.TechniqueMeltdownEffect;
 import com.darkness.jujutsukaisenzone.effect.ZoneEffect;
 import net.minecraft.world.effect.MobEffect;
@@ -20,6 +23,12 @@ public final class ModEffects
             EFFECTS.register("technique_meltdown", TechniqueMeltdownEffect::new);
     public static final RegistryObject<MobEffect> RUSH_INTO_THE_ZONE_CLIMAX =
             EFFECTS.register("rush_into_the_zone_climax", RushIntoTheZoneClimaxEffect::new);
+    public static final RegistryObject<MobEffect> DEATH_SENTENCE =
+            EFFECTS.register("death_sentence", DeathSentenceEffect::new);
+    public static final RegistryObject<MobEffect> CONFISCATION =
+            EFFECTS.register("confiscation", ConfiscationEffect::new);
+    public static final RegistryObject<MobEffect> SINFUL_ONE =
+            EFFECTS.register("sinful_one", SinfulOneEffect::new);
 
     private ModEffects()
     {

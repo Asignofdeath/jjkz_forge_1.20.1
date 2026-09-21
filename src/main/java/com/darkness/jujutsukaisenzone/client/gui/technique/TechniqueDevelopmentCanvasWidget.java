@@ -4,6 +4,7 @@ import com.lowdragmc.lowdraglib.gui.widget.FreeGraphView;
 import com.lowdragmc.lowdraglib.utils.Size;
 import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
 import com.darkness.jujutsukaisenzone.technique.development.SkillTreeLayoutEngine;
+import com.darkness.jujutsukaisenzone.technique.development.SkillUnlockLogic;
 import com.darkness.jujutsukaisenzone.technique.development.SkillTreeNodeDef;
 import com.darkness.jujutsukaisenzone.technique.development.TechniqueSkillTree;
 import com.darkness.jujutsukaisenzone.technique.development.TechniqueSkillTreeRegistry;
@@ -21,11 +22,75 @@ import java.util.Optional;
 @OnlyIn(Dist.CLIENT)
 public final class TechniqueDevelopmentCanvasWidget extends FreeGraphView
 {
+    private String treeId = "";
+
     public TechniqueDevelopmentCanvasWidget()
     {
+        this(resolveDefaultTreeId());
+    }
+
+    public TechniqueDevelopmentCanvasWidget(String treeId)
+    {
         super(0, 0, 1, 1);
+        this.treeId = treeId == null ? "" : treeId;
         setDrawGrid(true);
         setGridWidth(20);
+    }
+
+    public String treeId()
+    {
+        return treeId;
+    }
+
+    public void setTreeId(String treeId)
+    {
+        this.treeId = treeId == null ? "" : treeId;
+    }
+
+    public void rebuildGraph()
+    {
+        clearAllWidgets();
+
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.player == null || treeId.isBlank())
+        {
+            return;
+        }
+
+        Optional<TechniqueSkillTree> treeOpt = TechniqueSkillTreeRegistry.get(treeId);
+        if (treeOpt.isEmpty())
+        {
+            return;
+        }
+
+        TechniqueSkillTree tree = treeOpt.get();
+        java.util.List<SkillTreeNodeDef> visibleNodes = tree.nodes().stream()
+                .filter(node -> !node.isInfoNode() || SkillUnlockLogic.isInfoNodeVisible(minecraft.player, node))
+                .toList();
+        TechniqueSkillTree.Builder layoutBuilder = TechniqueSkillTree.builder(tree.techniqueId());
+        for (SkillTreeNodeDef node : visibleNodes)
+        {
+            layoutBuilder.node(node);
+        }
+        TechniqueSkillTree layoutTree = layoutBuilder.build();
+        Map<String, int[]> layout = SkillTreeLayoutEngine.layout(layoutTree);
+
+        Map<String, SkillTreeNodeWidget> nodeWidgets = new LinkedHashMap<>();
+        for (SkillTreeNodeDef nodeDef : visibleNodes)
+        {
+            SkillTreeNodeWidget widget = new SkillTreeNodeWidget(treeId, nodeDef);
+            int[] pos = layout.getOrDefault(nodeDef.nodeId(), new int[] { 0, 0 });
+            widget.setSelfPosition(pos[0], pos[1]);
+            nodeWidgets.put(nodeDef.nodeId(), widget);
+        }
+
+        addWidget(new SkillTreeConnectionsWidget(this, layoutTree, nodeWidgets));
+        for (SkillTreeNodeWidget widget : nodeWidgets.values())
+        {
+            addWidget(widget);
+        }
+
+        resetFitScaleByWidgets();
     }
 
     @Override
@@ -44,42 +109,14 @@ public final class TechniqueDevelopmentCanvasWidget extends FreeGraphView
         rebuildGraph();
     }
 
-    private void rebuildGraph()
+    private static String resolveDefaultTreeId()
     {
-        clearAllWidgets();
-
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.player == null)
         {
-            return;
+            return "";
         }
-
-        String techniqueId = PlayerTechniqueData.getInnateTechnique(minecraft.player);
-        Optional<TechniqueSkillTree> treeOpt = TechniqueSkillTreeRegistry.get(techniqueId);
-        if (treeOpt.isEmpty())
-        {
-            return;
-        }
-
-        TechniqueSkillTree tree = treeOpt.get();
-        Map<String, int[]> layout = SkillTreeLayoutEngine.layout(tree);
-
-        Map<String, SkillTreeNodeWidget> nodeWidgets = new LinkedHashMap<>();
-        for (SkillTreeNodeDef nodeDef : tree.nodes())
-        {
-            SkillTreeNodeWidget widget = new SkillTreeNodeWidget(techniqueId, nodeDef);
-            int[] pos = layout.getOrDefault(nodeDef.nodeId(), new int[] { 0, 0 });
-            widget.setSelfPosition(pos[0], pos[1]);
-            nodeWidgets.put(nodeDef.nodeId(), widget);
-        }
-
-        addWidget(new SkillTreeConnectionsWidget(this, tree, nodeWidgets));
-        for (SkillTreeNodeWidget widget : nodeWidgets.values())
-        {
-            addWidget(widget);
-        }
-
-        resetFitScaleByWidgets();
+        return PlayerTechniqueData.getInnateTechnique(minecraft.player);
     }
 
     public static void refreshIfOpen()

@@ -14,6 +14,7 @@ public enum SkillUnlockResult
     MISSING_PREREQUISITES,
     CONDITIONS_NOT_MET,
     INSUFFICIENT_INTEL,
+    INSUFFICIENT_VANILLA_XP,
     WRONG_TECHNIQUE;
 
     public Component toMessage()

@@ -140,6 +140,16 @@ public final class SkillTreeNodeWidget extends com.lowdragmc.lowdraglib.gui.widg
             return;
         }
 
+        if (nodeDef.isInfoNode())
+        {
+            Component title = TechniqueSkillTreeViewHelper.getDisplayName(player, techniqueId, nodeDef);
+            Component body = Component.translatable(nodeDef.infoDescriptionKey()).withStyle(ChatFormatting.GRAY);
+            setHoverTooltips(
+                    title.copy().withStyle(ChatFormatting.AQUA),
+                    body);
+            return;
+        }
+
         if (!nodeDef.isSkillNode())
         {
             clearHoverTooltips();
@@ -171,7 +181,8 @@ public final class SkillTreeNodeWidget extends com.lowdragmc.lowdraglib.gui.widg
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button)
     {
-        if (button != 0 || !isMouseOverElement(mouseX, mouseY) || nodeDef.isReferenceNode())
+        if (button != 0 || !isMouseOverElement(mouseX, mouseY)
+                || nodeDef.isReferenceNode() || nodeDef.isInfoNode())
         {
             return super.mouseClicked(mouseX, mouseY, button);
         }

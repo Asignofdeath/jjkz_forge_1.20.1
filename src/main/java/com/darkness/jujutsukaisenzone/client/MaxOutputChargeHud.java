@@ -1,28 +1,19 @@
 package com.darkness.jujutsukaisenzone.client;
 
-import com.darkness.jujutsukaisenzone.JuJutsuKaisenZone;
-import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.util.Mth;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.client.event.RenderGuiOverlayEvent;
-import net.minecraftforge.client.gui.overlay.VanillaGuiOverlay;
-import net.minecraftforge.eventbus.api.EventPriority;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-import yesman.epicfight.client.gui.EntityUI;
-import yesman.epicfight.config.ClientConfig;
-import yesman.epicfight.api.utils.math.Vec2i;
 
 /**
- * 术式槽位「最大输出」蓄力条，样式与 Epic Fight 蓄力条一致。
+ * 「最大输出」蓄力条状态；绘制由 {@link JjkzChargeBarOverlay} 统一调度。
  */
 public final class MaxOutputChargeHud
 {
+    private static final int FILL_COLOR = 0xFF44AAFF;
+
     private static boolean visible;
     private static int slot;
-    private static int holdOriginTick;
+    private static int holdOriginTick = -1;
     private static int requiredTicks;
     private static String label = "最大输出";
 
@@ -70,58 +61,30 @@ public final class MaxOutputChargeHud
         return visible ? slot : 0;
     }
 
+    static void render(GuiGraphics graphics, Minecraft minecraft, int screenWidth, int screenHeight, float partialTick)
+    {
+        if (!visible)
+        {
+            return;
+        }
+
+        float progress = resolveProgress(partialTick);
+        JjkzChargeBarHud.drawCentered(graphics, minecraft, screenWidth, screenHeight, label, progress, FILL_COLOR);
+    }
+
     private static int currentPlayerTick()
     {
         Minecraft minecraft = Minecraft.getInstance();
         return minecraft.player != null ? minecraft.player.tickCount : 0;
     }
 
-    private static float getProgress(float partialTick)
+    private static float resolveProgress(float partialTick)
     {
-        if (!visible || requiredTicks <= 0)
+        if (!visible || requiredTicks <= 0 || holdOriginTick < 0)
         {
             return 0.0F;
         }
         float heldTicks = currentPlayerTick() - holdOriginTick + partialTick;
         return Mth.clamp(heldTicks / (float) requiredTicks, 0.0F, 1.0F);
-    }
-
-    @Mod.EventBusSubscriber(modid = JuJutsuKaisenZone.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE, value = Dist.CLIENT)
-    public static final class Renderer
-    {
-        private Renderer()
-        {
-        }
-
-        @SubscribeEvent(priority = EventPriority.LOWEST)
-        public static void onRenderGuiOverlay(RenderGuiOverlayEvent.Post event)
-        {
-            if (!visible || !event.getOverlay().equals(VanillaGuiOverlay.HOTBAR.type()))
-            {
-                return;
-            }
-
-            Minecraft minecraft = Minecraft.getInstance();
-            if (minecraft.player == null || minecraft.options.hideGui || minecraft.screen != null)
-            {
-                return;
-            }
-
-            float partialTick = minecraft.getFrameTime();
-            float ratio = getProgress(partialTick);
-            int screenWidth = event.getWindow().getGuiScaledWidth();
-            int screenHeight = event.getWindow().getGuiScaledHeight();
-            Vec2i pos = ClientConfig.getChargingBarPosition(screenWidth, screenHeight);
-            GuiGraphics graphics = event.getGuiGraphics();
-
-            RenderSystem.enableBlend();
-            RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
-            graphics.blit(EntityUI.BATTLE_ICON, pos.x, pos.y, 1, 71, 238, 13, 255, 255);
-            graphics.blit(EntityUI.BATTLE_ICON, pos.x, pos.y, 1, 57, (int) (238 * ratio), 13, 255, 255);
-            RenderSystem.disableBlend();
-
-            int stringWidth = minecraft.font.width(label);
-            graphics.drawString(minecraft.font, label, pos.x + 120 - stringWidth / 2, pos.y - 12, 16777215, true);
-        }
     }
 }

@@ -22,6 +22,16 @@ public record UnlockCondition(UnlockConditionType type, String arg)
         return new UnlockCondition(UnlockConditionType.MIN_CURSED_RANK, Integer.toString(rank));
     }
 
+    public static UnlockCondition hasDomainExpansion()
+    {
+        return new UnlockCondition(UnlockConditionType.HAS_DOMAIN_EXPANSION, "");
+    }
+
+    public static UnlockCondition alwaysVisible()
+    {
+        return new UnlockCondition(UnlockConditionType.ALWAYS_VISIBLE, "");
+    }
+
     public boolean evaluate(Player player)
     {
         return UnlockConditionEvaluator.evaluate(player, this);

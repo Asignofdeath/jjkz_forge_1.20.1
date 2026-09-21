@@ -38,6 +38,20 @@ public final class ModSounds
     public static final RegistryObject<SoundEvent> SLASH_KILL = register("domain.slash_kill");
     /** 伏魔神龛「完美压制」反馈（{@code assets/.../sounds/domain/shrine_perfect}）。 */
     public static final RegistryObject<SoundEvent> SHRINE_DOMAIN_PERFECT = register("domain.shrine_perfect");
+    /** 诛伏赐死「全员回来重审」反馈（{@code assets/.../sounds/domain/chubukushishi_perfect_new}）。 */
+    public static final RegistryObject<SoundEvent> JUDGMENT_DOMAIN_PERFECT = register("domain.chubukushishi_perfect");
+    /** 诛伏赐死领域点击【开始审判】时于中心播放（{@code assets/.../sounds/domain/hold_a_court_session}）。 */
+    public static final RegistryObject<SoundEvent> JUDGMENT_DOMAIN_HOLD_A_COURT_SESSION = register("domain.hold_a_court_session");
+    /** 诛伏赐死结界构建完成时于中心播放（{@code assets/.../sounds/domain/laying_stone_tiles}）。 */
+    public static final RegistryObject<SoundEvent> JUDGMENT_DOMAIN_LAYING_STONE_TILES = register("domain.laying_stone_tiles");
+    /** 审判大标题演出（{@code assets/.../sounds/jutsushiki/judge/big_subtitle_show}）。 */
+    public static final RegistryObject<SoundEvent> JUDGMENT_BIG_SUBTITLE_SHOW = register("jutsushiki.judge.big_subtitle_show");
+    /** 审判「没收」惩罚（{@code assets/.../sounds/jutsushiki/judge/confiscation}）。 */
+    public static final RegistryObject<SoundEvent> JUDGMENT_CONFISCATION = register("jutsushiki.judge.confiscation");
+    /** 审判「死刑」惩罚（{@code assets/.../sounds/jutsushiki/judge/death_penalty}）。 */
+    public static final RegistryObject<SoundEvent> JUDGMENT_DEATH_PENALTY = register("jutsushiki.judge.death_penalty");
+    /** 处刑人之剑特攻必杀（{@code assets/.../sounds/jutsushiki/judge/execution}）。 */
+    public static final RegistryObject<SoundEvent> JUDGMENT_EXECUTION = register("jutsushiki.judge.execution");
     /** 解箭发射音效（{@code assets/.../sounds/jutsushiki/shrine/slash_kai_1_fire}）。 */
     public static final RegistryObject<SoundEvent> SHRINE_SLASH_KAI_1_FIRE = register("jutsushiki.shrine.slash_kai_1_fire");
     /** 解箭命中生物音效（{@code assets/.../sounds/jutsushiki/shrine/slash_kai_1_hit}）。 */

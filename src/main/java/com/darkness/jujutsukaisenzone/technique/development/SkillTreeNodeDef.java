@@ -15,9 +15,14 @@ public final class SkillTreeNodeDef
     private final String skillId;
     private final SkillTreeReferenceKind referenceKind;
     private final String referenceId;
+    private final String infoTitleKey;
+    private final String infoIconPath;
+    private final String infoDescriptionKey;
     private final List<String> prerequisiteNodeIds;
     private final List<UnlockCondition> unlockConditions;
+    private final List<UnlockCondition> visibilityConditions;
     private final int intelCost;
+    private final int vanillaXpLevelCost;
     private final boolean autoGranted;
 
     SkillTreeNodeDef(
@@ -26,9 +31,14 @@ public final class SkillTreeNodeDef
             String skillId,
             SkillTreeReferenceKind referenceKind,
             String referenceId,
+            String infoTitleKey,
+            String infoIconPath,
+            String infoDescriptionKey,
             List<String> prerequisiteNodeIds,
             List<UnlockCondition> unlockConditions,
+            List<UnlockCondition> visibilityConditions,
             int intelCost,
+            int vanillaXpLevelCost,
             boolean autoGranted)
     {
         this.nodeId = nodeId;
@@ -36,9 +46,14 @@ public final class SkillTreeNodeDef
         this.skillId = skillId;
         this.referenceKind = referenceKind;
         this.referenceId = referenceId;
+        this.infoTitleKey = infoTitleKey;
+        this.infoIconPath = infoIconPath;
+        this.infoDescriptionKey = infoDescriptionKey;
         this.prerequisiteNodeIds = List.copyOf(prerequisiteNodeIds);
         this.unlockConditions = List.copyOf(unlockConditions);
+        this.visibilityConditions = List.copyOf(visibilityConditions);
         this.intelCost = Math.max(0, intelCost);
+        this.vanillaXpLevelCost = Math.max(0, vanillaXpLevelCost);
         this.autoGranted = autoGranted;
     }
 
@@ -67,6 +82,21 @@ public final class SkillTreeNodeDef
         return referenceId;
     }
 
+    public String infoTitleKey()
+    {
+        return infoTitleKey;
+    }
+
+    public String infoIconPath()
+    {
+        return infoIconPath;
+    }
+
+    public String infoDescriptionKey()
+    {
+        return infoDescriptionKey;
+    }
+
     public List<String> prerequisiteNodeIds()
     {
         return prerequisiteNodeIds;
@@ -77,9 +107,19 @@ public final class SkillTreeNodeDef
         return unlockConditions;
     }
 
+    public List<UnlockCondition> visibilityConditions()
+    {
+        return visibilityConditions;
+    }
+
     public int intelCost()
     {
         return intelCost;
+    }
+
+    public int vanillaXpLevelCost()
+    {
+        return vanillaXpLevelCost;
     }
 
     public boolean autoGranted()
@@ -97,6 +137,11 @@ public final class SkillTreeNodeDef
         return kind == SkillTreeNodeKind.REFERENCE;
     }
 
+    public boolean isInfoNode()
+    {
+        return kind == SkillTreeNodeKind.INFO;
+    }
+
     public static Builder skill(String nodeId, String skillId)
     {
         return new Builder(nodeId, SkillTreeNodeKind.SKILL).skillId(skillId);
@@ -108,6 +153,11 @@ public final class SkillTreeNodeDef
                 .reference(referenceKind, referenceId);
     }
 
+    public static Builder info(String nodeId)
+    {
+        return new Builder(nodeId, SkillTreeNodeKind.INFO);
+    }
+
     public static final class Builder
     {
         private final String nodeId;
@@ -115,9 +165,14 @@ public final class SkillTreeNodeDef
         private String skillId = "";
         private SkillTreeReferenceKind referenceKind;
         private String referenceId = "";
+        private String infoTitleKey = "";
+        private String infoIconPath = "";
+        private String infoDescriptionKey = "";
         private List<String> prerequisiteNodeIds = Collections.emptyList();
         private List<UnlockCondition> unlockConditions = Collections.emptyList();
+        private List<UnlockCondition> visibilityConditions = Collections.emptyList();
         private int intelCost;
+        private int vanillaXpLevelCost;
         private boolean autoGranted;
 
         private Builder(String nodeId, SkillTreeNodeKind kind)
@@ -139,6 +194,24 @@ public final class SkillTreeNodeDef
             return this;
         }
 
+        public Builder titleKey(String infoTitleKey)
+        {
+            this.infoTitleKey = infoTitleKey;
+            return this;
+        }
+
+        public Builder iconPath(String infoIconPath)
+        {
+            this.infoIconPath = infoIconPath;
+            return this;
+        }
+
+        public Builder descriptionKey(String infoDescriptionKey)
+        {
+            this.infoDescriptionKey = infoDescriptionKey;
+            return this;
+        }
+
         public Builder requires(String... prerequisiteNodeIds)
         {
             this.prerequisiteNodeIds = List.of(prerequisiteNodeIds);
@@ -151,9 +224,22 @@ public final class SkillTreeNodeDef
             return this;
         }
 
+        public Builder visibleWhen(UnlockCondition... visibilityConditions)
+        {
+            this.visibilityConditions = List.of(visibilityConditions);
+            return this;
+        }
+
         public Builder intelCost(int intelCost)
         {
             this.intelCost = intelCost;
+            return this;
+        }
+
+        /** 解锁时消耗的原版经验等级。 */
+        public Builder vanillaXpLevelCost(int vanillaXpLevelCost)
+        {
+            this.vanillaXpLevelCost = vanillaXpLevelCost;
             return this;
         }
 
@@ -173,9 +259,14 @@ public final class SkillTreeNodeDef
                     skillId,
                     referenceKind,
                     referenceId,
+                    infoTitleKey,
+                    infoIconPath,
+                    infoDescriptionKey,
                     prerequisiteNodeIds,
                     unlockConditions,
+                    visibilityConditions,
                     intelCost,
+                    vanillaXpLevelCost,
                     autoGranted
             );
         }

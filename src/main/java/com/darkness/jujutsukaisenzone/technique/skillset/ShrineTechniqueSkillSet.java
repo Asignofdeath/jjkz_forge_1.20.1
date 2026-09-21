@@ -18,6 +18,7 @@ import com.darkness.jujutsukaisenzone.technique.development.SkillUnlockLogic;
 import com.darkness.jujutsukaisenzone.technique.development.SkillTreeNodeDef;
 import com.darkness.jujutsukaisenzone.technique.development.SkillTreeReferenceKind;
 import com.darkness.jujutsukaisenzone.technique.development.TechniqueSkillTree;
+import com.darkness.jujutsukaisenzone.technique.development.UnlockCondition;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
@@ -133,6 +134,13 @@ public final class ShrineTechniqueSkillSet extends AbstractInnateTechniqueSkillS
             .node(SkillTreeNodeDef.skill("shrine_fuga", SKILL_FUGA)
                     .requires(REF_SEANCE_COMPLETE)
                     .intelCost(600)
+                    .build())
+            .node(SkillTreeNodeDef.info("shrine_domain_fumoshinkan")
+                    .titleKey("skill_tree.jujutsukaisenzone.shrine_domain_fumoshinkan.title")
+                    .iconPath("textures/item/slash_technique_sukuna.png")
+                    .descriptionKey("skill_tree.jujutsukaisenzone.shrine_domain_fumoshinkan.desc")
+                    .requires("shrine_hachi")
+                    .visibleWhen(UnlockCondition.hasDomainExpansion())
                     .build())
             .build();
 

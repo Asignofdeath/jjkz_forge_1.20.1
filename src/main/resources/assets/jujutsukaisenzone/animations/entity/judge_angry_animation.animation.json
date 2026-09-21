@@ -1,0 +1,31 @@
+{
+	"format_version": "1.8.0",
+	"animations": {
+		"judge_angry_animation": {
+			"loop": "hold_on_last_frame",
+			"animation_length": 0.4167,
+			"bones": {
+				"bone5": {
+					"position": {
+						"0.0": {
+							"vector": [0, 0, 0]
+						},
+						"0.4167": {
+							"vector": [0, 0, 2]
+						}
+					}
+				},
+				"bone6": {
+					"position": {
+						"0.0": {
+							"vector": [0, 0, 0]
+						},
+						"0.4167": {
+							"vector": [0, 0, -2]
+						}
+					}
+				}
+			}
+		}
+	}
+}

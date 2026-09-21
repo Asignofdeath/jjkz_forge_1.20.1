@@ -1,6 +1,7 @@
 package com.darkness.jujutsukaisenzone.technique.domain;
 
 import com.darkness.jujutsukaisenzone.JuJutsuKaisenZone;
+import com.darkness.jujutsukaisenzone.effect.ConfiscationEffect;
 import com.darkness.jujutsukaisenzone.effect.TechniqueMeltdownEffect;
 import com.darkness.jujutsukaisenzone.compat.ShaderedCompat;
 import com.darkness.jujutsukaisenzone.player.BarrierRulesData;
@@ -88,6 +89,9 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
      * 业务意图：避免不同领域实现共享同一状态容器，导致 actionbar 文案与领域类型串台。
      */
     protected final ConcurrentMap<UUID, Deque<BarrierInstance>> ACTIVE_DOMAINS = new ConcurrentHashMap<>();
+
+    /** 延迟放置天空盒的倒计时（施法者 UUID → 剩余 tick）。 */
+    private final ConcurrentMap<UUID, Integer> deferredSkyboxPlacementDelayByCaster = new ConcurrentHashMap<>();
 
     // ==================== 派生字段 ====================
 
@@ -226,7 +230,34 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
     @Override
     protected void onBarrierClosed(ServerPlayer player, BarrierInstance instance)
     {
-        TechniqueMeltdownEffect.applyOnDomainClosed(player);
+        deferredSkyboxPlacementDelayByCaster.remove(player.getUUID());
+        if (shouldApplyMeltdownOnBarrierClosed(player, instance))
+        {
+            TechniqueMeltdownEffect.applyOnDomainClosed(player);
+        }
+    }
+
+    /**
+     * 是否在结界壳构建完成后延迟放置天空盒；默认即时放置。
+     * 子类可覆盖以配合客户端演出（如世界层滤镜结束后再出现内壁天空盒）。
+     */
+    protected boolean deferDomainSkyboxPlacement()
+    {
+        return false;
+    }
+
+    /**
+     * 结界构建完成到放置天空盒的延迟（tick）；仅当 {@link #deferDomainSkyboxPlacement()} 为 true 时生效。
+     */
+    protected int getDeferredDomainSkyboxPlacementDelayTicks()
+    {
+        return 0;
+    }
+
+    /** 领域关闭时是否对施术者施加术式熔断；默认 true。 */
+    protected boolean shouldApplyMeltdownOnBarrierClosed(ServerPlayer player, BarrierInstance instance)
+    {
+        return true;
     }
 
     // ==================== 领域方块 ====================
@@ -259,6 +290,11 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
         }
 
         if (TechniqueMeltdownEffect.blockDomainExpansion(player))
+        {
+            return;
+        }
+
+        if (ConfiscationEffect.blockDomainExpansion(player))
         {
             return;
         }
@@ -364,10 +400,7 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
         {
             // 即时展开：放置所有方块、生成地板、填充地板以下、清空地板以上
             placeAllDomainBlocks(level, shellBlocks, removedBlocks, center, radius, playerFootY);
-            // 放置天空盒（替换地板层 + 壳内层，如果玩家配置了天空盒）
-            placeDomainSkybox(level, shellBlocks, center, radius, playerFootY, removedBlocks, instance);
-            // 即时展开也视为“领域完成”，在此触发领域专属完成效果。
-            applyDomainSpecificEffect(player, instance);
+            completeDomainShellExpansion(player, level, instance, shellBlocks, center, radius, playerFootY, removedBlocks);
             String nameDisplay = domainName.isEmpty() ? "" : "「" + domainName + "」";
             player.displayClientMessage(
                     Component.literal(nameDisplay + "领域展开完成（半径 " + radius + "）")
@@ -382,9 +415,100 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
         }
     }
 
+    /**
+     * 瞬间构建领域结界与天空盒并触发 {@link #applyDomainSpecificEffect}（无展开动画）。
+     *
+     * @param consumeCursedEnergy 是否消耗展开咒力
+     * @return 是否成功创建领域实例
+     */
+    protected final boolean castAndCompleteDomainInstantly(ServerPlayer player, boolean consumeCursedEnergy)
+    {
+        if (!player.isAlive())
+        {
+            return false;
+        }
+
+        if (isPlayerInsideAnyDomain(player))
+        {
+            return false;
+        }
+
+        if (BarrierTechniqueServerLogic.getInstance().isPositionInBarrier(player.serverLevel(), player.blockPosition()))
+        {
+            return false;
+        }
+
+        if (!hasLearnedDomainExpansion(player))
+        {
+            return false;
+        }
+
+        if (!PlayerBarrierTechniqueData.hasLearned(player))
+        {
+            return false;
+        }
+
+        int radius = DOMAIN_RADIUS;
+        int expansionCost = calculateExpansionCost(0);
+        if (consumeCursedEnergy && !PlayerCursedEnergyData.tryConsume(player, expansionCost))
+        {
+            return false;
+        }
+
+        ServerLevel level = player.serverLevel();
+        BlockPos center = player.blockPosition();
+        int playerFootY = player.getBlockY() - 1;
+        Map<BlockPos, BlockState> removedBlocks = new HashMap<>();
+
+        List<BlockPos> shellBlocks = buildHollowSpherePositions(center, radius);
+        if (shellBlocks.isEmpty())
+        {
+            return false;
+        }
+
+        shellBlocks = sortShellBlocksForExpansion(shellBlocks, center, player);
+        boolean blockMobSpawn = BarrierRulesData.isBlockMobSpawn(player.getUUID());
+
+        Deque<BarrierInstance> queue = ACTIVE_DOMAINS.computeIfAbsent(player.getUUID(), key -> new ArrayDeque<>());
+        BarrierInstance instance = new BarrierInstance(
+                level.dimension(),
+                shellBlocks,
+                removedBlocks,
+                center,
+                radius,
+                blockMobSpawn,
+                10,
+                shellBlocks.size(),
+                false,
+                0,
+                expansionCost,
+                playerFootY);
+
+        queue.addLast(instance);
+        while (queue.size() > MAX_ACTIVE_BARRIER_COUNT)
+        {
+            BarrierInstance oldest = queue.pollFirst();
+            if (oldest != null)
+            {
+                clearBarrierInstance(player, oldest);
+            }
+        }
+
+        if (queue.isEmpty())
+        {
+            ACTIVE_DOMAINS.remove(player.getUUID());
+            return false;
+        }
+
+        placeAllDomainBlocks(level, shellBlocks, removedBlocks, center, radius, playerFootY);
+        completeDomainShellExpansion(player, level, instance, shellBlocks, center, radius, playerFootY, removedBlocks);
+        return true;
+    }
+
     @Override
     public void tickMaintain(ServerPlayer player)
     {
+        tickDeferredDomainSkyboxPlacement(player);
         Deque<BarrierInstance> queue = ACTIVE_DOMAINS.get(player.getUUID());
         if (queue == null || queue.isEmpty())
         {
@@ -660,6 +784,15 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
     protected ResourceLocation getDomainSkyboxTexture()
     {
         return DEFAULT_SKYBOX_TEXTURE;
+    }
+
+    /**
+     * 生得领域演出用的天空盒纹理；默认与 {@link #getDomainSkyboxTexture()} 相同。
+     * 正式领域若使用阶段性天空盒切换，子类可在此指定演出专用纹理。
+     */
+    public ResourceLocation resolveInnateDomainSkyboxTexture(ServerPlayer player)
+    {
+        return getDomainSkyboxTexture();
     }
 
     /**
@@ -975,16 +1108,91 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
         if (newProgress >= allBlocks.size())
         {
             instance.setExpanding(false);
-            // 展开完成后放置天空盒（替换地板层 + 壳内层）
-            placeDomainSkybox(level, allBlocks, center, radius, instance.getPlayerFootY(),
-                    instance.getRemovedBlocks(), instance);
-            // 动画展开完成后触发领域专属完成效果。
-            applyDomainSpecificEffect(player, instance);
+            completeDomainShellExpansion(
+                    player,
+                    level,
+                    instance,
+                    allBlocks,
+                    center,
+                    radius,
+                    instance.getPlayerFootY(),
+                    instance.getRemovedBlocks());
             nameDisplay = domainName.isEmpty() ? "" : "「" + domainName + "」";
             player.displayClientMessage(
                     Component.literal(nameDisplay + "领域构建完成")
                             .withStyle(ChatFormatting.GOLD), true);
         }
+    }
+
+    /**
+     * 结界壳构建完成：放置天空盒（或登记延迟放置）并触发领域专属完成效果。
+     */
+    private void completeDomainShellExpansion(
+            ServerPlayer player,
+            ServerLevel level,
+            BarrierInstance instance,
+            List<BlockPos> shellBlocks,
+            BlockPos center,
+            int radius,
+            int playerFootY,
+            Map<BlockPos, BlockState> removedBlocks)
+    {
+        if (deferDomainSkyboxPlacement())
+        {
+            scheduleDeferredDomainSkyboxPlacement(player);
+        }
+        else
+        {
+            placeDomainSkybox(level, shellBlocks, center, radius, playerFootY, removedBlocks, instance);
+        }
+        applyDomainSpecificEffect(player, instance);
+    }
+
+    private void scheduleDeferredDomainSkyboxPlacement(ServerPlayer player)
+    {
+        int delayTicks = Math.max(getDeferredDomainSkyboxPlacementDelayTicks(), 1);
+        deferredSkyboxPlacementDelayByCaster.put(player.getUUID(), delayTicks);
+    }
+
+    private void tickDeferredDomainSkyboxPlacement(ServerPlayer player)
+    {
+        UUID uuid = player.getUUID();
+        Integer remaining = deferredSkyboxPlacementDelayByCaster.get(uuid);
+        if (remaining == null)
+        {
+            return;
+        }
+
+        if (remaining <= 1)
+        {
+            deferredSkyboxPlacementDelayByCaster.remove(uuid);
+            Deque<BarrierInstance> queue = ACTIVE_DOMAINS.get(uuid);
+            if (queue == null || queue.isEmpty())
+            {
+                return;
+            }
+            BarrierInstance instance = queue.peekLast();
+            if (instance == null || instance.isExpanding())
+            {
+                return;
+            }
+            ServerLevel level = player.server.getLevel(instance.getDimension());
+            if (level == null)
+            {
+                return;
+            }
+            placeDomainSkybox(
+                    level,
+                    instance.getShellBlocks(),
+                    instance.getCenter(),
+                    instance.getRadius(),
+                    instance.getPlayerFootY(),
+                    instance.getRemovedBlocks(),
+                    instance);
+            return;
+        }
+
+        deferredSkyboxPlacementDelayByCaster.put(uuid, remaining - 1);
     }
 
     /**
@@ -1112,6 +1320,18 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
         {
             this.instance = instance;
         }
+
+        public BarrierInstance getBarrierInstance()
+        {
+            return instance;
+        }
+    }
+
+    /**
+     * 生得领域结界与天空盒建造完成后的装饰钩子（如审判术式地板、处刑架圈景观）。
+     */
+    protected void onInnateDomainArenaBuilt(ServerPlayer player, ServerLevel level, InnateArenaHandle handle)
+    {
     }
 
     public final InnateArenaHandle buildInnateDomainArena(
@@ -1121,13 +1341,23 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
             int radius,
             ResourceLocation skyboxTexture)
     {
+        return buildInnateDomainArena(player, level, center, radius, center.getY() - radius + 1, skyboxTexture);
+    }
+
+    public final InnateArenaHandle buildInnateDomainArena(
+            ServerPlayer player,
+            ServerLevel level,
+            BlockPos center,
+            int radius,
+            int playerFootY,
+            ResourceLocation skyboxTexture)
+    {
         Map<BlockPos, BlockState> removedBlocks = new HashMap<>();
         List<BlockPos> shellBlocks = buildHollowSpherePositions(center, radius);
         if (shellBlocks.isEmpty())
         {
             return null;
         }
-        int playerFootY = center.getY() - radius + 1;
         BarrierInstance instance = new BarrierInstance(
                 level.dimension(),
                 shellBlocks,
@@ -1144,7 +1374,9 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
         placeAllDomainBlocks(level, shellBlocks, removedBlocks, center, radius, playerFootY);
         placeDomainSkyboxWithTexture(level, shellBlocks, center, radius, playerFootY, removedBlocks, instance,
                 skyboxTexture);
-        return new InnateArenaHandle(instance);
+        InnateArenaHandle handle = new InnateArenaHandle(instance);
+        onInnateDomainArenaBuilt(player, level, handle);
+        return handle;
     }
 
     /** 拆除生得领域演出结界并恢复方块。 */

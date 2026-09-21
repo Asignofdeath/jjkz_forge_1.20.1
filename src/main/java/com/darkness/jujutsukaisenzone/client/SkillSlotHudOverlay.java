@@ -94,7 +94,7 @@ public final class SkillSlotHudOverlay
             // 画技能图标
             if (!skillId.isEmpty())
             {
-                var skill = findSkillById(setOpt.get(), skillId);
+                TechniqueSkill skill = SkillUnlockLogic.findSkillDefinition(techniqueId, skillId).orElse(null);
                 if (skill != null && SkillUnlockLogic.isSkillUnlocked(player, techniqueId, skillId, skill))
                 {
                     ResourceLocation icon = iconResource(skill.iconPath());
@@ -105,17 +105,6 @@ public final class SkillSlotHudOverlay
         }
 
         RenderSystem.disableBlend();
-    }
-
-    private static TechniqueSkill findSkillById(
-            com.darkness.jujutsukaisenzone.technique.skillset.IInnateTechniqueSkillSet set,
-            String skillId)
-    {
-        for (TechniqueSkill s : set.getConfigurableSkills())
-        {
-            if (s.skillId().equals(skillId)) return s;
-        }
-        return null;
     }
 
     private static ResourceLocation iconResource(String path)

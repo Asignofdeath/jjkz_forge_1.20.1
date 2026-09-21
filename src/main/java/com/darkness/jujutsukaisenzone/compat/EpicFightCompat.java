@@ -1,14 +1,18 @@
 package com.darkness.jujutsukaisenzone.compat;
 
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
 import yesman.epicfight.world.capabilities.EpicFightCapabilities;
 import yesman.epicfight.world.capabilities.entitypatch.player.PlayerPatch;
 import yesman.epicfight.world.capabilities.entitypatch.player.ServerPlayerPatch;
+import yesman.epicfight.world.capabilities.item.CapabilityItem;
 
 public final class EpicFightCompat
 {
     public static final float HEAVENLY_BURST_STAMINA_COST = 6.0F;
+    public static final float AERIAL_MULTI_JUMP_STAMINA_COST = 2.0F;
 
     private EpicFightCompat()
     {
@@ -89,6 +93,30 @@ public final class EpicFightCompat
         if (patch != null && JjkzEpicFightAnimations.SHRINE_DOMAIN_EXPANSION != null)
         {
             patch.stopPlaying(JjkzEpicFightAnimations.SHRINE_DOMAIN_EXPANSION);
+        }
+    }
+
+    /**
+     * 诛伏赐死领域结界构建完成：播放 {@code lookdown} 玩家动画（需已注册 {@link JjkzEpicFightAnimations#JUDGMENT_DOMAIN_LOOKDOWN}）。
+     */
+    public static void playJudgmentDomainLookdownAnimation(ServerPlayer player)
+    {
+        ServerPlayerPatch patch = EpicFightCapabilities.getEntityPatch(player, ServerPlayerPatch.class);
+        if (patch != null && JjkzEpicFightAnimations.JUDGMENT_DOMAIN_LOOKDOWN != null)
+        {
+            patch.playAnimationInstantly(JjkzEpicFightAnimations.JUDGMENT_DOMAIN_LOOKDOWN);
+        }
+    }
+
+    /**
+     * 「开始审判」开庭演出：播放 {@code swing_the_gavel} 玩家动画。
+     */
+    public static void playSwingTheGavelAnimation(ServerPlayer player)
+    {
+        ServerPlayerPatch patch = EpicFightCapabilities.getEntityPatch(player, ServerPlayerPatch.class);
+        if (patch != null && JjkzEpicFightAnimations.SWING_THE_GAVEL != null)
+        {
+            patch.playAnimationInstantly(JjkzEpicFightAnimations.SWING_THE_GAVEL);
         }
     }
 
@@ -229,5 +257,55 @@ public final class EpicFightCompat
         patch.resetActionTick();
         patch.setStamina(patch.getStamina() - actualCost);
         return true;
+    }
+
+    public static boolean tryConsumeAerialMultiJumpStamina(Player player)
+    {
+        ServerPlayerPatch patch = EpicFightCapabilities.getEntityPatch(player, ServerPlayerPatch.class);
+        if (patch == null)
+        {
+            return false;
+        }
+
+        float actualCost = patch.getModifiedStaminaConsume(AERIAL_MULTI_JUMP_STAMINA_COST);
+        if (!patch.hasStamina(actualCost))
+        {
+            return false;
+        }
+
+        patch.resetActionTick();
+        patch.setStamina(patch.getStamina() - actualCost);
+        return true;
+    }
+
+    /** 物品是否注册了 Epic Fight 武器 capability。 */
+    public static boolean isEpicFightWeapon(ItemStack stack)
+    {
+        return EpicFightCapabilities.getItemCapability(stack).isPresent();
+    }
+
+    /**
+     * 法槌形态变更后刷新 Epic Fight 武器类型。
+     * EF 在 capability 首次挂载时即固定类型，仅改 NBT 不会更新，需换栈并通知 PlayerPatch。
+     */
+    public static void refreshGavelWeaponHeldItem(
+            ServerPlayer player,
+            InteractionHand hand,
+            ItemStack oldStack,
+            ItemStack newStack)
+    {
+        if (!isBattleMode(player))
+        {
+            return;
+        }
+        ServerPlayerPatch patch = EpicFightCapabilities.getEntityPatch(player, ServerPlayerPatch.class);
+        if (patch == null)
+        {
+            return;
+        }
+        CapabilityItem oldCap = patch.getHoldingItemCapability(hand);
+        CapabilityItem newCap = EpicFightCapabilities.getItemStackCapability(newStack);
+        patch.updateHeldItem(oldCap, newCap, oldStack, newStack, hand);
+        patch.modifyLivingMotionByCurrentItem(true);
     }
 }

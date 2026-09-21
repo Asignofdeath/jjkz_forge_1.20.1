@@ -16,6 +16,7 @@ import com.darkness.jujutsukaisenzone.technique.development.SkillUnlockLogic;
 import com.darkness.jujutsukaisenzone.technique.development.SkillTreeNodeDef;
 import com.darkness.jujutsukaisenzone.technique.development.SkillTreeReferenceKind;
 import com.darkness.jujutsukaisenzone.technique.development.TechniqueSkillTree;
+import com.darkness.jujutsukaisenzone.technique.development.UnlockCondition;
 import com.darkness.jujutsukaisenzone.technique.scaling.LimitlessPurpleSkillGrowth;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.network.chat.Component;
@@ -127,6 +128,13 @@ public final class LimitlessTechniqueSkillSet extends AbstractInnateTechniqueSki
             .node(SkillTreeNodeDef.skill("limitless_remote_murasaki", SKILL_REMOTE_PURPLE)
                     .requires("limitless_purple", REF_CURSED_GRADE_SPECIAL)
                     .intelCost(500)
+                    .build())
+            .node(SkillTreeNodeDef.info("limitless_domain_muryokusho")
+                    .titleKey("skill_tree.jujutsukaisenzone.limitless_domain_muryokusho.title")
+                    .iconPath("textures/item/innate_technique_limitless.png")
+                    .descriptionKey("skill_tree.jujutsukaisenzone.limitless_domain_muryokusho.desc")
+                    .requires("limitless_purple")
+                    .visibleWhen(UnlockCondition.hasDomainExpansion())
                     .build())
             .build();
 

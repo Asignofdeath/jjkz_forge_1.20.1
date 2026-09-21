@@ -1,7 +1,11 @@
 package com.darkness.jujutsukaisenzone.registry;
 
 import com.darkness.jujutsukaisenzone.JuJutsuKaisenZone;
+import com.darkness.jujutsukaisenzone.entity.ChubukushishiEntity;
+import com.darkness.jujutsukaisenzone.entity.CourtSeatEntity;
 import com.darkness.jujutsukaisenzone.entity.DemonSubduingShrineEntity;
+import com.darkness.jujutsukaisenzone.entity.JudgeEntity;
+import com.darkness.jujutsukaisenzone.entity.GavelProjectileEntity;
 import com.darkness.jujutsukaisenzone.entity.SpecialEffectEntity;
 import com.darkness.jujutsukaisenzone.entity.WedgeEntity;
 import net.minecraft.world.entity.EntityType;
@@ -32,6 +36,45 @@ public final class ModEntities
                             .updateInterval(5)
                             .fireImmune()
                             .build("demon_subduing_shrine"));
+
+    /** 审判者 */
+    public static final RegistryObject<EntityType<JudgeEntity>> JUDGE =
+            ENTITY_TYPES.register("judge",
+                    () -> EntityType.Builder.<JudgeEntity>of(JudgeEntity::new, MobCategory.MISC)
+                            .sized(9.0F, 8.5F)
+                            .clientTrackingRange(16)
+                            .updateInterval(5)
+                            .fireImmune()
+                            .build("judge"));
+
+    /** 法庭座位 */
+    public static final RegistryObject<EntityType<CourtSeatEntity>> COURT_SEAT =
+            ENTITY_TYPES.register("court_seat",
+                    () -> EntityType.Builder.<CourtSeatEntity>of(CourtSeatEntity::new, MobCategory.MISC)
+                            .sized(2.0F, 1.5F)
+                            .clientTrackingRange(16)
+                            .updateInterval(5)
+                            .fireImmune()
+                            .build("court_seat"));
+
+    /** 处刑架圈景观 */
+    public static final RegistryObject<EntityType<ChubukushishiEntity>> EXECUTION_SCAFFOLD_CIRCLE =
+            ENTITY_TYPES.register("chubukushishi",
+                    () -> EntityType.Builder.<ChubukushishiEntity>of(ChubukushishiEntity::new, MobCategory.MISC)
+                            .sized(18.0F, 15.0F)
+                            .clientTrackingRange(16)
+                            .updateInterval(5)
+                            .fireImmune()
+                            .build("chubukushishi"));
+
+    /** 法槌投射物 */
+    public static final RegistryObject<EntityType<GavelProjectileEntity>> GAVEL_PROJECTILE =
+            ENTITY_TYPES.register("gavel_projectile",
+                    () -> EntityType.Builder.<GavelProjectileEntity>of(GavelProjectileEntity::new, MobCategory.MISC)
+                            .sized(0.5F, 0.5F)
+                            .clientTrackingRange(4)
+                            .updateInterval(10)
+                            .build("gavel_projectile"));
 
     /** 天元之楔 */
     public static final RegistryObject<EntityType<WedgeEntity>> WEDGE =

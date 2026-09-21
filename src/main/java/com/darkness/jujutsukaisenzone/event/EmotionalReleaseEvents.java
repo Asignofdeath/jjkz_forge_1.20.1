@@ -12,6 +12,7 @@ import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
+import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
@@ -22,7 +23,7 @@ public final class EmotionalReleaseEvents
     {
     }
 
-    @SubscribeEvent
+    @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onPlayerTick(TickEvent.PlayerTickEvent event)
     {
         if (event.phase != TickEvent.Phase.END || event.player.level().isClientSide)
@@ -51,6 +52,7 @@ public final class EmotionalReleaseEvents
         if (event.getEntity() instanceof ServerPlayer serverPlayer)
         {
             PlayerEmotionalReleaseData.clearAll(serverPlayer);
+            serverPlayer.setNoGravity(false);
         }
     }
 

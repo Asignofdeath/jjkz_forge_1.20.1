@@ -20,6 +20,8 @@ import com.darkness.jujutsukaisenzone.technique.commonskill.EmotionalReleaseComm
 import com.darkness.jujutsukaisenzone.technique.commonskill.ReverseTechniqueCommonKeySkill;
 import com.darkness.jujutsukaisenzone.player.mimicry.MimicryVoiceLineDefaults;
 import com.darkness.jujutsukaisenzone.technique.description.TechniqueSkillDescriptions;
+import com.darkness.jujutsukaisenzone.technique.skillset.JudgmentTechniqueSkillSet;
+import com.darkness.jujutsukaisenzone.technique.aerial.AerialCombatSkillRegistry;
 import com.darkness.jujutsukaisenzone.technique.skillset.LimitlessTechniqueSkillSet;
 import com.darkness.jujutsukaisenzone.technique.skillset.ShrineTechniqueSkillSet;
 import com.darkness.jujutsukaisenzone.technique.skillset.TechniqueSkillSetRegistry;
@@ -85,6 +87,8 @@ public class JuJutsuKaisenZone
 
         TechniqueSkillSetRegistry.register(LimitlessTechniqueSkillSet.INSTANCE);
         TechniqueSkillSetRegistry.register(ShrineTechniqueSkillSet.INSTANCE);
+        TechniqueSkillSetRegistry.register(JudgmentTechniqueSkillSet.INSTANCE);
+        AerialCombatSkillRegistry.bootstrap();
         TechniqueSkillDescriptions.bootstrap();
         CommonKeySkillRegistry.register(ReverseTechniqueCommonKeySkill.INSTANCE);
         CommonKeySkillRegistry.register(BarrierTechniqueCommonKeySkill.INSTANCE);

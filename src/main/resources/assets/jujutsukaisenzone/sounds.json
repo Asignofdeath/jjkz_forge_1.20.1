@@ -106,6 +106,65 @@
       }
     ]
   },
+  "domain.chubukushishi_perfect": {
+    "subtitle": "subtitles.jujutsukaisenzone.domain.chubukushishi_perfect",
+    "sounds": [
+      {
+        "name": "jujutsukaisenzone:domain/chubukushishi_perfect_new",
+        "attenuation_distance": 64
+      }
+    ]
+  },
+  "domain.hold_a_court_session": {
+    "subtitle": "subtitles.jujutsukaisenzone.domain.hold_a_court_session",
+    "sounds": [
+      {
+        "name": "jujutsukaisenzone:domain/hold_a_court_session",
+        "attenuation_distance": 64
+      }
+    ]
+  },
+  "domain.laying_stone_tiles": {
+    "subtitle": "subtitles.jujutsukaisenzone.domain.laying_stone_tiles",
+    "sounds": [
+      {
+        "name": "jujutsukaisenzone:domain/laying_stone_tiles",
+        "attenuation_distance": 64
+      }
+    ]
+  },
+  "jutsushiki.judge.big_subtitle_show": {
+    "subtitle": "subtitles.jujutsukaisenzone.jutsushiki.judge.big_subtitle_show",
+    "sounds": [
+      {
+        "name": "jujutsukaisenzone:jutsushiki/judge/big_subtitle_show"
+      }
+    ]
+  },
+  "jutsushiki.judge.confiscation": {
+    "subtitle": "subtitles.jujutsukaisenzone.jutsushiki.judge.confiscation",
+    "sounds": [
+      {
+        "name": "jujutsukaisenzone:jutsushiki/judge/confiscation"
+      }
+    ]
+  },
+  "jutsushiki.judge.death_penalty": {
+    "subtitle": "subtitles.jujutsukaisenzone.jutsushiki.judge.death_penalty",
+    "sounds": [
+      {
+        "name": "jujutsukaisenzone:jutsushiki/judge/death_penalty"
+      }
+    ]
+  },
+  "jutsushiki.judge.execution": {
+    "subtitle": "subtitles.jujutsukaisenzone.jutsushiki.judge.execution",
+    "sounds": [
+      {
+        "name": "jujutsukaisenzone:jutsushiki/judge/execution"
+      }
+    ]
+  },
   "jutsushiki.shrine.slash_kai_1_fire": {
     "subtitle": "subtitles.jujutsukaisenzone.jutsushiki.shrine.slash_kai_1_fire",
     "sounds": [

@@ -1,0 +1,28 @@
+{
+  "parent": "jujutsukaisenzone:sorcerer_special",
+  "criteria": {
+    "perfect_retrial": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "display": {
+    "announce_to_chat": true,
+    "description": {
+      "translate": "advancements.jujutsukaisenzone.perfect_retrial.description"
+    },
+    "frame": "task",
+    "hidden": false,
+    "icon": {
+      "item": "jujutsukaisenzone:trial_technique"
+    },
+    "show_toast": true,
+    "title": {
+      "translate": "advancements.jujutsukaisenzone.perfect_retrial.title"
+    }
+  },
+  "requirements": [
+    [
+      "perfect_retrial"
+    ]
+  ]
+}

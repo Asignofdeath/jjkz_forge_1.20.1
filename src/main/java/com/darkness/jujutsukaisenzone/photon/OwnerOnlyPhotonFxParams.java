@@ -27,6 +27,10 @@ public record OwnerOnlyPhotonFxParams(
     public static final OwnerOnlyPhotonFxParams DOMAIN_DEFAULT = new OwnerOnlyPhotonFxParams(
             Vec3.ZERO, Vec3.ZERO, new Vec3(1.0D, 1.0D, 1.0D), 0, false, false, AUTO_ROTATE_NONE);
 
+    /** 与 {@code photon fx photon:spotlight entity ... true false none} 一致。 */
+    public static final OwnerOnlyPhotonFxParams SPOTLIGHT = new OwnerOnlyPhotonFxParams(
+            Vec3.ZERO, Vec3.ZERO, new Vec3(1.0D, 1.0D, 1.0D), 0, true, false, AUTO_ROTATE_NONE);
+
     public void encode(FriendlyByteBuf buffer)
     {
         buffer.writeDouble(this.offset.x);

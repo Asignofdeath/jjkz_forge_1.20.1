@@ -42,9 +42,45 @@ public final class JjkzPlayerDataStorage extends SavedData
         return storage;
     }
 
+    private static final String LEGACY_TAG_FACTION = "jujutsukaisenzone_faction";
+    private static final String LEGACY_TAG_CURSE_GRADE_XP = "jujutsukaisenzone_curse_grade_xp";
+
     public PlayerDataEntry getOrCreate(ServerPlayer player)
     {
-        return players.computeIfAbsent(player.getUUID(), uuid -> new PlayerDataEntry());
+        PlayerDataEntry entry = players.computeIfAbsent(player.getUUID(), uuid -> new PlayerDataEntry());
+        importLegacyPersistentData(player, entry);
+        return entry;
+    }
+
+    private void importLegacyPersistentData(ServerPlayer player, PlayerDataEntry entry)
+    {
+        CompoundTag tag = player.getPersistentData();
+        boolean changed = false;
+
+        if (entry.factionId == null || entry.factionId.isEmpty())
+        {
+            String legacyFaction = tag.getString(LEGACY_TAG_FACTION);
+            if (!legacyFaction.isEmpty())
+            {
+                entry.factionId = legacyFaction;
+                changed = true;
+            }
+        }
+
+        if (entry.curseGradeExperience <= 0)
+        {
+            int legacyXp = tag.getInt(LEGACY_TAG_CURSE_GRADE_XP);
+            if (legacyXp > 0)
+            {
+                entry.curseGradeExperience = legacyXp;
+                changed = true;
+            }
+        }
+
+        if (changed)
+        {
+            setDirty();
+        }
     }
 
     @Override
@@ -82,6 +118,9 @@ public final class JjkzPlayerDataStorage extends SavedData
         private static final String TAG_SOUL_STUDYBOOK_READ_COUNT = "soulStudybookReadCount";
         private static final String TAG_BARRIER_TECHNIQUE_UPGRADE_CHANCE = "barrierTechniqueUpgradeChance";
         private static final String TAG_SEANCE_TECHNIQUE_UPGRADE_CHANCE = "seanceTechniqueUpgradeChance";
+        private static final String TAG_STRENGTHEN_TECHNIQUE_LEVEL = "strengthenTechniqueLevel";
+        private static final String TAG_STRENGTHEN_TECHNIQUE_UPGRADE_CHANCE = "strengthenTechniqueUpgradeChance";
+        private static final String TAG_STRENGTHEN_ACTIVE = "strengthenActive";
         private static final String TAG_LAST_PROCESSED_GAME_DAY = "lastProcessedGameDay";
         private static final String TAG_TECHNIQUE_INTEL = "techniqueIntel";
 
@@ -106,6 +145,9 @@ public final class JjkzPlayerDataStorage extends SavedData
         int soulStudybookReadCount;
         int barrierTechniqueUpgradeChance;
         int seanceTechniqueUpgradeChance;
+        String strengthenTechniqueLevel = StrengthenTechniqueLevel.UNLEARNED.name();
+        int strengthenTechniqueUpgradeChance;
+        boolean strengthenActive;
         long lastProcessedGameDay = -1L;
         final Map<String, Integer> techniqueIntel = new LinkedHashMap<>();
 
@@ -137,6 +179,11 @@ public final class JjkzPlayerDataStorage extends SavedData
             entry.soulStudybookReadCount = Math.max(0, tag.getInt(TAG_SOUL_STUDYBOOK_READ_COUNT));
             entry.barrierTechniqueUpgradeChance = clampUpgradeChance(tag.getInt(TAG_BARRIER_TECHNIQUE_UPGRADE_CHANCE));
             entry.seanceTechniqueUpgradeChance = clampUpgradeChance(tag.getInt(TAG_SEANCE_TECHNIQUE_UPGRADE_CHANCE));
+            entry.strengthenTechniqueLevel = tag.contains(TAG_STRENGTHEN_TECHNIQUE_LEVEL)
+                    ? tag.getString(TAG_STRENGTHEN_TECHNIQUE_LEVEL)
+                    : StrengthenTechniqueLevel.UNLEARNED.name();
+            entry.strengthenTechniqueUpgradeChance = clampUpgradeChance(tag.getInt(TAG_STRENGTHEN_TECHNIQUE_UPGRADE_CHANCE));
+            entry.strengthenActive = tag.getBoolean(TAG_STRENGTHEN_ACTIVE);
             entry.lastProcessedGameDay = tag.contains(TAG_LAST_PROCESSED_GAME_DAY)
                     ? tag.getLong(TAG_LAST_PROCESSED_GAME_DAY)
                     : -1L;
@@ -172,6 +219,11 @@ public final class JjkzPlayerDataStorage extends SavedData
             tag.putInt(TAG_SOUL_STUDYBOOK_READ_COUNT, Math.max(0, soulStudybookReadCount));
             tag.putInt(TAG_BARRIER_TECHNIQUE_UPGRADE_CHANCE, clampUpgradeChance(barrierTechniqueUpgradeChance));
             tag.putInt(TAG_SEANCE_TECHNIQUE_UPGRADE_CHANCE, clampUpgradeChance(seanceTechniqueUpgradeChance));
+            tag.putString(TAG_STRENGTHEN_TECHNIQUE_LEVEL, strengthenTechniqueLevel == null
+                    ? StrengthenTechniqueLevel.UNLEARNED.name()
+                    : strengthenTechniqueLevel);
+            tag.putInt(TAG_STRENGTHEN_TECHNIQUE_UPGRADE_CHANCE, clampUpgradeChance(strengthenTechniqueUpgradeChance));
+            tag.putBoolean(TAG_STRENGTHEN_ACTIVE, strengthenActive);
             tag.putLong(TAG_LAST_PROCESSED_GAME_DAY, lastProcessedGameDay);
             CompoundTag intelTag = new CompoundTag();
             for (Map.Entry<String, Integer> entry : techniqueIntel.entrySet())

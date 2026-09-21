@@ -1,10 +1,8 @@
 package com.darkness.jujutsukaisenzone.technique.domain;
 
-import com.darkness.jujutsukaisenzone.JuJutsuKaisenZone;
 import com.darkness.jujutsukaisenzone.compat.EpicFightCompat;
 import com.darkness.jujutsukaisenzone.entity.SpecialEffectEntity;
 import com.darkness.jujutsukaisenzone.player.PlayerDomainExpansionData;
-import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
@@ -37,10 +35,6 @@ public final class InnateDomainExperienceManager
     public static final int DOMAIN_RADIUS = AbstractDomainExpansion.DOMAIN_RADIUS;
 
     private static final int SLOWNESS_AMPLIFIER = 5;
-    private static final ResourceLocation LIMITLESS_INNATE_SKYBOX =
-            ResourceLocation.fromNamespaceAndPath(JuJutsuKaisenZone.MODID, "textures/environment/stat_sky2");
-    private static final ResourceLocation SHRINE_INNATE_SKYBOX =
-            ResourceLocation.fromNamespaceAndPath(JuJutsuKaisenZone.MODID, "textures/environment/shrine_cubemap");
 
     private static final ConcurrentMap<UUID, InnateDomainSession> SESSIONS = new ConcurrentHashMap<>();
 
@@ -65,13 +59,13 @@ public final class InnateDomainExperienceManager
                 origin.getX(),
                 level.getMaxBuildHeight() - 1 - DOMAIN_RADIUS,
                 origin.getZ());
-        ResourceLocation skybox = resolveSkyboxTexture(player);
+        AbstractDomainExpansion domain = DomainExpansionRouter.getDomainForPlayer(player);
+        ResourceLocation skybox = domain.resolveInnateDomainSkyboxTexture(player);
         if (skybox == null)
         {
             return;
         }
 
-        AbstractDomainExpansion domain = DomainExpansionRouter.getDomainForPlayer(player);
         AbstractDomainExpansion.InnateArenaHandle arena = domain.buildInnateDomainArena(
                 player, level, center, DOMAIN_RADIUS, skybox);
         if (arena == null)
@@ -287,19 +281,6 @@ public final class InnateDomainExperienceManager
         return dx * dx + dz * dz <= radius * radius
                 && pos.y >= origin.getY() - radius
                 && pos.y <= origin.getY() + radius + 1.0D;
-    }
-
-    private static ResourceLocation resolveSkyboxTexture(ServerPlayer player)
-    {
-        if (PlayerTechniqueData.isLimitless(player))
-        {
-            return LIMITLESS_INNATE_SKYBOX;
-        }
-        if (PlayerTechniqueData.isShrine(player))
-        {
-            return SHRINE_INNATE_SKYBOX;
-        }
-        return null;
     }
 
     private static final class InnateDomainSession

@@ -26,6 +26,9 @@ public final class ModCreativeTabEvents
 
         event.accept(ModItems.INNATE_TECHNIQUE_LIMITLESS, CreativeModeTab.TabVisibility.SEARCH_TAB_ONLY);
         event.accept(ModItems.SLASH_TECHNIQUE_SUKUNA, CreativeModeTab.TabVisibility.SEARCH_TAB_ONLY);
+        event.accept(ModItems.TRIAL_TECHNIQUE, CreativeModeTab.TabVisibility.SEARCH_TAB_ONLY);
+        event.accept(ModItems.SM_GAVEL_WEAPON, CreativeModeTab.TabVisibility.SEARCH_TAB_ONLY);
+        event.accept(ModItems.EXECUTIONERS_SWORD, CreativeModeTab.TabVisibility.SEARCH_TAB_ONLY);
         event.accept(ModItems.REVERSE_STUDYBOOK, CreativeModeTab.TabVisibility.SEARCH_TAB_ONLY);
         event.accept(ModItems.BARRIER_STUDYBOOK, CreativeModeTab.TabVisibility.SEARCH_TAB_ONLY);
         event.accept(ModItems.DOMAIN_STUDYBOOK, CreativeModeTab.TabVisibility.SEARCH_TAB_ONLY);

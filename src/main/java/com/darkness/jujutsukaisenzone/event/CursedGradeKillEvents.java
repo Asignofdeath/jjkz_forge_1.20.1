@@ -5,6 +5,7 @@ import com.darkness.jujutsukaisenzone.JuJutsuKaisenZone;
 import com.darkness.jujutsukaisenzone.player.PlayerCursedGradeData;
 import com.darkness.jujutsukaisenzone.player.PlayerFactionData;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.Vec3;
@@ -46,8 +47,8 @@ public final class CursedGradeKillEvents
             return;
         }
 
-        // 确认攻击者是玩家
-        if (!(event.getSource().getEntity() instanceof ServerPlayer killer))
+        ServerPlayer killer = resolveKiller(event);
+        if (killer == null)
         {
             return;
         }
@@ -67,6 +68,27 @@ public final class CursedGradeKillEvents
         }
 
         distributeExp(killer, victim, totalExp, killerFaction);
+    }
+
+    /**
+     * 解析击杀玩家：术式/投射物伤害时直接实体往往不是玩家本体。
+     */
+    private static ServerPlayer resolveKiller(LivingDeathEvent event)
+    {
+        DamageSource source = event.getSource();
+        if (source.getEntity() instanceof ServerPlayer player)
+        {
+            return player;
+        }
+        if (source.getDirectEntity() instanceof ServerPlayer player)
+        {
+            return player;
+        }
+        if (event.getEntity().getLastHurtByMob() instanceof ServerPlayer player)
+        {
+            return player;
+        }
+        return null;
     }
 
     /**

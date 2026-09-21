@@ -14,6 +14,7 @@ import com.darkness.jujutsukaisenzone.technique.skillset.SpecialMoveInput;
 import com.darkness.jujutsukaisenzone.technique.skillset.TechniqueSkill;
 import com.darkness.jujutsukaisenzone.technique.skillset.TechniqueSkillSetRegistry;
 import net.minecraft.client.Minecraft;
+import net.minecraft.world.entity.player.Player;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
@@ -221,8 +222,8 @@ public final class TechniqueSkillKeyEvents
                         ? 0
                         : setOpt.map(s -> s.getHoldReleaseChargeTicksBySkill(minecraft.player, skillId)).orElse(0);
                 boolean requiresHoldRelease = holdReleaseChargeTicks > 0;
-                boolean supportsMaxOutput = !requiresHoldRelease && !skillId.isEmpty()
-                        && setOpt.map(s -> s.supportsMaxOutputBySkill(minecraft.player, skillId)).orElse(false);
+                int maxOutputChargeTicks = resolveMaxOutputChargeTicks(minecraft.player, setOpt, skillId);
+                boolean supportsMaxOutput = !requiresHoldRelease && maxOutputChargeTicks > 0;
 
                 if (!wasDown && isDown)
                 {
@@ -237,14 +238,10 @@ public final class TechniqueSkillKeyEvents
                     }
                     else if (supportsMaxOutput)
                     {
-                        int chargeTicks = setOpt.map(s -> s.getMaxOutputChargeTicksBySkill(minecraft.player, skillId)).orElse(0);
-                        if (chargeTicks > 0)
-                        {
-                            SLOT_HOLD_ORIGIN_TICK[i] = playerTick;
-                            SLOT_CHARGE_BEGIN_TICK[i] = -1;
-                            SLOT_CHARGE_REQUIRED_TICKS[i] = chargeTicks;
-                            SLOT_HOLD_RELEASE_MODE[i] = false;
-                        }
+                        SLOT_HOLD_ORIGIN_TICK[i] = playerTick;
+                        SLOT_CHARGE_BEGIN_TICK[i] = -1;
+                        SLOT_CHARGE_REQUIRED_TICKS[i] = maxOutputChargeTicks;
+                        SLOT_HOLD_RELEASE_MODE[i] = false;
                     }
                     else
                     {
@@ -294,6 +291,7 @@ public final class TechniqueSkillKeyEvents
                     else if (SLOT_CHARGE_BEGIN_TICK[i] < 0)
                     {
                         ModNetwork.sendTechniqueSkillUseToServer(slot);
+                        MaxOutputChargeHud.end();
                     }
                     else
                     {
@@ -392,6 +390,28 @@ public final class TechniqueSkillKeyEvents
         SLOT_CHARGE_BEGIN_TICK[hotkeyIndex] = beginTick;
         ModNetwork.sendTechniqueMaxOutputToServer(TechniqueMaxOutputC2SPacket.ACTION_CHARGE_BEGIN, slot);
         MaxOutputChargeHud.begin(slot, SLOT_CHARGE_REQUIRED_TICKS[hotkeyIndex], "最大输出 · " + slot, beginTick);
+    }
+
+    private static int resolveMaxOutputChargeTicks(
+            Player player,
+            Optional<IInnateTechniqueSkillSet> setOpt,
+            String skillId)
+    {
+        if (skillId.isEmpty())
+        {
+            return 0;
+        }
+        int ticks = setOpt.map(s -> s.getMaxOutputChargeTicksBySkill(player, skillId)).orElse(0);
+        if (ticks > 0)
+        {
+            return ticks;
+        }
+        return setOpt.flatMap(s -> s.getConfigurableSkills().stream()
+                        .filter(skill -> skill.skillId().equals(skillId))
+                        .map(TechniqueSkill::maxOutputChargeTicks)
+                        .filter(chargeTicks -> chargeTicks > 0)
+                        .findFirst())
+                .orElse(0);
     }
 
     private static void abortSlotHold(int hotkeyIndex, boolean sendCancelIfCharging)

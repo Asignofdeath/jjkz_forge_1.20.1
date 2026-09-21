@@ -103,6 +103,21 @@ public final class TechniqueSkillTree
             {
                 throw new IllegalStateException("术式 " + techniqueId + " 引用节点配置不完整：" + node.nodeId());
             }
+            if (node.isInfoNode())
+            {
+                if (node.infoTitleKey() == null || node.infoTitleKey().isBlank())
+                {
+                    throw new IllegalStateException("术式 " + techniqueId + " 说明节点缺少 titleKey：" + node.nodeId());
+                }
+                if (node.infoDescriptionKey() == null || node.infoDescriptionKey().isBlank())
+                {
+                    throw new IllegalStateException("术式 " + techniqueId + " 说明节点缺少 descriptionKey：" + node.nodeId());
+                }
+                if (node.visibilityConditions().isEmpty())
+                {
+                    throw new IllegalStateException("术式 " + techniqueId + " 说明节点缺少 visibilityConditions：" + node.nodeId());
+                }
+            }
         }
         detectCycle();
     }
