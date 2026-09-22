@@ -138,9 +138,32 @@ public final class LimitlessTechniqueSkillSet extends AbstractInnateTechniqueSki
                     .build())
             .build();
 
+    /**
+     * Shift + 槽位数字触发的特别招式（不占独立槽位）。
+     * <p>
+     * 数值沿用原技能（等级 / 咒力 / 冷却 = 同数字槽位），因此这里只声明「挂在哪个原技能上、
+     * 用什么名字」；开发树的节点由 {@code TechniqueSpecialMoveAttacher} 自动派生。
+     * 图标留空 = 复用原技能图标。
+     */
+    private static final List<TechniqueSpecialMove> SPECIAL_MOVES = List.of(
+            new TechniqueSpecialMove("limitless_blue_shift", SKILL_BLUE, SpecialMoveInput.MOD_SHIFT,
+                    Component.literal("苍（机动）"), null),
+            new TechniqueSpecialMove("limitless_red_shift", SKILL_RED, SpecialMoveInput.MOD_SHIFT,
+                    Component.literal("赫（机动）"), null),
+            new TechniqueSpecialMove("limitless_purple_shift", SKILL_PURPLE, SpecialMoveInput.MOD_SHIFT,
+                    Component.literal("茈（升空悬停）"), null));
+
     static
     {
         SKILL_TREE.validateAgainstSkills(SKILLS);
+    }
+
+    @Override
+    public List<TechniqueSpecialMove> getSpecialMoves(String baseSkillId)
+    {
+        return SPECIAL_MOVES.stream()
+                .filter(move -> move.baseSkillId().equals(baseSkillId))
+                .toList();
     }
 
     private LimitlessTechniqueSkillSet()

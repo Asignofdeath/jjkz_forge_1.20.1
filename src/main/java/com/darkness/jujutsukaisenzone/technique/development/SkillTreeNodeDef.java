@@ -1,5 +1,7 @@
 package com.darkness.jujutsukaisenzone.technique.development;
 
+import com.darkness.jujutsukaisenzone.technique.skillset.TechniqueSpecialMove;
+
 import java.util.Collections;
 import java.util.List;
 
@@ -13,6 +15,7 @@ public final class SkillTreeNodeDef
     private final String nodeId;
     private final SkillTreeNodeKind kind;
     private final String skillId;
+    private final TechniqueSpecialMove specialMove;
     private final SkillTreeReferenceKind referenceKind;
     private final String referenceId;
     private final String infoTitleKey;
@@ -29,6 +32,7 @@ public final class SkillTreeNodeDef
             String nodeId,
             SkillTreeNodeKind kind,
             String skillId,
+            TechniqueSpecialMove specialMove,
             SkillTreeReferenceKind referenceKind,
             String referenceId,
             String infoTitleKey,
@@ -44,6 +48,7 @@ public final class SkillTreeNodeDef
         this.nodeId = nodeId;
         this.kind = kind;
         this.skillId = skillId;
+        this.specialMove = specialMove;
         this.referenceKind = referenceKind;
         this.referenceId = referenceId;
         this.infoTitleKey = infoTitleKey;
@@ -70,6 +75,18 @@ public final class SkillTreeNodeDef
     public String skillId()
     {
         return skillId;
+    }
+
+    /** 特别招式声明；仅 {@link SkillTreeNodeKind#SPECIAL_MOVE} 节点非空。 */
+    public TechniqueSpecialMove specialMove()
+    {
+        return specialMove;
+    }
+
+    /** 特别招式依附的原技能 skillId；非特别招式节点返回 {@code null}。 */
+    public String baseSkillId()
+    {
+        return specialMove == null ? null : specialMove.baseSkillId();
     }
 
     public SkillTreeReferenceKind referenceKind()
@@ -132,6 +149,11 @@ public final class SkillTreeNodeDef
         return kind == SkillTreeNodeKind.SKILL;
     }
 
+    public boolean isSpecialMoveNode()
+    {
+        return kind == SkillTreeNodeKind.SPECIAL_MOVE;
+    }
+
     public boolean isReferenceNode()
     {
         return kind == SkillTreeNodeKind.REFERENCE;
@@ -142,9 +164,36 @@ public final class SkillTreeNodeDef
         return kind == SkillTreeNodeKind.INFO;
     }
 
+    /**
+     * 两个节点之间是否算一条「连线」——决定要不要画前置线、要不要参与点选高亮的连通关系。
+     * <p>
+     * <b>说明节点不参与任何连线。</b>它在 {@link #prerequisiteNodeIds()} 里声明的节点只被
+     * {@link SkillTreeLayoutEngine} 当作<b>布局锚点</b>（决定它排在哪一列、行序上贴近谁），
+     * 与解锁前置无关：没有任何技能以说明节点为前置，说明节点自身也不参与解锁判定
+     * （{@code SkillUnlockLogic#isNodeRequirementMet} 对说明节点只查可见性条件）。
+     * 因此连线与高亮都必须把说明节点排除，否则界面上会出现「不代表任何前置关系的线」。
+     */
+    public static boolean isConnectableEdge(SkillTreeNodeDef from, SkillTreeNodeDef to)
+    {
+        if (from == null || to == null)
+        {
+            return false;
+        }
+        return !from.isInfoNode() && !to.isInfoNode();
+    }
+
     public static Builder skill(String nodeId, String skillId)
     {
         return new Builder(nodeId, SkillTreeNodeKind.SKILL).skillId(skillId);
+    }
+
+    /**
+     * 特别招式节点：{@code nodeId} 由 {@code TechniqueSpecialMoveAttacher} 生成，
+     * 通常 {@code requires(原技能节点)}，{@code skillId} 取变体自身 id。
+     */
+    public static Builder specialMove(String nodeId, TechniqueSpecialMove specialMove)
+    {
+        return new Builder(nodeId, SkillTreeNodeKind.SPECIAL_MOVE).specialMove(specialMove);
     }
 
     public static Builder reference(String nodeId, SkillTreeReferenceKind referenceKind, String referenceId)
@@ -163,6 +212,7 @@ public final class SkillTreeNodeDef
         private final String nodeId;
         private final SkillTreeNodeKind kind;
         private String skillId = "";
+        private TechniqueSpecialMove specialMove;
         private SkillTreeReferenceKind referenceKind;
         private String referenceId = "";
         private String infoTitleKey = "";
@@ -184,6 +234,14 @@ public final class SkillTreeNodeDef
         public Builder skillId(String skillId)
         {
             this.skillId = skillId;
+            return this;
+        }
+
+        /** 特别招式节点：skillId 自动取变体自身 id，展示信息全部来自 {@code specialMove}。 */
+        public Builder specialMove(TechniqueSpecialMove specialMove)
+        {
+            this.specialMove = specialMove;
+            this.skillId = specialMove.variantId();
             return this;
         }
 
@@ -212,6 +270,14 @@ public final class SkillTreeNodeDef
             return this;
         }
 
+        /**
+         * 声明前置节点。
+         * <p>
+         * 技能 / 特别招式节点：表示解锁前置，会画连线。
+         * <br>
+         * 说明节点（{@link SkillTreeNodeDef#info}）：只表示<b>布局锚点</b>，用于自动布局定位，
+         * <b>不画连线</b>、也不参与解锁判定（见 {@link SkillTreeNodeDef#isConnectableEdge}）。
+         */
         public Builder requires(String... prerequisiteNodeIds)
         {
             this.prerequisiteNodeIds = List.of(prerequisiteNodeIds);
@@ -257,6 +323,7 @@ public final class SkillTreeNodeDef
                     nodeId,
                     kind,
                     skillId,
+                    specialMove,
                     referenceKind,
                     referenceId,
                     infoTitleKey,

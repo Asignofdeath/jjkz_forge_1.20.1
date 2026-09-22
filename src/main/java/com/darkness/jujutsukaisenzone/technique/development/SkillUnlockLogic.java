@@ -44,7 +44,40 @@ public final class SkillUnlockLogic
         {
             return isInfoNodeVisible(player, node);
         }
+        if (node.isSpecialMoveNode())
+        {
+            return isSpecialMoveUnlocked(player, techniqueId, node);
+        }
         return isSkillNodeUnlocked(player, techniqueId, node);
+    }
+
+    /**
+     * 特别招式节点是否已解锁。
+     * <p>
+     * 特别招式**没有自己的基础字段**，解锁状态直接继承它所依附的原技能：原技能解锁 = 变体可用。
+     * 因此开发树里这些节点只做展示，不能单独消耗术式情报解锁
+     * （{@link #canUnlockSkill} / {@link #tryUnlockSkill} 对它们一律拒绝）。
+     */
+    public static boolean isSpecialMoveUnlocked(Player player, String techniqueId, SkillTreeNodeDef node)
+    {
+        if (!node.isSpecialMoveNode())
+        {
+            return false;
+        }
+        return findBaseSkillNode(techniqueId, node)
+                .map(base -> isSkillNodeUnlocked(player, techniqueId, base))
+                .orElse(false);
+    }
+
+    /** 特别招式所依附的原技能节点。 */
+    public static Optional<SkillTreeNodeDef> findBaseSkillNode(String techniqueId, SkillTreeNodeDef node)
+    {
+        if (!node.isSpecialMoveNode() || node.specialMove() == null)
+        {
+            return Optional.empty();
+        }
+        return TechniqueSkillTreeRegistry.get(techniqueId)
+                .flatMap(tree -> tree.findSkillNode(node.specialMove().baseSkillId()));
     }
 
     /** 说明节点是否满足出现条件。 */

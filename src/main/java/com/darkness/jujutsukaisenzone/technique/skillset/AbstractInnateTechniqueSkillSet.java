@@ -292,6 +292,18 @@ public abstract class AbstractInnateTechniqueSkillSet implements IInnateTechniqu
         castWithSkillEconomy(player, skill, () -> castSkill(player, skillId));
     }
 
+    /**
+     * 特别招式默认链路：**按原技能的数值结算经济，再交给 {@code castSpecialMoveBySkill} 执行演出**。
+     * <p>
+     * {@code skill} 由 {@code skillId} 反查而来，也就是「原技能」——特别招式没有自己的招式记录，
+     * 所以等级 / 咒力 / 冷却天然沿用原技能（这正是「特别招式与原技能数值同步」的实现方式）。
+     * 若某条目需要独立解锁，应改用
+     * {@link #castWithSlotEconomy(ServerPlayer, int, Runnable, java.util.function.Predicate)} 重载。
+     * <p>
+     * <b>子类若要实现「不消耗咒力 / 不吃冷却」的特别招式</b>（清除、查询类动作），必须覆写本方法，
+     * 在进入 {@code castWithSkillEconomy} **之前**分流并 return；一旦走到 {@code castSpecialMoveBySkill}
+     * 再做判断，咒力与冷却已经扣掉了。
+     */
     @Override
     public void useSpecialMove(ServerPlayer player, String skillId, int modifierMask)
     {
@@ -310,7 +322,14 @@ public abstract class AbstractInnateTechniqueSkillSet implements IInnateTechniqu
     {
     }
 
-    /** 按技能 ID 释放特别招式变体（子类实现）。 */
+    /**
+     * 按技能 ID 释放特别招式（子类实现）。
+     * <p>
+     * 执行到这里时，{@code modifierMask} 已经过通路校验，且**咒力 / 冷却 / 等级已按原技能结算**：
+     * 本方法只负责「演出」，不负责经济。常见写法是先 {@code if (modifierMask != SpecialMoveInput.MOD_SHIFT) return;}
+     * 收口本术式支持的修饰键——但那种写法只适用于「本来就要扣费」的条目；免费条目请回到
+     * {@code useSpecialMove(ServerPlayer, String, int)} 前置分流。
+     */
     protected void castSpecialMoveBySkill(ServerPlayer player, String skillId, int modifierMask)
     {
     }

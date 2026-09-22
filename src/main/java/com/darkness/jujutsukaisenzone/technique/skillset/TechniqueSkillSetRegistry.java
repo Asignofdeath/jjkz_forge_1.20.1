@@ -6,6 +6,7 @@ import com.darkness.jujutsukaisenzone.network.ModNetwork;
 import com.darkness.jujutsukaisenzone.technique.domain.JudgmentDomainExpansion;
 import com.darkness.jujutsukaisenzone.technique.development.SkillUnlockLogic;
 import com.darkness.jujutsukaisenzone.technique.development.TechniqueSkillTreeRegistry;
+import com.darkness.jujutsukaisenzone.technique.development.TechniqueSpecialMoveAttacher;
 import com.darkness.jujutsukaisenzone.player.PlayerHoldReleaseChargeData;
 import com.darkness.jujutsukaisenzone.player.PlayerMaxOutputChargeData;
 import com.darkness.jujutsukaisenzone.player.PlayerSkillBarConfig;
@@ -40,7 +41,10 @@ public final class TechniqueSkillSetRegistry
         {
             LOGGER.warn("术式技能集重复注册，已覆盖：{}", id);
         }
-        skillSet.getSkillTree().ifPresent(TechniqueSkillTreeRegistry::register);
+        // 技能树注册前先把该技能集声明的特别招式挂成节点（原技能 → 特别招式的派生边）。
+        skillSet.getSkillTree()
+                .map(tree -> TechniqueSpecialMoveAttacher.attach(tree, skillSet))
+                .ifPresent(TechniqueSkillTreeRegistry::register);
     }
 
     public static Optional<IInnateTechniqueSkillSet> get(String techniqueId)
@@ -115,8 +119,12 @@ public final class TechniqueSkillSetRegistry
     }
 
     /**
-     * 修饰键 + 快捷栏位触发特别招式：先查该栏位配置的 skillId，
-     * 再调用 {@link IInnateTechniqueSkillSet#useSpecialMove} 按 skillId 路由变体释放。
+     * 修饰键 + 技能键触发特别招式：先查该栏位配置的 skillId，
+     * 再调用 {@link IInnateTechniqueSkillSet#useSpecialMove(ServerPlayer, String, int)} 按 skillId 路由释放。
+     * <p>
+     * 注意这里解析出的 {@code skillId} 不只是「路由键」，它同时决定了这次特别招式的**数值来源**：
+     * 特别招式不占独立槽位、没有自己的招式记录，等级 / 咒力 / 冷却一律取该 skillId 所对应的原技能
+     * （通则见 {@link IInnateTechniqueSkillSet#useSpecialMove(ServerPlayer, SpecialMoveInput)}）。
      */
     public static void useSpecialMove(ServerPlayer player, SpecialMoveInput input)
     {

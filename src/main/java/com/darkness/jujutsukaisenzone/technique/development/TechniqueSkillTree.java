@@ -98,6 +98,10 @@ public final class TechniqueSkillTree
             {
                 throw new IllegalStateException("术式 " + techniqueId + " 技能节点缺少 skillId：" + node.nodeId());
             }
+            if (node.isSpecialMoveNode() && node.specialMove() == null)
+            {
+                throw new IllegalStateException("术式 " + techniqueId + " 特别招式节点缺少声明：" + node.nodeId());
+            }
             if (node.isReferenceNode()
                     && (node.referenceKind() == null || node.referenceId() == null || node.referenceId().isBlank()))
             {

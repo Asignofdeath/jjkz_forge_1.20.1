@@ -11,6 +11,7 @@ import com.darkness.jujutsukaisenzone.technique.development.SkillTreeNodeDef;
 import com.darkness.jujutsukaisenzone.technique.development.SkillTreeReferenceKind;
 import com.darkness.jujutsukaisenzone.technique.development.SkillUnlockLogic;
 import com.darkness.jujutsukaisenzone.technique.skillset.TechniqueSkill;
+import com.darkness.jujutsukaisenzone.technique.skillset.TechniqueSpecialMove;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -54,6 +55,13 @@ public final class TechniqueSkillTreeViewHelper
                     ? NodeVisualState.REFERENCE_SATISFIED
                     : NodeVisualState.REFERENCE_LOCKED;
         }
+        // 特别招式没有独立解锁：状态完全跟随原技能，故复用技能的已解锁 / 未解锁两态。
+        if (node.isSpecialMoveNode())
+        {
+            return SkillUnlockLogic.isSpecialMoveUnlocked(player, techniqueId, node)
+                    ? NodeVisualState.SKILL_UNLOCKED
+                    : NodeVisualState.SKILL_LOCKED;
+        }
 
         Optional<TechniqueSkill> skillOpt = SkillUnlockLogic.findSkillDefinition(techniqueId, node.skillId());
         if (skillOpt.isEmpty())
@@ -81,6 +89,16 @@ public final class TechniqueSkillTreeViewHelper
             case SKILL_CAN_UNLOCK -> 0xFFFFFF55;
             case REFERENCE_LOCKED, SKILL_LOCKED -> 0xFF888888;
         };
+    }
+
+    /** 特别招式节点用独立的边框色（青蓝）区分于同列的普通技能。 */
+    public static int getBorderColor(NodeVisualState state, SkillTreeNodeDef node)
+    {
+        if (node == null || !node.isSpecialMoveNode())
+        {
+            return getBorderColor(state);
+        }
+        return state == NodeVisualState.SKILL_UNLOCKED ? 0xFF66CCFF : 0xFF5A6B7A;
     }
 
     public static Component getDisplayName(Player player, String techniqueId, SkillTreeNodeDef node)
@@ -113,6 +131,15 @@ public final class TechniqueSkillTreeViewHelper
             return Component.literal(node.nodeId());
         }
 
+        if (node.isSpecialMoveNode())
+        {
+            if (!SkillUnlockLogic.isSpecialMoveUnlocked(player, techniqueId, node))
+            {
+                return Component.literal("XXX");
+            }
+            return getSpecialMoveDisplayName(techniqueId, node);
+        }
+
         if (isSkillHidden(player, techniqueId, node))
         {
             return Component.literal("XXX");
@@ -131,6 +158,19 @@ public final class TechniqueSkillTreeViewHelper
                     ? iconResource(node.infoIconPath())
                     : null;
         }
+        if (node.isSpecialMoveNode())
+        {
+            if (!SkillUnlockLogic.isSpecialMoveUnlocked(player, techniqueId, node))
+            {
+                return LOCKED_SKILL_ICON;
+            }
+            TechniqueSpecialMove move = node.specialMove();
+            if (move != null && move.hasOwnIcon())
+            {
+                return iconResource(move.iconPath());
+            }
+            return baseSkillIcon(techniqueId, node);
+        }
         if (!node.isSkillNode())
         {
             return null;
@@ -142,6 +182,44 @@ public final class TechniqueSkillTreeViewHelper
         return SkillUnlockLogic.findSkillDefinition(techniqueId, node.skillId())
                 .map(skill -> iconResource(skill.iconPath()))
                 .orElse(null);
+    }
+
+    /** 特别招式的默认图标：原技能的图标。 */
+    private static ResourceLocation baseSkillIcon(String techniqueId, SkillTreeNodeDef node)
+    {
+        String baseSkillId = node.baseSkillId();
+        if (baseSkillId == null)
+        {
+            return null;
+        }
+        return SkillUnlockLogic.findSkillDefinition(techniqueId, baseSkillId)
+                .map(skill -> iconResource(skill.iconPath()))
+                .orElse(null);
+    }
+
+    /** 特别招式的展示名：优先用声明中的名字，否则「原技能名（Shift）」。 */
+    private static Component getSpecialMoveDisplayName(String techniqueId, SkillTreeNodeDef node)
+    {
+        TechniqueSpecialMove move = node.specialMove();
+        if (move == null)
+        {
+            return Component.literal(node.nodeId());
+        }
+        if (move.displayName() != null)
+        {
+            return move.displayName();
+        }
+        return baseSkillDisplayName(techniqueId, move.baseSkillId())
+                .copy()
+                .append(Component.literal("（" + move.modifierLabel() + "）"));
+    }
+
+    /** 原技能的展示名（特别招式的名称 / 提示文案会引用它）。 */
+    public static Component baseSkillDisplayName(String techniqueId, String baseSkillId)
+    {
+        return SkillUnlockLogic.findSkillDefinition(techniqueId, baseSkillId)
+                .map(TechniqueSkill::displayName)
+                .orElse(Component.literal(baseSkillId));
     }
 
     private static boolean isSkillHidden(Player player, String techniqueId, SkillTreeNodeDef node)
@@ -193,6 +271,24 @@ public final class TechniqueSkillTreeViewHelper
                         + " / " + PlayerCursedGradeData.getRankDisplayName(required);
             }
             return state == NodeVisualState.REFERENCE_SATISFIED ? "已习得" : "未习得";
+        }
+
+        if (node.isSpecialMoveNode())
+        {
+            TechniqueSpecialMove move = node.specialMove();
+            if (move == null)
+            {
+                return "";
+            }
+            if (state == NodeVisualState.SKILL_UNLOCKED)
+            {
+                return Component.translatable(
+                        "gui.jujutsukaisenzone.skill_tree.special_move_trigger",
+                        move.modifierLabel()).getString();
+            }
+            return Component.translatable(
+                    "gui.jujutsukaisenzone.skill_tree.special_move_follows",
+                    baseSkillDisplayName(techniqueId, move.baseSkillId())).getString();
         }
 
         return switch (state)

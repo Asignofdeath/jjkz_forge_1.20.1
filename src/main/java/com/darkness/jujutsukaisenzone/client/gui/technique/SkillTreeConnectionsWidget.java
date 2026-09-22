@@ -22,11 +22,19 @@ import java.util.Map;
 public final class SkillTreeConnectionsWidget extends com.lowdragmc.lowdraglib.gui.widget.Widget
 {
     private static final int LINE_COLOR = 0xFFBBBBBB;
+    /** 原技能 → 特别招式的派生连线：用青蓝色与「前置解锁」连线区分。 */
+    private static final int SPECIAL_MOVE_LINE_COLOR = 0xFF7FB8FF;
     private static final float SCREEN_LINE_WIDTH = 3.0F;
+    /** 点选高亮时的连线配色 / 线宽。 */
+    private static final int HIGHLIGHT_LINE_COLOR = 0xFFFFD24A;
+    private static final float SCREEN_HIGHLIGHT_WIDTH = 5.5F;
+    /** 有选中节点时，其余连线的压暗透明度（约 27%）。 */
+    private static final int DIMMED_ALPHA = 0x46;
 
     private final FreeGraphView graphView;
     private final TechniqueSkillTree tree;
     private final Map<String, SkillTreeNodeWidget> nodeWidgets;
+    private SkillTreeHighlight highlight = SkillTreeHighlight.NONE;
 
     public SkillTreeConnectionsWidget(FreeGraphView graphView, TechniqueSkillTree tree, Map<String, SkillTreeNodeWidget> nodeWidgets)
     {
@@ -37,12 +45,52 @@ public final class SkillTreeConnectionsWidget extends com.lowdragmc.lowdraglib.g
         setClientSideWidget();
     }
 
+    /** 由画布注入当前点选高亮；{@link SkillTreeHighlight#NONE} 表示无选中。 */
+    public void setHighlight(SkillTreeHighlight highlight)
+    {
+        this.highlight = highlight == null ? SkillTreeHighlight.NONE : highlight;
+    }
+
     @Override
     public void drawInBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks)
     {
         float scale = Math.max(0.05F, graphView.getScale());
         float lineWidth = SCREEN_LINE_WIDTH / scale;
+        float highlightWidth = SCREEN_HIGHLIGHT_WIDTH / scale;
+        boolean active = highlight.isActive();
 
+        // 第一遍：普通连线。存在选中节点时整体压暗，让高亮子图浮出来。
+        for (SkillTreeNodeDef node : tree.nodes())
+        {
+            SkillTreeNodeWidget targetWidget = nodeWidgets.get(node.nodeId());
+            if (targetWidget == null)
+            {
+                continue;
+            }
+
+            int baseColor = node.isSpecialMoveNode() ? SPECIAL_MOVE_LINE_COLOR : LINE_COLOR;
+            int lineColor = active ? withAlpha(baseColor, DIMMED_ALPHA) : baseColor;
+            for (String prereqId : node.prerequisiteNodeIds())
+            {
+                if (active && highlight.isEdgeConnected(prereqId, node.nodeId()))
+                {
+                    continue;
+                }
+                SkillTreeNodeWidget sourceWidget = nodeWidgets.get(prereqId);
+                // 说明节点不参与连线：它的 requires 只是自动布局的锚点。
+                if (sourceWidget == null || !SkillTreeNodeDef.isConnectableEdge(sourceWidget.nodeDef(), node))
+                {
+                    continue;
+                }
+                drawConnection(graphics, sourceWidget, targetWidget, lineWidth, lineColor);
+            }
+        }
+
+        // 第二遍：与选中节点相连的连线，金色加粗，压在其他连线之上。
+        if (!active)
+        {
+            return;
+        }
         for (SkillTreeNodeDef node : tree.nodes())
         {
             SkillTreeNodeWidget targetWidget = nodeWidgets.get(node.nodeId());
@@ -53,21 +101,31 @@ public final class SkillTreeConnectionsWidget extends com.lowdragmc.lowdraglib.g
 
             for (String prereqId : node.prerequisiteNodeIds())
             {
+                if (!highlight.isEdgeConnected(prereqId, node.nodeId()))
+                {
+                    continue;
+                }
                 SkillTreeNodeWidget sourceWidget = nodeWidgets.get(prereqId);
                 if (sourceWidget == null)
                 {
                     continue;
                 }
-                drawConnection(graphics, sourceWidget, targetWidget, lineWidth);
+                drawConnection(graphics, sourceWidget, targetWidget, highlightWidth, HIGHLIGHT_LINE_COLOR);
             }
         }
+    }
+
+    private static int withAlpha(int color, int alpha)
+    {
+        return (color & 0x00FFFFFF) | ((alpha & 0xFF) << 24);
     }
 
     private void drawConnection(
             GuiGraphics graphics,
             SkillTreeNodeWidget from,
             SkillTreeNodeWidget to,
-            float lineWidth)
+            float lineWidth,
+            int color)
     {
         float[] start = edgeAnchor(from, to);
         float[] end = edgeAnchor(to, from);
@@ -78,12 +136,12 @@ public final class SkillTreeConnectionsWidget extends com.lowdragmc.lowdraglib.g
 
         if (Math.abs(x1 - x2) < 0.5F)
         {
-            drawVerticalSegment(graphics, x1, y1, y2, lineWidth, LINE_COLOR);
+            drawVerticalSegment(graphics, x1, y1, y2, lineWidth, color);
             return;
         }
         if (Math.abs(y1 - y2) < 0.5F)
         {
-            drawHorizontalSegment(graphics, x1, x2, y1, lineWidth, LINE_COLOR);
+            drawHorizontalSegment(graphics, x1, x2, y1, lineWidth, color);
             return;
         }
 
@@ -95,9 +153,9 @@ public final class SkillTreeConnectionsWidget extends com.lowdragmc.lowdraglib.g
         {
             // 相邻列：单弯折 L 形，垂直段在列间隙中
             float bendX = columnGapCenter(sourceDepth);
-            drawHorizontalSegment(graphics, x1, bendX, y1, lineWidth, LINE_COLOR);
-            drawVerticalSegment(graphics, bendX, y1, y2, lineWidth, LINE_COLOR);
-            drawHorizontalSegment(graphics, bendX, x2, y2, lineWidth, LINE_COLOR);
+            drawHorizontalSegment(graphics, x1, bendX, y1, lineWidth, color);
+            drawVerticalSegment(graphics, bendX, y1, y2, lineWidth, color);
+            drawHorizontalSegment(graphics, bendX, x2, y2, lineWidth, color);
         }
         else
         {
@@ -106,11 +164,11 @@ public final class SkillTreeConnectionsWidget extends com.lowdragmc.lowdraglib.g
             float bendX2 = columnGapCenter(targetDepth - 1);
             float yTrunk = findSafeHorizontalY(sourceDepth, targetDepth, y1, y2);
 
-            drawHorizontalSegment(graphics, x1, bendX1, y1, lineWidth, LINE_COLOR);
-            drawVerticalSegment(graphics, bendX1, y1, yTrunk, lineWidth, LINE_COLOR);
-            drawHorizontalSegment(graphics, bendX1, bendX2, yTrunk, lineWidth, LINE_COLOR);
-            drawVerticalSegment(graphics, bendX2, yTrunk, y2, lineWidth, LINE_COLOR);
-            drawHorizontalSegment(graphics, bendX2, x2, y2, lineWidth, LINE_COLOR);
+            drawHorizontalSegment(graphics, x1, bendX1, y1, lineWidth, color);
+            drawVerticalSegment(graphics, bendX1, y1, yTrunk, lineWidth, color);
+            drawHorizontalSegment(graphics, bendX1, bendX2, yTrunk, lineWidth, color);
+            drawVerticalSegment(graphics, bendX2, yTrunk, y2, lineWidth, color);
+            drawHorizontalSegment(graphics, bendX2, x2, y2, lineWidth, color);
         }
     }
 

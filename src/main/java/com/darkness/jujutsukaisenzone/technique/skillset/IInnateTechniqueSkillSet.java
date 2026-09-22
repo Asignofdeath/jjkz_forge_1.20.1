@@ -29,7 +29,22 @@ public interface IInnateTechniqueSkillSet
     void useSkillSlot(ServerPlayer player, int slot);
 
     /**
-     * 特别招式：不占独立 1~9 槽位，由修饰键与关联槽位组合触发（如槽位变体、苍+赫联动茈等）。
+     * 特别招式：**不占独立 1~9 槽位**的独立技能，由「修饰键 + 技能键」触发（如槽位变体、苍+赫联动茈等）。
+     * <p>
+     * <b>数值同步（通则）</b>：特别招式没有自己的招式记录，它的等级 / 咒力 / 冷却一律沿用**所依附的原技能**
+     * ——即 {@link SpecialMoveInput#baseSlot()} 指向的栏位、经快捷栏配置解析出的那个 skillId 所对应的
+     * 招式数值。所以「特别招式多少级、吃多少咒力、转多久冷却」默认就等于原技能，不需要（也无法）单独配置。
+     * <p>
+     * <b>唯一可独立的是解锁</b>：用
+     * {@code AbstractInnateTechniqueSkillSet#castWithSlotEconomy(ServerPlayer, int, Runnable, java.util.function.Predicate)}
+     * 换掉解锁判定即可让变体拥有自己的解锁字段（先例：无限术式苍/赫机动变体、Shift+3 茈升空悬停变体）。
+     * <p>
+     * <b>例外：不消耗经济条目的前置分流</b>。默认链路是
+     * {@code useSpecialMove(skillId, mask)} → {@code castWithSkillEconomy(原技能, ...)} → {@code castSpecialMoveBySkill}，
+     * 也就是**先扣咒力 / 上冷却，再执行演出**。若某个特别招式条目本身不该消耗咒力或吃冷却
+     * （清除 / 查询类，如星间飞行的标记清除），子类必须在覆写
+     * {@code useSpecialMove(ServerPlayer, String, int)} 时**抢先分流并 return**，
+     * 绝不能依赖 {@code castSpecialMoveBySkill} 里的条件判断——那时费用已经扣掉了。
      */
     default void useSpecialMove(ServerPlayer player, SpecialMoveInput input)
     {
@@ -105,6 +120,22 @@ public interface IInnateTechniqueSkillSet
     }
 
     /**
+     * 返回以 {@code baseSkillId} 为原技能的特别招式声明列表（不占槽位的修饰键变体）。
+     * <p>
+     * 这些变体不需要在 {@link #getSkillTree()} 里手写节点：注册时
+     * {@code TechniqueSpecialMoveAttacher} 会为每个声明派生一个「原技能 → 特别招式」的节点，
+     * 用于在术式开发界面中展示。变体没有自己的基础字段，等级 / 咒力 / 冷却 / 解锁跟随原技能
+     * （通则见 {@link #useSpecialMove(ServerPlayer, SpecialMoveInput)}）。
+     *
+     * @param baseSkillId 原技能 skillId
+     * @return 该原技能下的特别招式；无则返回空列表
+     */
+    default List<TechniqueSpecialMove> getSpecialMoves(String baseSkillId)
+    {
+        return Collections.emptyList();
+    }
+
+    /**
      * 已解锁技能是否应出现在技能快捷栏配置界面（及可被拖入栏位）。
      * 默认与解锁状态一致；部分技能可要求额外上下文（如宿傩拟态）。
      */
@@ -128,8 +159,12 @@ public interface IInnateTechniqueSkillSet
     }
 
     /**
-     * 按技能 ID 释放特别招式（修饰键 + 槽位触发的变体）。
+     * 按技能 ID 释放特别招式（修饰键 + 技能键触发的独立技能）。
      * 默认实现无操作。
+     * <p>
+     * 数值同步与例外规则见 {@link #useSpecialMove(ServerPlayer, SpecialMoveInput)}。
+     * 注意：默认链路由 {@code AbstractInnateTechniqueSkillSet} 在**结算咒力 / 冷却之后**才调用本方法，
+     * 需要「免费」的条目请在子类覆写本方法做前置分流。
      */
     default void useSpecialMove(ServerPlayer player, String skillId, int modifierMask)
     {
