@@ -13,9 +13,12 @@ import com.darkness.jujutsukaisenzone.technique.skillset.LimitlessTechniqueSkill
 import com.darkness.jujutsukaisenzone.technique.skillset.SpecialMoveInput;
 import com.darkness.jujutsukaisenzone.technique.skillset.TechniqueSkill;
 import com.darkness.jujutsukaisenzone.technique.skillset.TechniqueSkillSetRegistry;
+import com.mojang.blaze3d.platform.InputConstants;
+import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.player.Player;
 import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.client.settings.KeyConflictContext;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -33,14 +36,42 @@ import java.util.Optional;
  * 无修饰键：支持最大输出的槽位短按松手为普通释放；按住超过阈值后进入蓄力（显示蓄力条），
  * 蓄满松手为最大输出，蓄力期间未满松手则取消。不支持最大输出的槽位按下即释放。
  * <p>
- * 鼠标侧键 4/5 在两种模式下调节不同参数：
+ * 调节模式由 {@link #KEY_ADJUST_MODE}（默认鼠标中键）循环切换，档位由 {@link #KEY_ADJUST_TIER_DOWN}
+ * （默认鼠标侧键 4）/ {@link #KEY_ADJUST_TIER_UP}（默认鼠标侧键 5）按 ±1 调节，三者均可在控制设置中改键：
  * - 施法距离模式：调节施法距离档位（-25% / +25%）。
  * - 结界半径模式：调节结界半径档位（8 / 16 / 32 / 64）。
- * 鼠标中键在两种模式间切换。
+ * - 星星标记模式：切换「星星标记」当前标记（仅生得术式为星间飞行时可用）。
  */
 @Mod.EventBusSubscriber(modid = JuJutsuKaisenZone.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE, value = Dist.CLIENT)
 public final class TechniqueSkillKeyEvents
 {
+    /** 循环切换调节模式（施法距离 / 结界半径 / 星星标记）。默认中键（GLFW 的 MOUSE_BUTTON_3 即中键）。 */
+    public static final KeyMapping KEY_ADJUST_MODE = new KeyMapping(
+            "key.jujutsukaisenzone.adjust_mode",
+            KeyConflictContext.IN_GAME,
+            InputConstants.Type.MOUSE,
+            GLFW.GLFW_MOUSE_BUTTON_3,
+            "key.categories.jujutsukaisenzone"
+    );
+
+    /** 当前调节模式的档位 −1（星星标记模式下为上一个标记）。 */
+    public static final KeyMapping KEY_ADJUST_TIER_DOWN = new KeyMapping(
+            "key.jujutsukaisenzone.adjust_tier_down",
+            KeyConflictContext.IN_GAME,
+            InputConstants.Type.MOUSE,
+            GLFW.GLFW_MOUSE_BUTTON_4,
+            "key.categories.jujutsukaisenzone"
+    );
+
+    /** 当前调节模式的档位 +1（星星标记模式下为下一个标记）。 */
+    public static final KeyMapping KEY_ADJUST_TIER_UP = new KeyMapping(
+            "key.jujutsukaisenzone.adjust_tier_up",
+            KeyConflictContext.IN_GAME,
+            InputConstants.Type.MOUSE,
+            GLFW.GLFW_MOUSE_BUTTON_5,
+            "key.categories.jujutsukaisenzone"
+    );
+
     /** 每组槽位数，共 {@link #SLOT_GROUP_COUNT} 组。 */
     private static final int SLOTS_PER_GROUP = 3;
     private static final int SLOT_GROUP_COUNT = 3;
@@ -74,8 +105,20 @@ public final class TechniqueSkillKeyEvents
     private static boolean lastMouseButton4Down;
     private static boolean lastMouseButton5Down;
     private static boolean lastMouseMiddleDown;
-    /** 0 = 施法距离模式，1 = 结界半径模式。 */
-    private static int currentAdjustMode = 0;
+
+    /** 调节模式：施法距离档位。所有玩家可用。 */
+    private static final int ADJUST_MODE_CAST_RANGE = 0;
+    /** 调节模式：结界半径档位。所有玩家可用。 */
+    private static final int ADJUST_MODE_BARRIER_RADIUS = 1;
+    /** 调节模式：切换「星星标记」当前标记。仅生得术式为星间飞行时可用。 */
+    private static final int ADJUST_MODE_STAR_MARK = 2;
+    /** 通用可用模式数（施法距离 + 结界半径）。 */
+    private static final int ADJUST_MODE_COUNT_BASE = 2;
+    /** 星间飞行额外提供「星星标记」模式。 */
+    private static final int ADJUST_MODE_COUNT_LOVE_RENDEZVOUS = ADJUST_MODE_STAR_MARK + 1;
+
+    /** 当前调节模式，取值见 {@code ADJUST_MODE_*} 常量。 */
+    private static int currentAdjustMode = ADJUST_MODE_CAST_RANGE;
 
     /** 打断后须先松键再蓄力，避免按住期间立刻重新进入蓄力。 */
     private static final boolean[] SLOT_IGNORE_HOLD_UNTIL_RELEASE = new boolean[HOTKEY_KEYS.length];
@@ -122,43 +165,36 @@ public final class TechniqueSkillKeyEvents
             return;
         }
 
-        /* 鼠标侧键/中键的档位调整只需战斗模式，无需生得术式 */
+        /* 调节模式的按键调整只需战斗模式，无需生得术式；按键可在控制设置中改绑 */
         long window = minecraft.getWindow().getWindow();
-        boolean mouse4Down = GLFW.glfwGetMouseButton(window, GLFW.GLFW_MOUSE_BUTTON_4) == GLFW.GLFW_PRESS;
-        boolean mouse5Down = GLFW.glfwGetMouseButton(window, GLFW.GLFW_MOUSE_BUTTON_5) == GLFW.GLFW_PRESS;
-        boolean mouseMiddleDown = GLFW.glfwGetMouseButton(window, GLFW.GLFW_MOUSE_BUTTON_3) == GLFW.GLFW_PRESS;
+        boolean mouse4Down = KEY_ADJUST_TIER_DOWN.isDown();
+        boolean mouse5Down = KEY_ADJUST_TIER_UP.isDown();
+        boolean mouseMiddleDown = KEY_ADJUST_MODE.isDown();
+
+        /* 「星星标记」模式只服务于星间飞行；术式变更后自动退回施法距离模式 */
+        int adjustModeCount = resolveAdjustModeCount(minecraft.player);
+        if (currentAdjustMode >= adjustModeCount)
+        {
+            currentAdjustMode = ADJUST_MODE_CAST_RANGE;
+        }
 
         if (mouseMiddleDown && !lastMouseMiddleDown)
         {
-            currentAdjustMode = 1 - currentAdjustMode;
-            String modeName = (currentAdjustMode == 0) ? "施法距离" : "结界半径";
+            currentAdjustMode = (currentAdjustMode + 1) % adjustModeCount;
             minecraft.player.displayClientMessage(
-                    net.minecraft.network.chat.Component.literal("切换至：" + modeName + " 调节模式"), true);
+                    net.minecraft.network.chat.Component.literal(
+                            "切换至：" + adjustModeName(currentAdjustMode) + " 调节模式"), true);
         }
         lastMouseMiddleDown = mouseMiddleDown;
 
         if (mouse4Down && !lastMouseButton4Down)
         {
-            if (currentAdjustMode == 0)
-            {
-                ModNetwork.sendAdjustCastRangeTierToServer(-1);
-            }
-            else
-            {
-                ModNetwork.sendAdjustBarrierRadiusTierToServer(-1);
-            }
+            applyAdjustModeDelta(currentAdjustMode, -1);
         }
 
         if (mouse5Down && !lastMouseButton5Down)
         {
-            if (currentAdjustMode == 0)
-            {
-                ModNetwork.sendAdjustCastRangeTierToServer(1);
-            }
-            else
-            {
-                ModNetwork.sendAdjustBarrierRadiusTierToServer(1);
-            }
+            applyAdjustModeDelta(currentAdjustMode, 1);
         }
 
         lastMouseButton4Down = mouse4Down;
@@ -371,6 +407,35 @@ public final class TechniqueSkillKeyEvents
         Arrays.fill(SLOT_HOLD_RELEASE_MODE, false);
         Arrays.fill(SLOT_HOLD_RELEASE_COMPLETED, false);
         MaxOutputChargeHud.end();
+    }
+
+    /** 当前可用调节模式数：星间飞行额外开启「切换星星标记」模式。 */
+    private static int resolveAdjustModeCount(Player player)
+    {
+        return PlayerTechniqueData.isLoveRendezvous(player)
+                ? ADJUST_MODE_COUNT_LOVE_RENDEZVOUS
+                : ADJUST_MODE_COUNT_BASE;
+    }
+
+    private static String adjustModeName(int mode)
+    {
+        return switch (mode)
+        {
+            case ADJUST_MODE_BARRIER_RADIUS -> "结界半径";
+            case ADJUST_MODE_STAR_MARK -> "星星标记";
+            default -> "施法距离";
+        };
+    }
+
+    /** 按当前调节模式把侧键 ±1 派发到对应参数。 */
+    private static void applyAdjustModeDelta(int mode, int delta)
+    {
+        switch (mode)
+        {
+            case ADJUST_MODE_BARRIER_RADIUS -> ModNetwork.sendAdjustBarrierRadiusTierToServer(delta);
+            case ADJUST_MODE_STAR_MARK -> ModNetwork.sendSelectStarMarkToServer(delta);
+            default -> ModNetwork.sendAdjustCastRangeTierToServer(delta);
+        }
     }
 
     private static boolean hasAnySlotHoldTracked()

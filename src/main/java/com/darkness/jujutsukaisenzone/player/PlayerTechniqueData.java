@@ -14,6 +14,7 @@ public final class PlayerTechniqueData
     public static final String TECHNIQUE_LIMITLESS = "limitless";
     public static final String TECHNIQUE_SHRINE = "shrine";
     public static final String TECHNIQUE_JUDGMENT = "judgment";
+    public static final String TECHNIQUE_LOVE_RENDEZVOUS = "love_rendezvous";
     private static final String TAG_INNATE_TECHNIQUE = "jujutsukaisenzone_innate_technique";
 
     private PlayerTechniqueData()
@@ -71,6 +72,11 @@ public final class PlayerTechniqueData
         return TECHNIQUE_JUDGMENT.equals(getInnateTechnique(player));
     }
 
+    public static boolean isLoveRendezvous(Player player)
+    {
+        return TECHNIQUE_LOVE_RENDEZVOUS.equals(getInnateTechnique(player));
+    }
+
     /**
      * 选择咒术师/诅咒师/咒灵阵营后随机觉醒生得术式；已有术式、天与咒缚或不可绑定阵营时跳过。
      *
@@ -111,6 +117,7 @@ public final class PlayerTechniqueData
             case TECHNIQUE_LIMITLESS -> "无下限";
             case TECHNIQUE_SHRINE -> "御厨子";
             case TECHNIQUE_JUDGMENT -> "审判";
+            case TECHNIQUE_LOVE_RENDEZVOUS -> "星间飞行";
             default -> techniqueId;
         };
     }

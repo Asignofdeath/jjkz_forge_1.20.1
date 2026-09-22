@@ -3,6 +3,7 @@ package com.darkness.jujutsukaisenzone.network;
 import com.darkness.jujutsukaisenzone.JuJutsuKaisenZone;
 import com.darkness.jujutsukaisenzone.network.packet.AdjustCastRangeTierC2SPacket;
 import com.darkness.jujutsukaisenzone.network.packet.AerialMultiJumpC2SPacket;
+import com.darkness.jujutsukaisenzone.network.packet.SelectStarMarkC2SPacket;
 import com.darkness.jujutsukaisenzone.network.packet.AdjustBarrierRadiusTierC2SPacket;
 import com.darkness.jujutsukaisenzone.network.packet.BarrierTechniqueCastC2SPacket;
 import com.darkness.jujutsukaisenzone.network.packet.DomainExpansionCastC2SPacket;
@@ -454,6 +455,11 @@ public final class ModNetwork
                 .decoder(AerialMultiJumpC2SPacket::decode)
                 .consumerMainThread(AerialMultiJumpC2SPacket::handle)
                 .add();
+        CHANNEL.messageBuilder(SelectStarMarkC2SPacket.class, packetId++, NetworkDirection.PLAY_TO_SERVER)
+                .encoder(SelectStarMarkC2SPacket::encode)
+                .decoder(SelectStarMarkC2SPacket::decode)
+                .consumerMainThread(SelectStarMarkC2SPacket::handle)
+                .add();
     }
 
     public static void sendCursedEnergySync(ServerPlayer player, int current, int max)
@@ -520,6 +526,12 @@ public final class ModNetwork
     public static void sendAerialMultiJumpRequest()
     {
         CHANNEL.send(PacketDistributor.SERVER.noArg(), new AerialMultiJumpC2SPacket());
+    }
+
+    /** 客户端 → 服务端：切换星星标记的当前标记（delta 为 ±1）。 */
+    public static void sendSelectStarMarkToServer(int delta)
+    {
+        CHANNEL.send(PacketDistributor.SERVER.noArg(), new SelectStarMarkC2SPacket(delta));
     }
 
     public static void sendUnlockSkillResult(

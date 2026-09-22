@@ -13,7 +13,8 @@ public enum JjkzCreativeTabCategory
             List.of(
                     ModItems.INNATE_TECHNIQUE_LIMITLESS,
                     ModItems.SLASH_TECHNIQUE_SUKUNA,
-                    ModItems.TRIAL_TECHNIQUE
+                    ModItems.TRIAL_TECHNIQUE,
+                    ModItems.LOVE_RENDEZVOUS
             )),
     WEAPONS(
             "gui.jujutsukaisenzone.creative_tab.category.weapons",

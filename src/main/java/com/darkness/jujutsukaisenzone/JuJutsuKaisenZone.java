@@ -5,6 +5,7 @@ import com.darkness.jujutsukaisenzone.client.TechniqueDevelopmentKeyHandler;
 import com.darkness.jujutsukaisenzone.client.TechniqueExpansionKeyHandler;
 import com.darkness.jujutsukaisenzone.client.gui.SkillBarConfigScreen;
 import com.darkness.jujutsukaisenzone.compat.EpicFightCompat;
+import com.darkness.jujutsukaisenzone.event.TechniqueSkillKeyEvents;
 import com.darkness.jujutsukaisenzone.network.ModNetwork;
 import com.darkness.jujutsukaisenzone.registry.ModBlockEntities;
 import com.darkness.jujutsukaisenzone.registry.ModBlocks;
@@ -23,6 +24,7 @@ import com.darkness.jujutsukaisenzone.technique.description.TechniqueSkillDescri
 import com.darkness.jujutsukaisenzone.technique.skillset.JudgmentTechniqueSkillSet;
 import com.darkness.jujutsukaisenzone.technique.aerial.AerialCombatSkillRegistry;
 import com.darkness.jujutsukaisenzone.technique.skillset.LimitlessTechniqueSkillSet;
+import com.darkness.jujutsukaisenzone.technique.skillset.LoveRendezvousTechniqueSkillSet;
 import com.darkness.jujutsukaisenzone.technique.skillset.ShrineTechniqueSkillSet;
 import com.darkness.jujutsukaisenzone.technique.skillset.TechniqueSkillSetRegistry;
 import com.darkness.jujutsukaisenzone.registry.ModBlocks;
@@ -88,6 +90,7 @@ public class JuJutsuKaisenZone
         TechniqueSkillSetRegistry.register(LimitlessTechniqueSkillSet.INSTANCE);
         TechniqueSkillSetRegistry.register(ShrineTechniqueSkillSet.INSTANCE);
         TechniqueSkillSetRegistry.register(JudgmentTechniqueSkillSet.INSTANCE);
+        TechniqueSkillSetRegistry.register(LoveRendezvousTechniqueSkillSet.INSTANCE);
         AerialCombatSkillRegistry.bootstrap();
         TechniqueSkillDescriptions.bootstrap();
         CommonKeySkillRegistry.register(ReverseTechniqueCommonKeySkill.INSTANCE);
@@ -144,6 +147,9 @@ public class JuJutsuKaisenZone
             event.register(SKILL_BAR_CONFIG_KEY);
             event.register(TechniqueDevelopmentKeyHandler.KEY_MAPPING);
             event.register(TechniqueExpansionKeyHandler.KEY_MAPPING);
+            event.register(TechniqueSkillKeyEvents.KEY_ADJUST_MODE);
+            event.register(TechniqueSkillKeyEvents.KEY_ADJUST_TIER_DOWN);
+            event.register(TechniqueSkillKeyEvents.KEY_ADJUST_TIER_UP);
         }
 
         @SubscribeEvent

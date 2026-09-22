@@ -4,6 +4,7 @@ import com.darkness.jujutsukaisenzone.JuJutsuKaisenZone;
 import com.darkness.jujutsukaisenzone.block.JJKZSkyblock;
 import com.darkness.jujutsukaisenzone.item.BarrierStudybookItem;
 import com.darkness.jujutsukaisenzone.item.LimitlessTechniqueBinderItem;
+import com.darkness.jujutsukaisenzone.item.LoveRendezvousTechniqueBinderItem;
 import com.darkness.jujutsukaisenzone.item.DomainStudybookItem;
 import com.darkness.jujutsukaisenzone.item.ReverseStudybookItem;
 import com.darkness.jujutsukaisenzone.item.SlashTechniqueSukunaBinderItem;
@@ -44,6 +45,12 @@ public final class ModItems
     public static final RegistryObject<Item> TRIAL_TECHNIQUE = ITEMS.register(
             "trial_technique",
             () -> new TrialTechniqueBinderItem(new Item.Properties().stacksTo(1))
+    );
+
+    /** 星间飞行 */
+    public static final RegistryObject<Item> LOVE_RENDEZVOUS = ITEMS.register(
+            "love_rendezvous",
+            () -> new LoveRendezvousTechniqueBinderItem(new Item.Properties().stacksTo(1))
     );
 
     /** 法槌（Epic Fight 武器） */

@@ -18,6 +18,9 @@ import com.darkness.jujutsukaisenzone.technique.skill.JudgmentTrialSkillLogic;
 import com.darkness.jujutsukaisenzone.technique.skill.JudgmentWeaponLogic;
 import com.darkness.jujutsukaisenzone.technique.skillset.JudgmentTechniqueSkillSet;
 import com.darkness.jujutsukaisenzone.technique.skillset.LimitlessTechniqueSkillSet;
+import com.darkness.jujutsukaisenzone.technique.skillset.LoveRendezvousTechniqueSkillSet;
+import com.darkness.jujutsukaisenzone.technique.skill.StarMarkRules;
+import com.darkness.jujutsukaisenzone.player.StarMarkType;
 import com.darkness.jujutsukaisenzone.technique.scaling.ShrineSkillGrowth;
 import com.darkness.jujutsukaisenzone.technique.skillset.ShrineTechniqueSkillSet;
 import com.darkness.jujutsukaisenzone.technique.skillset.TechniqueSkill;
@@ -45,6 +48,7 @@ public final class TechniqueSkillDescriptions
         registerLimitlessSkills();
         registerShrineSkills();
         registerJudgmentSkills();
+        registerLoveRendezvousSkills();
         registerCommonSkills();
         registerAerialSkills();
     }
@@ -220,6 +224,28 @@ public final class TechniqueSkillDescriptions
                                 JudgmentTrialSkillLogic.DEATH_SENTENCE_BONUS_PER_DEBUFF_PERCENT),
                         TechniqueSkillStatFormat.formatNumber(
                                 JudgmentTrialSkillLogic.MAX_DEATH_SENTENCE_DEBUFF_BONUS_PERCENT)
+                });
+    }
+
+    private static void registerLoveRendezvousSkills()
+    {
+        TechniqueSkillDescriptionRegistry.register(
+                LoveRendezvousTechniqueSkillSet.SKILL_STAR_MARK,
+                (player, techniqueId, skill) -> new Object[] {
+                        TechniqueSkillStatFormat.formatNumber(StarMarkRules.MARK_RANGE),
+                        Integer.toString(StarMarkType.count())
+                });
+        TechniqueSkillDescriptionRegistry.register(
+                LoveRendezvousTechniqueSkillSet.SKILL_STAR_PULL,
+                (player, techniqueId, skill) -> new Object[] {
+                        TechniqueSkillStatFormat.formatNumber(StarMarkRules.PULL_RANGE),
+                        Integer.toString(StarMarkRules.PULL_DURATION_TICKS / 20)
+                });
+        TechniqueSkillDescriptionRegistry.register(
+                LoveRendezvousTechniqueSkillSet.SKILL_STAR_GATE,
+                (player, techniqueId, skill) -> new Object[] {
+                        TechniqueSkillStatFormat.formatNumber(StarMarkRules.GATE_RADIUS),
+                        Integer.toString(StarMarkRules.GATE_DURATION_TICKS / 20)
                 });
     }
 

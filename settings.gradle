@@ -13,3 +13,8 @@ pluginManagement {
 plugins {
     id 'org.gradle.toolchains.foojay-resolver-convention' version '0.7.0'
 }
+
+// 固定项目名，避免它跟随目录名 JuJutsuKaisenZone_forge-1.20.1（含点号）。
+// ForgeGradle 生成 IDEA 运行配置时用的是 project.name，而 IDEA 导入 Gradle 项目时会把名称里的点号换成下划线，
+// 两者不一致会导致 runClient 等配置的模块引用悬空、点运行就弹编辑框。
+rootProject.name = 'JuJutsuKaisenZone_forge-1_20_1'
