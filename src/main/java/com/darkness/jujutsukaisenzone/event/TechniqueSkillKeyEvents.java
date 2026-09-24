@@ -200,6 +200,9 @@ public final class TechniqueSkillKeyEvents
         lastMouseButton4Down = mouse4Down;
         lastMouseButton5Down = mouse5Down;
 
+        /* 快速双击 Shift：清除星星标记（单独清除 / 全部清除由服务端按准星自行判定） */
+        handleStarMarkDoubleTapClear(minecraft, window);
+
         Optional<IInnateTechniqueSkillSet> setOpt = TechniqueSkillSetRegistry.get(
                 PlayerTechniqueData.getInnateTechnique(minecraft.player));
         boolean acceptHotbar = setOpt.map(set -> set.acceptsClientHotbarInput(minecraft.player)).orElse(false);
@@ -242,6 +245,12 @@ public final class TechniqueSkillKeyEvents
             {
                 LAST_HOTKEY_STATES[i] = isDown;
                 continue;
+            }
+
+            if (isDown && !wasDown)
+            {
+                /* 任何技能键都会打断「双击 Shift」的序列，避免 Shift+技能键 被误判成双击 */
+                lastShiftPressTick = -1;
             }
 
             if (modifierMask != 0 && acceptSpecial && isDown && !wasDown)
@@ -566,7 +575,54 @@ public final class TechniqueSkillKeyEvents
         Arrays.fill(SLOT_HOLD_RELEASE_COMPLETED, false);
         Arrays.fill(SLOT_IGNORE_HOLD_UNTIL_RELEASE, false);
         currentSkillSlotGroup = 0;
+        lastShiftDown = false;
+        lastShiftPressTick = -1;
         MaxOutputChargeHud.end();
+    }
+
+    /** 双击 Shift 的判定窗口（约 400ms）；两次按下之间松开、且中间没有按任何技能键才算数。 */
+    private static final int STAR_MARK_CLEAR_DOUBLE_TAP_TICKS = 8;
+
+    private static boolean lastShiftDown;
+    /** 上一次 Shift 按下的 tick；-1 表示序列已中断（没有待配对的上一次按下）。 */
+    private static int lastShiftPressTick = -1;
+
+    /**
+     * 快速双击 Shift 清除「星星标记」。
+     * <p>
+     * 服务端只在按技能键那一刻收到修饰键掩码，拿不到 Shift 的原始按键状态，所以双击只能在客户端判定；
+     * 判定通过后只发一个无字段包，清除走「单独清除」还是「全部清除」由服务端按准星自行决定。
+     * 仅在战斗模式且生得术式为星间飞行时生效——Shift 同时是原版潜行键，全局生效会污染潜行体验。
+     */
+    private static void handleStarMarkDoubleTapClear(Minecraft minecraft, long window)
+    {
+        boolean shiftDown = glfwKeyPressed(window, GLFW.GLFW_KEY_LEFT_SHIFT)
+                || glfwKeyPressed(window, GLFW.GLFW_KEY_RIGHT_SHIFT);
+        if (!shiftDown)
+        {
+            lastShiftDown = false;
+            return;
+        }
+        if (lastShiftDown)
+        {
+            return;
+        }
+        lastShiftDown = true;
+
+        if (minecraft.player == null || !PlayerTechniqueData.isLoveRendezvous(minecraft.player))
+        {
+            lastShiftPressTick = -1;
+            return;
+        }
+
+        int now = minecraft.player.tickCount;
+        if (lastShiftPressTick >= 0 && now - lastShiftPressTick <= STAR_MARK_CLEAR_DOUBLE_TAP_TICKS)
+        {
+            lastShiftPressTick = -1;
+            ModNetwork.sendStarMarkClearToServer();
+            return;
+        }
+        lastShiftPressTick = now;
     }
 
     /** Shift/Ctrl/Alt（左右键任一按下即置位），与 {@link SpecialMoveInput} 位定义一致。 */

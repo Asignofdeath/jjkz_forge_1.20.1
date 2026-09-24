@@ -67,6 +67,9 @@ public final class CursedEnergyEvents
         if (event.getEntity() instanceof ServerPlayer serverPlayer)
         {
             PlayerCursedEnergyData.initializeIfAbsent(serverPlayer);
+            // 技能解锁 / 等级写在 persistentData 根标签上，而 Forge 重生只会搬运 PlayerPersisted 子标签，
+            // 不补这一步玩家一死就会丢掉全部技能成长（开发树、技能栏、空战能力全部退回未解锁）。
+            SkillUnlockLogic.copyProgressionFrom(serverPlayer, event.getOriginal());
             PlayerSkillBarConfig.copyAllFrom(serverPlayer, event.getOriginal());
             syncPlayerState(serverPlayer);
         }

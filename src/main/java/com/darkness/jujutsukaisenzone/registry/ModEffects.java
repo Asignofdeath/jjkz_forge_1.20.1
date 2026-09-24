@@ -5,6 +5,8 @@ import com.darkness.jujutsukaisenzone.effect.ConfiscationEffect;
 import com.darkness.jujutsukaisenzone.effect.DeathSentenceEffect;
 import com.darkness.jujutsukaisenzone.effect.RushIntoTheZoneClimaxEffect;
 import com.darkness.jujutsukaisenzone.effect.SinfulOneEffect;
+import com.darkness.jujutsukaisenzone.effect.StarArmorBreakEffect;
+import com.darkness.jujutsukaisenzone.effect.StarConfusionEffect;
 import com.darkness.jujutsukaisenzone.effect.TechniqueMeltdownEffect;
 import com.darkness.jujutsukaisenzone.effect.ZoneEffect;
 import net.minecraft.world.effect.MobEffect;
@@ -29,6 +31,12 @@ public final class ModEffects
             EFFECTS.register("confiscation", ConfiscationEffect::new);
     public static final RegistryObject<MobEffect> SINFUL_ONE =
             EFFECTS.register("sinful_one", SinfulOneEffect::new);
+    /** 星间飞行 · Mimosa 引爆：降护甲（另附原版发光）。 */
+    public static final RegistryObject<MobEffect> STAR_ARMOR_BREAK =
+            EFFECTS.register("star_armor_break", StarArmorBreakEffect::new);
+    /** 星间飞行 · Ginan 引爆：短时混乱，非玩家实体随机转向。 */
+    public static final RegistryObject<MobEffect> STAR_CONFUSION =
+            EFFECTS.register("star_confusion", StarConfusionEffect::new);
 
     private ModEffects()
     {

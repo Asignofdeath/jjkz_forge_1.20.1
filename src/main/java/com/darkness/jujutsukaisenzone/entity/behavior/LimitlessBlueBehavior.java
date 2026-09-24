@@ -3,6 +3,7 @@ package com.darkness.jujutsukaisenzone.entity.behavior;
 import com.darkness.jujutsukaisenzone.entity.SpecialEffectEntity;
 import com.darkness.jujutsukaisenzone.entity.data.LimitlessBlueConfig;
 import com.darkness.jujutsukaisenzone.entity.util.LimitlessBlueBlockPull;
+import com.darkness.jujutsukaisenzone.technique.TechniqueDamageSources;
 import com.darkness.jujutsukaisenzone.technique.scaling.LimitlessBlueSkillGrowth;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
@@ -71,7 +72,7 @@ public class LimitlessBlueBehavior extends EffectBehavior
                     && entity.distanceToSqr(target) <= LimitlessBlueConfig.DAMAGE_RADIUS * LimitlessBlueConfig.DAMAGE_RADIUS
                     && canDamageByBlue(target))
             {
-                target.hurt(entity.damageSources().magic(), damage);
+                TechniqueDamageSources.deal(target, owner, damage);
             }
         }
     }

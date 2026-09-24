@@ -19,13 +19,18 @@ import com.darkness.jujutsukaisenzone.technique.skill.JudgmentWeaponLogic;
 import com.darkness.jujutsukaisenzone.technique.skillset.JudgmentTechniqueSkillSet;
 import com.darkness.jujutsukaisenzone.technique.skillset.LimitlessTechniqueSkillSet;
 import com.darkness.jujutsukaisenzone.technique.skillset.LoveRendezvousTechniqueSkillSet;
+import com.darkness.jujutsukaisenzone.technique.skill.StarFlightSkillLogic;
+import com.darkness.jujutsukaisenzone.technique.skill.StarMarkDetonation;
 import com.darkness.jujutsukaisenzone.technique.skill.StarMarkRules;
+import com.darkness.jujutsukaisenzone.player.PlayerStarMarkData;
+import com.darkness.jujutsukaisenzone.player.StarMark;
 import com.darkness.jujutsukaisenzone.player.StarMarkType;
 import com.darkness.jujutsukaisenzone.technique.scaling.ShrineSkillGrowth;
 import com.darkness.jujutsukaisenzone.technique.skillset.ShrineTechniqueSkillSet;
 import com.darkness.jujutsukaisenzone.technique.skillset.TechniqueSkill;
 import com.darkness.jujutsukaisenzone.technique.commonskill.CommonTechniqueSkillRegistry;
 import com.darkness.jujutsukaisenzone.technique.aerial.AerialCombatSkills;
+import com.darkness.jujutsukaisenzone.technique.BarrierTechniqueServerLogic;
 import com.darkness.jujutsukaisenzone.technique.StrengthenTechniqueServerLogic;
 import com.darkness.jujutsukaisenzone.player.PlayerStrengthenTechniqueData;
 import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
@@ -232,8 +237,15 @@ public final class TechniqueSkillDescriptions
         TechniqueSkillDescriptionRegistry.register(
                 LoveRendezvousTechniqueSkillSet.SKILL_STAR_MARK,
                 (player, techniqueId, skill) -> new Object[] {
+                        /* 顺序必须与 lang 里 %s 的出现次序一致：
+                           持有上限 → 距离 → 星数 → 等级 → 衰减 → 引爆半径 → 引爆单体伤害 */
+                        Integer.toString(PlayerStarMarkData.MAX_MARKS),
                         TechniqueSkillStatFormat.formatNumber(StarMarkRules.MARK_RANGE),
-                        Integer.toString(StarMarkType.count())
+                        Integer.toString(StarMarkType.count()),
+                        Integer.toString(StarMark.MAX_STACKS),
+                        Integer.toString(StarMarkRules.STACK_DECAY_TICKS / 20),
+                        TechniqueSkillStatFormat.formatNumber(StarMarkDetonation.RADIUS),
+                        TechniqueSkillStatFormat.formatNumber(StarMarkDetonation.DETONATION_DAMAGE)
                 });
         TechniqueSkillDescriptionRegistry.register(
                 LoveRendezvousTechniqueSkillSet.SKILL_STAR_PULL,
@@ -244,8 +256,22 @@ public final class TechniqueSkillDescriptions
         TechniqueSkillDescriptionRegistry.register(
                 LoveRendezvousTechniqueSkillSet.SKILL_STAR_GATE,
                 (player, techniqueId, skill) -> new Object[] {
-                        TechniqueSkillStatFormat.formatNumber(StarMarkRules.GATE_RADIUS),
-                        Integer.toString(StarMarkRules.GATE_DURATION_TICKS / 20)
+                        /*
+                         * 星域半径已托管给「结界尺寸调节器」，具体档位只存在服务端，
+                         * 而描述是客户端渲染的——所以只能报「默认 / 上限」区间，不报本人当前值。
+                         * 星域本身没有时限，所以「持续秒数」填的是**跨序解锁的存活窗口**，不是域的寿命。
+                         */
+                        Integer.toString(BarrierTechniqueServerLogic.staticGetDefaultRadius()),
+                        Integer.toString(BarrierTechniqueServerLogic.staticGetMaxRadius()),
+                        Integer.toString(StarMarkRules.UNLOCK_DECAY_TICKS / 20)
+                });
+        TechniqueSkillDescriptionRegistry.register(
+                LoveRendezvousTechniqueSkillSet.SKILL_STAR_FLIGHT,
+                (player, techniqueId, skill) -> new Object[] {
+                        /* 顺序必须与 lang 里 %s 的出现次序一致：射程 → 冲撞伤害 → 引爆单体伤害 */
+                        TechniqueSkillStatFormat.formatNumber(StarFlightSkillLogic.CAST_RANGE),
+                        TechniqueSkillStatFormat.formatNumber(StarFlightSkillLogic.RAM_DAMAGE),
+                        TechniqueSkillStatFormat.formatNumber(StarMarkDetonation.DETONATION_DAMAGE)
                 });
     }
 

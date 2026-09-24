@@ -334,11 +334,9 @@ public final class ShrineTechniqueSkillSet extends AbstractInnateTechniqueSkillS
         launchFugaHoldRelease(player, entityUuid);
     }
 
-    @Override
-    protected void castSpecialMoveBySkill(ServerPlayer player, String skillId, int modifierMask)
-    {
-        // 暂无特别招式变体
-    }
+    // 本术式暂无特别招式变体：不覆写 castSpecialMoveBySkill，也不声明 getSpecialMoves。
+    // 未声明 = 基类 acceptsSpecialMove 在结算咒力与冷却之前就把修饰键组合静默拦下，
+    // 所以「Shift/Ctrl/Alt + 数字键」不会白扣一次咒力（这里以前是个空的覆写，会白扣）。
 
     @Override
     public boolean supportsCastRangeTiers()

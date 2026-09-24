@@ -30,6 +30,12 @@ import java.util.Optional;
  */
 public final class SkillUnlockLogic
 {
+    private static final String MOD_TAG_PREFIX = "jujutsukaisenzone_";
+    /** 解锁 key 的中缀：{@code *_unlock_slot_*}、{@code *_unlock_variant_shift_slot_*}，空战能力则以 {@code _unlock} 结尾。 */
+    private static final String UNLOCK_TAG_INFIX = "_unlock";
+    /** 等级 key 的中缀：{@code *_level_slot_*}。 */
+    private static final String LEVEL_TAG_INFIX = "_level_";
+
     private SkillUnlockLogic()
     {
     }
@@ -293,12 +299,60 @@ public final class SkillUnlockLogic
         CompoundTag data = player.getPersistentData();
         for (String key : data.getAllKeys())
         {
-            if (key.startsWith("jujutsukaisenzone_") && key.contains("_unlock_") && data.getBoolean(key))
+            if (isUnlockTagKey(key, data) && data.getBoolean(key))
             {
                 result.put(key, true);
             }
         }
         return result;
+    }
+
+    /**
+     * 死亡重生时把技能成长数据从旧玩家搬到新玩家上。
+     * <p>
+     * Forge 重生走的是 {@code PlayerList#respawn} → new {@code ServerPlayer} → {@code restoreFrom}，
+     * 而 {@code restoreFrom} 只搬运 persistentData 的 {@code PlayerPersisted} 子标签（原版注释：
+     * Copy over a section of the Entity Data from the old player）——写在<b>根标签</b>上的解锁 / 等级键
+     * 一条都不会跟过来。所以必须在 {@code PlayerEvent.Clone} 里手动补一份，否则玩家一死，开发树、
+     * 技能栏、空战能力全部退回未解锁。
+     * <p>
+     * 只搬「技能成长」键（{@link #isUnlockTagKey} / {@link #isLevelTagKey}）：咒力、连击、星域这些
+     * 战斗态数据本来就该在死亡时清空，不会顺带搬过去。
+     */
+    public static void copyProgressionFrom(Player newPlayer, Player originalPlayer)
+    {
+        CompoundTag oldData = originalPlayer.getPersistentData();
+        if (oldData.isEmpty())
+        {
+            return;
+        }
+        CompoundTag newData = newPlayer.getPersistentData();
+        for (String key : oldData.getAllKeys())
+        {
+            if (isUnlockTagKey(key, oldData) || isLevelTagKey(key, oldData))
+            {
+                newData.put(key, oldData.get(key).copy());
+            }
+        }
+    }
+
+    /**
+     * 技能解锁 tag：{@code jujutsukaisenzone_*_unlock*} 的布尔叶子。
+     * <p>
+     * 必须连带判类型：{@code jujutsukaisenzone_love_rendezvous_gate_unlocks}（星域跨序位图）名字里也带
+     * {@code _unlock}，但它是 long 数组、且属于一局内的会话进度，不能混进解锁状态里。
+     */
+    private static boolean isUnlockTagKey(String key, CompoundTag data)
+    {
+        return key.startsWith(MOD_TAG_PREFIX) && key.contains(UNLOCK_TAG_INFIX)
+                && data.contains(key, CompoundTag.TAG_BYTE);
+    }
+
+    /** 技能等级 tag：{@code jujutsukaisenzone_*_level_slot_*} 的整型叶子。 */
+    private static boolean isLevelTagKey(String key, CompoundTag data)
+    {
+        return key.startsWith(MOD_TAG_PREFIX) && key.contains(LEVEL_TAG_INFIX)
+                && data.contains(key, CompoundTag.TAG_INT);
     }
 
     /** 将服务端下发的 unlockTag 写入客户端 persistentData。 */

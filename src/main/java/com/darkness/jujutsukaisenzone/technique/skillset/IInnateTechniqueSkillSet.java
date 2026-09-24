@@ -39,12 +39,20 @@ public interface IInnateTechniqueSkillSet
      * {@code AbstractInnateTechniqueSkillSet#castWithSlotEconomy(ServerPlayer, int, Runnable, java.util.function.Predicate)}
      * 换掉解锁判定即可让变体拥有自己的解锁字段（先例：无限术式苍/赫机动变体、Shift+3 茈升空悬停变体）。
      * <p>
-     * <b>例外：不消耗经济条目的前置分流</b>。默认链路是
-     * {@code useSpecialMove(skillId, mask)} → {@code castWithSkillEconomy(原技能, ...)} → {@code castSpecialMoveBySkill}，
-     * 也就是**先扣咒力 / 上冷却，再执行演出**。若某个特别招式条目本身不该消耗咒力或吃冷却
-     * （清除 / 查询类，如星间飞行的标记清除），子类必须在覆写
-     * {@code useSpecialMove(ServerPlayer, String, int)} 时**抢先分流并 return**，
-     * 绝不能依赖 {@code castSpecialMoveBySkill} 里的条件判断——那时费用已经扣掉了。
+     * <b>两道前置收口</b>。{@code AbstractInnateTechniqueSkillSet} 在结算经济**之前**先问两件事：
+     * {@code acceptsSpecialMove}（该 skillId + 掩码组合有没有实现，默认按
+     * {@link #getSpecialMoves(String)} 的声明<b>精确</b>匹配，声明 Shift 不会顺带放行 Shift+Ctrl）
+     * 与 {@code isSpecialMoveUnlocked}（变体自身的解锁）。答否就直接 return，
+     * <b>不扣咒力、不上冷却</b>。由此得出两条硬约定：
+     * <ul>
+     *   <li><b>先声明，后执行</b>：只在 {@code castSpecialMoveBySkill} 里写分支、却不在
+     *       {@code getSpecialMoves} 里声明，等于这个组合不存在（按了没反应，但至少不会白扣费）。
+     *       反过来说，{@code castSpecialMoveBySkill} 里也不该再写掩码收口——那已经是扣费之后。</li>
+     *   <li><b>免费 / 条件性放行的条目</b>（清除、查询类，如星间飞行的标记清除与打自身标记）：
+     *       子类要覆写 {@code useSpecialMove(ServerPlayer, String, int)} 抢先分流并 return，
+     *       <b>同时</b>覆写 {@code acceptsSpecialMove} 把那些组合放进来；绝不能只靠
+     *       {@code castSpecialMoveBySkill} 里的条件判断——那时费用已经扣掉了。</li>
+     * </ul>
      */
     default void useSpecialMove(ServerPlayer player, SpecialMoveInput input)
     {
@@ -162,9 +170,10 @@ public interface IInnateTechniqueSkillSet
      * 按技能 ID 释放特别招式（修饰键 + 技能键触发的独立技能）。
      * 默认实现无操作。
      * <p>
-     * 数值同步与例外规则见 {@link #useSpecialMove(ServerPlayer, SpecialMoveInput)}。
+     * 数值同步与两道前置收口见 {@link #useSpecialMove(ServerPlayer, SpecialMoveInput)}。
      * 注意：默认链路由 {@code AbstractInnateTechniqueSkillSet} 在**结算咒力 / 冷却之后**才调用本方法，
-     * 需要「免费」的条目请在子类覆写本方法做前置分流。
+     * 所以本方法只该写演出；需要「免费」的条目请在子类覆写本方法做前置分流，并同步覆写
+     * {@code acceptsSpecialMove}。
      */
     default void useSpecialMove(ServerPlayer player, String skillId, int modifierMask)
     {

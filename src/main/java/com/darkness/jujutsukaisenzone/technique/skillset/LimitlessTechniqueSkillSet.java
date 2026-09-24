@@ -371,37 +371,30 @@ public final class LimitlessTechniqueSkillSet extends AbstractInnateTechniqueSki
     @Override
     protected void castSpecialMoveBySkill(ServerPlayer player, String skillId, int modifierMask)
     {
-        if (modifierMask != SpecialMoveInput.MOD_SHIFT) return;
+        /* 掩码与变体解锁都已由基类收口在扣费之前（acceptsSpecialMove / isSpecialMoveUnlocked），
+           这里只负责演出——不要再在这里写掩码判断，那会在咒力与冷却已经扣掉之后才 return。 */
         switch (skillId)
         {
-            case SKILL_BLUE ->
-            {
-                if (!isShiftVariantUnlockedForSlot1(player))
-                {
-                    player.sendSystemMessage(net.minecraft.network.chat.Component.literal("该变体招式尚未解锁。"));
-                    return;
-                }
-                castBlueNormal(player, true);
-            }
-            case SKILL_RED ->
-            {
-                if (!isShiftVariantUnlockedForSlot2(player))
-                {
-                    player.sendSystemMessage(net.minecraft.network.chat.Component.literal("该变体招式尚未解锁。"));
-                    return;
-                }
-                castRedNormal(player, true);
-            }
-            case SKILL_PURPLE ->
-            {
-                if (!isShiftVariantUnlockedForSlot3(player))
-                {
-                    player.sendSystemMessage(net.minecraft.network.chat.Component.literal("该变体招式尚未解锁。"));
-                    return;
-                }
-                LimitlessPurpleShiftSpecialEvents.begin(player);
-            }
+            case SKILL_BLUE -> castBlueNormal(player, true);
+            case SKILL_RED -> castRedNormal(player, true);
+            case SKILL_PURPLE -> LimitlessPurpleShiftSpecialEvents.begin(player);
         }
+    }
+
+    /**
+     * 苍 / 赫 / 茈 的三个 Shift 变体各有**独立解锁字段**（与同槽位普通招式分离），
+     * 所以要在基类结算咒力与冷却之前先查一次：未解锁时基类只提示「该招式尚未解锁。」，不扣费。
+     */
+    @Override
+    protected boolean isSpecialMoveUnlocked(ServerPlayer player, String skillId, int modifierMask)
+    {
+        return switch (skillId)
+        {
+            case SKILL_BLUE -> isShiftVariantUnlockedForSlot1(player);
+            case SKILL_RED -> isShiftVariantUnlockedForSlot2(player);
+            case SKILL_PURPLE -> isShiftVariantUnlockedForSlot3(player);
+            default -> true;
+        };
     }
 
     @Override

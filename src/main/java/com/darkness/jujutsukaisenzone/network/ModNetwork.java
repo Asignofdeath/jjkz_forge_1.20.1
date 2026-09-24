@@ -4,6 +4,7 @@ import com.darkness.jujutsukaisenzone.JuJutsuKaisenZone;
 import com.darkness.jujutsukaisenzone.network.packet.AdjustCastRangeTierC2SPacket;
 import com.darkness.jujutsukaisenzone.network.packet.AerialMultiJumpC2SPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SelectStarMarkC2SPacket;
+import com.darkness.jujutsukaisenzone.network.packet.StarMarkClearC2SPacket;
 import com.darkness.jujutsukaisenzone.network.packet.AdjustBarrierRadiusTierC2SPacket;
 import com.darkness.jujutsukaisenzone.network.packet.BarrierTechniqueCastC2SPacket;
 import com.darkness.jujutsukaisenzone.network.packet.DomainExpansionCastC2SPacket;
@@ -460,6 +461,11 @@ public final class ModNetwork
                 .decoder(SelectStarMarkC2SPacket::decode)
                 .consumerMainThread(SelectStarMarkC2SPacket::handle)
                 .add();
+        CHANNEL.messageBuilder(StarMarkClearC2SPacket.class, packetId++, NetworkDirection.PLAY_TO_SERVER)
+                .encoder(StarMarkClearC2SPacket::encode)
+                .decoder(StarMarkClearC2SPacket::decode)
+                .consumerMainThread(StarMarkClearC2SPacket::handle)
+                .add();
     }
 
     public static void sendCursedEnergySync(ServerPlayer player, int current, int max)
@@ -532,6 +538,12 @@ public final class ModNetwork
     public static void sendSelectStarMarkToServer(int delta)
     {
         CHANNEL.send(PacketDistributor.SERVER.noArg(), new SelectStarMarkC2SPacket(delta));
+    }
+
+    /** 客户端 → 服务端：快速双击 Shift 清除星星标记（单独清除 / 全部清除由服务端按准星判定）。 */
+    public static void sendStarMarkClearToServer()
+    {
+        CHANNEL.send(PacketDistributor.SERVER.noArg(), new StarMarkClearC2SPacket());
     }
 
     public static void sendUnlockSkillResult(

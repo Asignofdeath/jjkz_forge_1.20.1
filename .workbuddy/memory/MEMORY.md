@@ -1,91 +1,54 @@
 # 项目长期备忘（JujutsuKaisenZone / Forge 1.20.1）
 
-> 细节与过程见 `.workbuddy/memory/YYYY-MM-DD.md`；本文件只留**必须记牢的结论**。
+> 只留「不知道就会踩坑」的结论；机制细节见 `2026-09-22.md` / `2026-09-23.md`。
 
-## 环境（重要）
-- PowerShell 工具 stdout 不可见，不要用它读输出。
-- Bash 默认缺 coreutils，**命令前补一行 PATH 即可用**（`ls`/`cat`/`grep`/`git`）：
-  `export PATH="/c/Windows/System32:/c/Windows:/c/Users/19316/.workbuddy/binaries/PortableGit/versions/1.2.0/usr/bin:/c/Users/19316/.workbuddy/binaries/PortableGit/versions/1.2.0/cmd:$PATH"`
-- **不要 `cd` 到项目目录**：cwd 已是项目根，`cd D:/...` 必失败。`dirname: command not found` / `cd: null directory` 是宿主 shim 噪音。
-- Python：`C:/Users/19316/.workbuddy/binaries/python/versions/3.13.12/python.exe`。
-- 编译：`./gradlew compileJava --project-cache-dir=build/.gradle-tmp --console=plain`（1~1.5 分钟，后台跑）。报错提 log 后 `iconv -f GBK -t UTF-8` 再 grep「错误」。
-- ⚠️ **同一文件的多次 Edit 不能放在同一条消息里并行发**：后一次基于旧内容写回，会静默覆盖掉先一次（表现为编译「找不到符号」）。必须串行。不同文件之间并行没问题。
+## 环境 / 铁律
+- ⛔ **禁止跑 `./gradlew`（含 compileJava）**：游戏锁 `build/` + 管道憋输出，能卡 10min~1h。编译由用户在 IDEA 做；AI 只做静态自查（读文件 / grep 全部调用点 / 核对签名）。长任务输出别接 `| tail`。
+- 别 `cd` 到项目目录。PowerShell stdout 不可见。Bash 缺 coreutils，先补 PATH：`export PATH="/c/Users/19316/.workbuddy/binaries/PortableGit/versions/1.2.0/usr/bin:/c/Windows/System32:$PATH"`
+- 裸 python 无 PIL/numpy；图像用 `.../python/envs/default/Scripts/python.exe`。**给 Windows exe 传路径必须写 `C:/...`**（`/c/...` 被当相对路径且不报错）。
+- 同一文件多处 Edit 必须串行；不同文件可并行。EBUSY = 被游戏/IDEA 占用，重试即可。
+- 工具集会**中途变化**，缺写入类工具时报 Tool Not Found：别重试，直接给用户精确补丁（行号 / 唯一锚点）。
 
-## 新增生得术式（6 处固定改动面，以 `love_rendezvous` 为例）
-1. `item/XxxTechniqueBinderItem` — 校验 `PlayerCursedEnergyData.isHeavenlyRestricted` + `PlayerFactionData.canBindInnateTechnique` 后 `PlayerTechniqueData.setInnateTechnique`。
-2. `registry/ModItems` — `ITEMS.register("<id>", () -> new XxxBinderItem(new Item.Properties().stacksTo(1)))`。
-3. **创造模式两套列表，必须两处都改**：`registry/ModCreativeTabEvents`（`TabVisibility.SEARCH_TAB_ONLY`，原版标签页/搜索页）＋ `client/gui/creative/JjkzCreativeTabCategory`（对应枚举的硬编码 `List`）。
-   后者是 LDLib 自绘面板（`JjkzCreativeTabPanel` + `CreativeModeInventoryScreenMixin`），与 Forge 标签页体系无关，`TabVisibility` 管不到。
-4. `player/PlayerTechniqueData` — `TECHNIQUE_XXX` 常量、`isXxx()`、`getDisplayName()` 分支。
-5. `assets/.../models/item/<id>.json` + `textures/item/<id>.png`。
-6. `lang/zh_cn.json` + `en_us.json` — `item.jujutsukaisenzone.<id>`。
+## Forge 1.20.1 玩家数据
+- **`getPersistentData()` 根标签死亡重生时全丢**：`PlayerList#respawn` → new `ServerPlayer` → `restoreFrom` **只搬 `PlayerPersisted` 子标签**，之后才发 `PlayerEvent.Clone`。
+- ⇒ 跨死亡三选一：写 `Player.PERSISTED_NBT_TAG` 子标签 / `PlayerEvent.Clone` 手动搬 / SavedData `JjkzPlayerDataStorage`。
+- ⛔ **服务端无法用 `deltaMovement` 移动玩家**（客户端每 tick 覆盖）⇒「高速平移 / 冲刺」只能每 tick `ServerPlayer#teleportTo(x,y,z)`（≤1.5 格/tick 即「高速」观感）；`lookAt(...)` 必须在 teleport **之前**，位置包才带朝向。玩家位移类技能的状态用**静态内存 Map + deadline 兜底**，别落盘（掉线会留残留）。
+- **改维度不重建玩家实体**（`changeDimension` 复用对象）⇒ 服务端数据不丢，只有客户端 LocalPlayer 重建、需重新同步。
+- 查源码：`~/.gradle/caches/forge_gradle/minecraft_user_repo/net/minecraftforge/forge/<ver>_mapped_official_1.20.1/...-sources.jar`（含补丁）；`mcp/.../decompile/output.jar` 是**未打补丁**版，别用。
+- 杂项：按键注册走 `RegisterKeyMappingsEvent`；同时监听 mod + FORGE 总线的类必须拆开（`client/BarrierRulesKeyHandler` 漏 `bus = MOD` 待修）；推实体 `setDeltaMovement(dm.add(impulse)); hurtMarked = true;`；`MobEffect#addAttributeModifier` 第二参是 **String**。
 
-## 新增技能集 / 技能
-1. `XxxTechniqueSkillSet extends AbstractInnateTechniqueSkillSet`，实现 `getSlotCost`/`getSlotCooldownTicks`/`isSlotUnlocked`/`getSlotSkillLevel`/`getSlotCooldownTag`/`getSlotDisplayName`/`getSlotIconPath`/`castSkillSlot`。
-   **全部写成「按 `SKILLS` 下标取」（`skillForSlot(slot)`），不要逐槽 if 链**；tag 用 `tag("unlock"|"level"|"cooldown", slot)`。
-2. 技能定义在静态 `List<TechniqueSkill>`；节点用 `TechniqueSkillTree.builder(techniqueId)`；静态块 `validateAgainstSkills(SKILLS)`。
-3. `JuJutsuKaisenZone` 构造函数 `TechniqueSkillSetRegistry.register(XxxTechniqueSkillSet.INSTANCE)`（内部顺带注册技能树）。
-4. `TechniqueSkillDescriptions` 注册描述解析器 + lang `skill.jujutsukaisenzone.<skillId>.desc`。
-5. 图标放 `textures/gui/technique/<name>.png`，`iconPath` 写相对路径。
-6. **加技能 = `SKILLS` 追加一项 + 一个树节点 + 一条描述与 lang。**
+## 技能解锁 / 死亡保留
+- 键：`jujutsukaisenzone_<technique>_unlock_slot_N`(bool) / `_level_slot_N`(int) / `_cooldown_slot_N`(long)；空战是 `..._aerial_*_unlock`（**`_unlock` 结尾、无下划线**）。
+- 缺 key：等级 = 1 级；解锁 = **未解锁**；空战 Shift 变体相反（缺失 = 已解锁）。
+- 识别键的**唯一判据** = `SkillUnlockLogic.isUnlockTagKey/isLevelTagKey`（前缀 + 中缀 + **判 NBT 类型**；星域 `..._gate_unlocks` 是 long[] 必须排除）。`snapshotUnlockTags` 与 `copyProgressionFrom` 共用。
+- 客户端开发树读**客户端** persistentData ⇒ 必须 `syncToClient`。
+- 跨死亡靠 `SkillUnlockLogic.copyProgressionFrom(new, original)`（在 `onPlayerClone` 调）；只搬解锁 / 等级，咒力 / 连击 / 星域等战斗态保持清空。**新增持久化成长数据必须一起接进来**。
+- 术式情报在 SavedData `JjkzPlayerDataStorage.TAG_TECHNIQUE_INTEL`；技能栏另有 `PlayerSkillBarConfig.copyAllFrom`。遗留：`*_cast_range_tier` 仍随死亡丢失。
 
-## 命名约定
-- **术式双名沿用原作**：中文显示名（`getDisplayName()`、lang `item.*`）用**汉字表记**（无下限 / 御厨子 / 审判 / 星间飞行）；术式 ID、注册名、类名、tag 用**原作读音 / 官方英文名**（`love_rendezvous` / `LoveRendezvousTechniqueSkillSet`）。
-  **ID 与类名一律不改**（牵动贴图路径、模型、注册名、存档字符串），调整只改显示文案。
-- skillId：`<technique>_<name>`。技能节点 nodeId 直接用 skillId；`autoGranted()` = 获得术式即解锁。
-- tag：`jujutsukaisenzone_<technique>_{unlock|level|cooldown}_slot_N`。
-- 玩家级战斗数据统一写 `player.getPersistentData()` → **死亡重生清空**（Forge 只搬 `PlayerPersisted` 子标签）；要跨死亡保留得用该子标签或 `JjkzPlayerDataStorage`。
-- **未注册技能集不会崩**：`SkillSlotHudOverlay`/`SkillBarConfigScreen`/`TechniqueDevelopmentCanvasWidget`/`SkillUnlockLogic` 都对 `Optional.empty()` 兜底，只是不显示、不进随机觉醒池。
+## 新增术式 / 技能集
+- 生得术式 6 处：`item/XxxTechniqueBinderItem`、`ModItems`、创造模式**两套**列表（`ModCreativeTabEvents` + `client/gui/creative/JjkzCreativeTabCategory`，后者 LDLib 自绘、`TabVisibility` 管不到）、`PlayerTechniqueData`、模型+贴图、lang。
+- 技能集 `extends AbstractInnateTechniqueSkillSet`：槽位 `skillForSlot(slot)`；tag = `tag("unlock"|"level"|"cooldown", slot)`；树 = `TechniqueSkillTree.builder(id)` + 静态块 `validateAgainstSkills(SKILLS)`；构造函数里 `register(INSTANCE)`。
+- 加技能 = `SKILLS` 追加 + 树节点 + 描述 + lang；图标 `textures/gui/technique/<name>.png`。命名：显示名用汉字，ID / 类名 / 注册名 / tag 用官方英文，**ID 与类名一律不改**。
+- ⚠️ **新增术式伤害必须走 `TechniqueDamageSources.deal(target, owner, amount)`**，别写 `damageSources().magic()`——后者 `getEntity()`/`getLastHurtByMob()` 恒为 null，击杀不给咒术经验、不掉术式情报、不记罪恶者、`BlackFlashEvents` 击杀检测也不触发。`deal` = 补归因 + `LivingKnockBackEvent` 吃掉 0.4 击退 + **刻意不填 `directEntity`**（保持术式无视盾牌）；只剩「生物仇恨施术者」这一条连带（原版语义，保留）。
+- 原版 `LivingEntity#hurt` 的三件事全读 `getEntity()`（causingEntity）：盾挡看 `getSourcePosition()`（= directEntity 位置，全库只此一处用），击退 `if (entity1 != null && !IS_EXPLOSION)`，仇恨 `setLastHurtByMob` 受 `no_anger` 标签门控（1.20.1 该标签只有 `mob_attack_no_aggro`）。**1.20.1 无 `no_knockback` 标签**，要精确免击退只能从 Forge 的 `LivingKnockBackEvent`（`knockback()` 第一行，可取消）或「取消后自己抵消位移」下手。
 
-## 特别招式（修饰键 + 技能键）
-**定义**：不占独立 1~9 槽位、由「修饰键 + 技能键」触发的独立技能。
-链路：`SpecialMoveInput(modifierMask, baseSlot)` → `TechniqueSpecialMoveC2SPacket` → `TechniqueSkillSetRegistry.useSpecialMove`（按栏位配置解析 skillId）→ `IInnateTechniqueSkillSet#useSpecialMove(player, skillId, mask)` → `AbstractInnateTechniqueSkillSet` 默认实现 → `castSpecialMoveBySkill`。
+## 特别招式 / 调节模式
+- 链路：`SpecialMoveInput` → `TechniqueSpecialMoveC2SPacket` → registry `useSpecialMove` → `useSpecialMove(player, skillId, mask)` → 基类 → `castSpecialMoveBySkill`。数值与原技能同源，只有解锁可独立。
+- ⚠️ **两道前置收口**（在扣咒力 / 上冷却**之前**）：`acceptsSpecialMove`（默认 = `getSpecialMoves` 掩码**精确相等**，不匹配静默 return）+ `isSpecialMoveUnlocked` ⇒ **先声明、后执行**：新增特别招式必须写进 `getSpecialMoves`。
+- ⚠️ 免费 / 条件放行条目（清除、查询、自身标记）：覆写 `useSpecialMove(player, skillId, mask)` 分流，**同时覆写 `acceptsSpecialMove`**，否则被静默拦下。开发树自动派生节点 = 覆写 `getSpecialMoves(baseSkillId)`。
+- 调节模式 `TechniqueSkillKeyEvents`：中键循环、侧键 4/5 = delta ∓1；`CAST_RANGE=0`/`BARRIER_RADIUS=1`/`STAR_MARK=2`；加新模式的钩子 = `resolveAdjustModeCount` + `applyAdjustModeDelta`。
 
-**数值同步（默认，结构上无法不同步）**：特别招式**没有自己的 `TechniqueSkill` 记录**，`findSkillById(skillId)` 反查出「原技能」再走 `castWithSkillEconomy(skill, …)` → 等级 / 咒力 / 冷却一律取原技能那一份。**唯一可独立的是解锁**：`castWithSlotEconomy(player, slot, cast, isUnlocked)` 重载（无限术式用 `isShiftVariantUnlockedForSlotN`）。
+## 星星标记 / 禁行星域（细节见 09-22、09-23 日志）
+- 两套进度独立：① 星位等级 `stacks`（叠加驱动，衰减 8s/级、**最低 1 级**，`MAX_MARKS=32` 按最久未打顶掉）；② 跨序解锁（位图，**接触驱动**，10s 限时，**每次展开清零**）。结算唯一位置 `StarMarkSkillLogic.resolveAll`；同星叠满 = **引爆**（半径 4 给 debuff + 传染，**爆心单体伤害 22**——只有爆心那一个目标受伤，`damageCore` 里方块/掉落物/施术者自己一概豁免，层数清零）。
+- ⚠️ 星域**无时限**（开关式），解除只有 Ctrl+技能键 / 换维度 / 换术式三条；⚠️ 星域表现与标记**解耦**（外环只看「域是否生效」，无标记也要画）；⚠️ 域开着时重复施放 = 新实例、进度全重置。
+- ⚠️ 半径托管给 `BarrierTechniqueServerLogic.staticGetBarrierRadius`（`{8,16,32,64}`，默认 8）——**全项目唯一尺寸档位**，每 tick 现取；描述在客户端、档位在服务端 ⇒ 只能写「默认 / 上限」。
+- ⭐ 展开瞬间弹射**单向**（方块弹实体、血多弹血少），初速与半径反相关 **× 被弹方星位倍率** `burstStackScale`（`1+0.25×(等级-1)`，1级×1 → 5级×2；等级取 `ResolvedMark.mark().stacks()`，`resolveAll` 已结算衰减），关键是固定上抛（离地后摩擦 45%→9%，同初速多飞约 5 倍）⇒ **只乘初速、绝不乘 `BURST_LIFT`**（乘了是弧线变高，不是变远）。
+- ⭐ 「踢足球」制导 = 同星吸引里的 `GUIDANCE_IMPULSE=0.045` 附加横向加力，**只在 `!entity.onGround()` 的成员上生效**（成员级判据，必须在成员循环内现算，组级 strength/verticalScale 管不到），垂直分量清零。触发条件复用 `ATTRACT_RANGE=16`，**不需要发射方记状态**。⛔ 铁律：**用「加力」不用「转向」**（加力才能免费得到「速度越快越难命中」），且**绝不乘星位/半径倍率**（设计决策点：固定额度补偿才留得住难度梯度，见 09-24 日志）。
+- ⭐ **撞击伤害**（`resolveImpacts`，踢足球的**收益点**）：伤害 = 水平速度 × 12，双方各一记，走 `TechniqueDamageSources.deal`。触发三件套 = 球身 `TAG_BURST_UNTIL` 未过期（弹射时盖，⇒「缓慢靠近不痛」精确成立） + 水平速度 ≥ 0.45 + 扫掠命中。⚠️ **必须扫掠**：实体间原版不碰撞，球速 2.8 格/tick vs 猪宽 0.7 ⇒ 逐点判定会隧穿（越用力越打不中）。用 `boundingBox.inflate(0.35).clip(head.subtract(deltaMovement), head)`——**tick END 时 `getDeltaMovement()` 就是本 tick 实际位移**。方块/掉落物不参与（球门零伤害）；`TAG_IMPACT_AT` 挂球身 ⇒ 多施术者天然去抖。⚠️ `AABB#intersects(Vec3,Vec3)` 是两点式，别当线段用。⚠️ 推力对**服务端玩家无效**（客户端每 tick 覆盖 deltaMovement）⇒「禁行」靠的是解锁门槛。
+- 📌 **命名**：弹射 + 制导 + 撞击伤害这一整套玩法正式名为 **「星星大碰撞！」/ Star Crash!**，说明节点 id = `love_rendezvous_star_gate_collision`（挂在 `love_rendezvous_star_gate` 下，lang 键 `skill_tree.jujutsukaisenzone.love_rendezvous_star_gate_collision.title/.desc`）。
+- 槽位 4 **「飞行，穿越」**（`StarFlightSkillLogic`，动画 `flying_turn` / `flying_turn_kick`）：条件 = 自身有标记 + 目标标记满级 + ≤20 格（**不筛跨序**）；流程 = `deactivateGate` → 每 tick 追踪位移 → **`detonate` 引爆旧印记** → 冲撞 12 + **补上「当前选中」印记**（`applySelectedMark`，直走 `PlayerStarMarkData.put`、不经经济）→ **仅当新印记与自身标记跨序时才 `StarMarkRules.flightKick`**（力度 `BURST_IMPULSE_NEAR × burstStackScale(5)`，**永远施术者弹目标**）。爆心须在 `detonate` 前取。前置校验**必须在 `castWithSkillEconomy` 之前**。⚠️ 射程 `CAST_RANGE` 与飞行时长上限**必须同步**：`MAX_FLIGHT_TICKS ≥ CAST_RANGE / TICKS_PER_BLOCK`（现 20/1.25 = 16，`FLIGHT_TIMEOUT_TICKS` 取两倍 32）。描述与动作栏提示全走 `CAST_RANGE`，改常量即自动跟随，lang 只有 `%s`。槽位 4 = 技能栏第二组第 1 格。
+- 力学只在服务端 `StarMarkRules`：一律**增量**速度 + `hurtMarked=true`（防与 EpicFight 抢位移）；同标记用质心。⚠️ **制导与撞击的成员池 = `apply(owner, marks)` 里「该施术者自己的标记列表」，不是全局**：没标记的实体既不制导也不当球（`resolveImpacts:585` 球 / `:611` 靶）。⇒ 「飞行，穿越」踢飞的目标**能**继续当球，靠的正是末段补上的那颗新印记（`detonate` 会吃掉旧标记，**补印记必须排在弹飞之前**）；但**制导还要 `group.size() >= 2`**，即同一颗星必须也打给了另一个实体，否则只是纯抛物线。`MARK_RANGE=128`（须 > 半径上限 64）。`StarMark` **7 字段 → 6 处构造点**。
 
-**⚠️ 顺序坑**：默认链路「**先扣咒力 / 上冷却，再演出**」。所以在 `castSpecialMoveBySkill` 里 `if (mask != MOD_SHIFT) return;` 收口是错的 —— **任何非该掩码的组合（Ctrl / Alt / Shift+Ctrl…）都会白扣一次费**。根因是通路**完全不校验掩码**：客户端 `buildModifierMask` 按着什么发什么，`TechniqueSpecialMoveC2SPacket` 只查 `slot 1..9 && mask != 0`，registry 只按 skillId 路由。
-→ **「不消耗经济」的条目（清除 / 查询类）必须在子类覆写 `useSpecialMove(player, skillId, mask)` 抢先分流并 return。**
-> 既有隐患（未修）：`LimitlessTechniqueSkillSet.castSpecialMoveBySkill` 就是这个写法。
-> 死代码：`AbstractInnateTechniqueSkillSet.useSpecialMove(player, SpecialMoveInput)` → `castSpecialMove(player, input)` 自 registry 改走三参重载后不可达（`Limitless`/`Shrine` 的 `castSpecialMove` 覆写同理）。
-
-**在开发树显示特别招式**：只需覆写 `getSpecialMoves(baseSkillId)` 返回 `TechniqueSpecialMove` 列表，
-`TechniqueSkillSetRegistry.register` 自动用 `TechniqueSpecialMoveAttacher` 派生节点（nodeId = `原技能节点id + "$" + variantId`，`requires(原技能节点)`，复用原技能图标与解锁状态），**不要手写树节点**。
-`SkillTreeNodeKind.SPECIAL_MOVE` 不可单独解锁，解锁状态 = 原技能状态。界面：青蓝边框 + 青蓝连线。
-
-## 战斗内「调节模式」体系（TechniqueSkillKeyEvents）
-- 中键循环切换模式；侧键 4 → delta −1，侧键 5 → delta +1。
-- 模式：`ADJUST_MODE_CAST_RANGE=0` / `ADJUST_MODE_BARRIER_RADIUS=1` / `ADJUST_MODE_STAR_MARK=2`（仅星间飞行可用）。
-- 加「仅某术式可用」的模式：放开 `resolveAdjustModeCount`（中键 `%` 循环、每 tick 超界退回 0），侧键派发在 `applyAdjustModeDelta` 加分支。
-- C2S 包：`AdjustCastRangeTierC2SPacket` / `AdjustBarrierRadiusTierC2SPacket` / `SelectStarMarkC2SPacket`，均「delta ±1 + 服务端校验 + 动作栏提示」。
-- 三个可改键：`KEY_ADJUST_MODE` / `KEY_ADJUST_TIER_DOWN` / `KEY_ADJUST_TIER_UP`（中键 / 侧键4 / 侧键5），在 `JuJutsuKaisenZone.ClientModEvents.onRegisterKeyMappings` 注册。
-- 中键默认与**原版「选取方块」**同绑（MOUSE:2）→ 控制界面标红、游戏内两者都触发；刻意为之。
-
-## Forge 1.20.1 按键与 API 要点（已核实反编译源码）
-- **注册必须走 `RegisterKeyMappingsEvent`**（mod 总线）：它做的是 `options.keyMappings = ArrayUtils.add(...)`，决定控制界面可见性与 options.txt 持久化。只 new 出 KeyMapping 只够 `isDown()` 用。
-- 同时要监听 mod 总线与 FORGE 总线的事件类**必须拆开**（`@Mod.EventBusSubscriber` 的 `bus` 只能给一个）。
-  ⚠️ `client/BarrierRulesKeyHandler` 踩了这个坑（漏 `bus = MOD` → 注册方法死代码，待修）。
-- 鼠标键用 `KeyMapping.isDown()` 安全：`MouseHandler.onPress` 只在 `screen == null && overlay == null` 时 `KeyMapping.set(Type.MOUSE, ...)`。`isDown()` 额外校验 `KeyConflictContext`，`IN_GAME.isActive()` == 无界面。
-- `InputEvent.MouseScrollingEvent`（1.20.1）**只有 `getScrollDelta()`**；`getDeltaX()/getDeltaY()` 属 1.20.6+。查 Forge API 认准 `1.20.1` 分支。
-- 推 / 拉实体：`hurtMarked` / `hasImpulse` / `fallDistance` 是公有可写字段。惯用 `target.setDeltaMovement(target.getDeltaMovement().add(impulse)); target.hurtMarked = true;`
-
-## 「星星标记」体系（星间飞行 / love_rendezvous）
-- **语义是「目标 → 星」**：同一目标至多一个标记（重复打标 = 覆盖），同一颗星可打给任意多个目标。`PlayerStarMarkData` 的 NBT 是根下一个 **ListTag**；旧格式被 `getList(TAG_ROOT,10)` 静默忽略，**不需要迁移**。
-- 施加必须是**接触**，两条入口都汇入 `LoveRendezvousTechniqueSkillSet.INSTANCE.tryApplyMark(player, mark, name)`（咒力 / 冷却 / 解锁都在里面结算）：
-  实体走 `AttackEntityEvent`（近战，含掉落物，挂 `event/StarMarkEvents`）；方块走**星星标记技能键**，视线由**服务端**自算（`StarMarkSkillLogic.lookedAtBlock`，`ClipContext` OUTLINE，4.5 格），客户端只报「按了键」。
-  ⚠️ 历史坑：曾用 `PlayerInteractEvent.RightClickBlock` 打方块，会与放置方块抢右键，已废弃 —— 别再退回右键。
-- 力学（`technique/skill/StarMarkRules`，只在服务端）三条铁律：① 一律**增量**速度 `dm.add(impulse)` + `hurtMarked=true`，**不覆盖**（否则与 EpicFight 抢位移）；② 同标记用**质心**不用两两成对（收敛、不自激）；③ **方块是静态锚点**，只推会动的一侧，方块之间不判定。
-  三态：同标记吸引 / 相邻无效果 / 跨序斥力（只在「禁行」星域内）。`MIN_SEPARATION=1.5` 内不再吸引、斥力翻倍；`MAX_SIMULATED=16` 按距离截断；`MARK_RANGE=32` 外自动解除。
-- `StarMarkType` 枚举顺序即原作星序，相邻判定 = `Math.abs(ordinal差) == 1`。牵引 / 禁行状态也存 `getPersistentData()` 根级（`..._pull_until` / `..._gate_until`）。
-
-## 术式开发界面（client/gui/technique）
-- **LDLib 的 `Widget.drawInBackground` 按子组件加入顺序绘制，后加入者在上层** → 「置顶 / 层级」只需控制 `addWidget` 先后，**不需要 z-index / bringToFront API**。
-  证据：`TechniqueDevelopmentCanvasWidget.rebuildGraph()` 先加连线、后加节点，连线因此永远垫底。
-- 点选高亮（已实现）：`SkillTreeHighlight` record 承载「选中节点 + 直连节点 + 直连连线」；`rebuildGraph(boolean refitView)` 的 refit **只有点选时传 false**，以免重置玩家的平移 / 缩放。
-- ⚠️ 点选回调**不能当场重建**：它发生在父容器遍历子组件（`mouseClicked`）途中，当场 `clearAllWidgets()` 会并发修改 —— 登记 pending，放到 `updateScreen()` 执行。
-- 「辉光」省事做法：用 `DrawerHelper.drawFilledFrameRoundBox` 在**外扩一圈**的圆角框上先画半透明色，再画本体覆盖内圈，只留外缘辉光。
-- **说明节点（INFO）不参与任何连线**：`prerequisiteNodeIds()` 是双用途的 —— 对技能/特别招式/引用节点是「解锁前置会画线」，对说明节点只是**布局锚点**（`SkillTreeLayoutEngine` 用来算列深与行序）。
-  统一判定入口 `SkillTreeNodeDef.isConnectableEdge(from, to)`（任一端 INFO 即 false），连线绘制与点选高亮都必须走它。
-
-## IDEA 运行配置
-- 根因：ForgeGradle `RunConfig.getIdeaModule()` = `project.getName().replace(' ', '_') + ".main"`（**只换空格不换点号**），而 IDEA 导入时把项目名点号换成下划线 → 目录名 `...-1.20.1` 带点必然错位。
-- 修法：`settings.gradle` 固定 `rootProject.name = 'JuJutsuKaisenZone_forge-1_20_1'` 后 `./gradlew genIntellijRuns`（约 2 分钟）；改完必须在 IDEA 里 **Reload All from Disk**。
+## 术式开发界面 / IDEA
+- LDLib `drawInBackground` 按 `addWidget` 顺序绘制 ⇒ 层级只靠加入顺序。⚠️ 点选回调不能当场 `clearAllWidgets()`，登记 pending 到 `updateScreen()`；重建用 `rebuildGraph(false)` 才不重置平移缩放。
+- IDEA：ForgeGradle `getIdeaModule()` 只把空格换下划线 ⇒ `settings.gradle` 固定 `rootProject.name = 'JuJutsuKaisenZone_forge-1_20_1'` → `genIntellijRuns` → Reload All from Disk。

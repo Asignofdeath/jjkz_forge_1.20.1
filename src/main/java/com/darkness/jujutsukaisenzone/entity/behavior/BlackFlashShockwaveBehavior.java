@@ -2,6 +2,7 @@ package com.darkness.jujutsukaisenzone.entity.behavior;
 
 import com.darkness.jujutsukaisenzone.entity.SpecialEffectEntity;
 import com.darkness.jujutsukaisenzone.entity.data.BlackFlashConfig;
+import com.darkness.jujutsukaisenzone.technique.TechniqueDamageSources;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
@@ -75,7 +76,7 @@ public class BlackFlashShockwaveBehavior extends EffectBehavior
         {
             if (target == owner || !target.isAlive()) continue;
             if (target.distanceToSqr(entity) > radius * radius) continue;
-            target.hurt(level.damageSources().magic(), BlackFlashConfig.SHOCKWAVE_DAMAGE);
+            TechniqueDamageSources.deal(target, owner, BlackFlashConfig.SHOCKWAVE_DAMAGE);
         }
 
         entity.discard();

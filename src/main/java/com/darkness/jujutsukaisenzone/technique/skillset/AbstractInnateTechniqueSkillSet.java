@@ -293,16 +293,25 @@ public abstract class AbstractInnateTechniqueSkillSet implements IInnateTechniqu
     }
 
     /**
-     * 特别招式默认链路：**按原技能的数值结算经济，再交给 {@code castSpecialMoveBySkill} 执行演出**。
+     * 特别招式默认链路：**先做两道前置收口，再按原技能的数值结算经济，最后交给
+     * {@code castSpecialMoveBySkill} 执行演出**。
+     * <p>
+     * 收口顺序是这条链路的要害：{@code castWithSkillEconomy} 一进去就扣咒力 / 上冷却，之后再判就要不回来了
+     * ——曾经的「Ctrl + 数字键白扣一次咒力」「变体未解锁照样扣费」都是把判断写在了它后面。
+     * 现在两道收口都在它**之前**：
+     * <ol>
+     *   <li>{@link #acceptsSpecialMove}：该 skillId + 掩码组合有没有实现（默认按
+     *       {@code getSpecialMoves(skillId)} 的声明判定，掩码需精确相等）——没有则静默忽略；</li>
+     *   <li>{@link #isSpecialMoveUnlocked}：变体自身的解锁状态（默认跟随原技能）——未解锁则提示并忽略。</li>
+     * </ol>
      * <p>
      * {@code skill} 由 {@code skillId} 反查而来，也就是「原技能」——特别招式没有自己的招式记录，
      * 所以等级 / 咒力 / 冷却天然沿用原技能（这正是「特别招式与原技能数值同步」的实现方式）。
-     * 若某条目需要独立解锁，应改用
-     * {@link #castWithSlotEconomy(ServerPlayer, int, Runnable, java.util.function.Predicate)} 重载。
      * <p>
-     * <b>子类若要实现「不消耗咒力 / 不吃冷却」的特别招式</b>（清除、查询类动作），必须覆写本方法，
-     * 在进入 {@code castWithSkillEconomy} **之前**分流并 return；一旦走到 {@code castSpecialMoveBySkill}
-     * 再做判断，咒力与冷却已经扣掉了。
+     * <b>子类若要实现「不消耗咒力 / 不吃冷却」的特别招式</b>（清除、查询类动作），仍然必须覆写本方法，
+     * 在进入 {@code castWithSkillEconomy} **之前**分流并 return——{@link #acceptsSpecialMove} 只回答
+     * 「有没有实现」，不回答「要扣多少费」。请连同 {@link #acceptsSpecialMove} 一起覆写，否则那些组合
+     * 会在第一道收口就被静默拦下。
      */
     @Override
     public void useSpecialMove(ServerPlayer player, String skillId, int modifierMask)
@@ -314,7 +323,52 @@ public abstract class AbstractInnateTechniqueSkillSet implements IInnateTechniqu
         }
         TechniqueSkill skill = findSkillById(skillId);
         if (skill == null) return;
+        if (!acceptsSpecialMove(player, skillId, modifierMask))
+        {
+            return;
+        }
+        if (!isSpecialMoveUnlocked(player, skillId, modifierMask))
+        {
+            player.sendSystemMessage(Component.literal("该招式尚未解锁。"));
+            return;
+        }
         castWithSkillEconomy(player, skill, () -> castSpecialMoveBySkill(player, skillId, modifierMask));
+    }
+
+    /**
+     * 该 {@code skillId} + 修饰键组合是否有实现；在 {@link #castWithSkillEconomy} **之前**调用。
+     * <p>
+     * 默认按 {@link IInnateTechniqueSkillSet#getSpecialMoves(String)} 的声明判定，且要求掩码**精确相等**
+     * ——声明 {@code MOD_SHIFT} 不会顺带放行 {@code Shift+Ctrl}。没有声明的组合一律静默忽略，不扣咒力也不上冷却。
+     * <p>
+     * ⚠️ 因此「先声明，后执行」是硬约定：<b>新增特别招式必须同时在 {@code getSpecialMoves} 里声明</b>，
+     * 只在 {@code castSpecialMoveBySkill} 里写分支是不会被调用的（表现为按了没反应，而不是白扣费）。
+     * <p>
+     * 需要「免费」或「条件性放行」（如星间飞行的标记清除、打自身标记）的技能集，覆写
+     * {@link #useSpecialMove(ServerPlayer, String, int)} 自行分流，并一并覆写本方法把那些组合放进来。
+     */
+    protected boolean acceptsSpecialMove(ServerPlayer player, String skillId, int modifierMask)
+    {
+        for (TechniqueSpecialMove move : getSpecialMoves(skillId))
+        {
+            if (move.modifierMask() == modifierMask)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 特别招式自身的解锁判定；在 {@link #castWithSkillEconomy} **之前**调用，返回 {@code false} 时
+     * 由 {@link #useSpecialMove(ServerPlayer, String, int)} 统一提示并忽略，因此不会浪费咒力与冷却。
+     * <p>
+     * 默认 {@code true}——原技能的解锁由 {@code castWithSkillEconomy} 负责。变体拥有独立解锁字段的技能集
+     * （先例：无限术式苍 / 赫机动变体）覆写本方法，即可把「变体未解锁」也拦在扣费之前。
+     */
+    protected boolean isSpecialMoveUnlocked(ServerPlayer player, String skillId, int modifierMask)
+    {
+        return true;
     }
 
     /** 按技能 ID 释放（子类实现具体演出）。 */
@@ -325,10 +379,10 @@ public abstract class AbstractInnateTechniqueSkillSet implements IInnateTechniqu
     /**
      * 按技能 ID 释放特别招式（子类实现）。
      * <p>
-     * 执行到这里时，{@code modifierMask} 已经过通路校验，且**咒力 / 冷却 / 等级已按原技能结算**：
-     * 本方法只负责「演出」，不负责经济。常见写法是先 {@code if (modifierMask != SpecialMoveInput.MOD_SHIFT) return;}
-     * 收口本术式支持的修饰键——但那种写法只适用于「本来就要扣费」的条目；免费条目请回到
-     * {@code useSpecialMove(ServerPlayer, String, int)} 前置分流。
+     * 执行到这里时，组合已由 {@link #acceptsSpecialMove} / {@link #isSpecialMoveUnlocked} 放行，
+     * 且**咒力 / 冷却 / 等级已按原技能结算**：本方法只负责「演出」，不负责经济，也**不需要**再写
+     * {@code if (modifierMask != ...) return;} 之类的掩码收口——那是收口写晚了的旧写法，会在扣费之后才 return。
+     * 唯一仍需在本方法里判的是「跟掩码无关的其它上下文」（例如玩家当前状态是否允许该演出）。
      */
     protected void castSpecialMoveBySkill(ServerPlayer player, String skillId, int modifierMask)
     {

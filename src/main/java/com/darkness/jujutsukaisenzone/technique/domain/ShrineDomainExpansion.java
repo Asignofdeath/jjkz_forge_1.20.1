@@ -13,6 +13,7 @@ import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
 import com.darkness.jujutsukaisenzone.registry.ModEntities;
 import com.darkness.jujutsukaisenzone.registry.ModSounds;
 import com.darkness.jujutsukaisenzone.photon.OwnerOnlyShrineSlashFx;
+import com.darkness.jujutsukaisenzone.technique.TechniqueDamageSources;
 import com.darkness.jujutsukaisenzone.technique.scaling.ShrineDomainSkillGrowth;
 import net.minecraft.ChatFormatting;
 import net.minecraft.advancements.Advancement;
@@ -1292,7 +1293,7 @@ public final class ShrineDomainExpansion extends AbstractTechniqueDomain
             return false;
         }
 
-        if (!target.hurt(owner.damageSources().magic(), ShrineDomainSkillGrowth.slashDamage(owner)))
+        if (!TechniqueDamageSources.deal(target, owner, ShrineDomainSkillGrowth.slashDamage(owner)))
         {
             return false;
         }
@@ -1311,7 +1312,7 @@ public final class ShrineDomainExpansion extends AbstractTechniqueDomain
             return false;
         }
 
-        if (!target.hurt(owner.damageSources().magic(), ShrineDomainSkillGrowth.powerSlashDamage(owner)))
+        if (!TechniqueDamageSources.deal(target, owner, ShrineDomainSkillGrowth.powerSlashDamage(owner)))
         {
             return false;
         }

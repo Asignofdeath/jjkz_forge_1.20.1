@@ -240,6 +240,41 @@ public final class EpicFightCompat
         }
     }
 
+    /**
+     * 「飞行，穿越」起手：播放 {@link JjkzEpicFightAnimations#FLYING_TURN}（飞踢前摇）。
+     * <p>
+     * 起手动画铺满整段飞行（约 26 帧 ≈ 0.43 秒，与最长飞行时长同量级），
+     * 抵达时由 {@link #stopFlyingTurnAnimation} 停掉再切踢击。
+     */
+    public static void playFlyingTurnAnimation(ServerPlayer player)
+    {
+        ServerPlayerPatch patch = EpicFightCapabilities.getEntityPatch(player, ServerPlayerPatch.class);
+        if (patch != null && JjkzEpicFightAnimations.FLYING_TURN != null)
+        {
+            patch.playAnimationInstantly(JjkzEpicFightAnimations.FLYING_TURN);
+        }
+    }
+
+    /** 停止「飞行，穿越」起手动画（穿越中止或切到踢击时调用）。 */
+    public static void stopFlyingTurnAnimation(ServerPlayer player)
+    {
+        ServerPlayerPatch patch = EpicFightCapabilities.getEntityPatch(player, ServerPlayerPatch.class);
+        if (patch != null && JjkzEpicFightAnimations.FLYING_TURN != null)
+        {
+            patch.stopPlaying(JjkzEpicFightAnimations.FLYING_TURN);
+        }
+    }
+
+    /** 「飞行，穿越」踢击：抵达目标时播放 {@link JjkzEpicFightAnimations#FLYING_TURN_KICK}。 */
+    public static void playFlyingTurnKickAnimation(ServerPlayer player)
+    {
+        ServerPlayerPatch patch = EpicFightCapabilities.getEntityPatch(player, ServerPlayerPatch.class);
+        if (patch != null && JjkzEpicFightAnimations.FLYING_TURN_KICK != null)
+        {
+            patch.playAnimationInstantly(JjkzEpicFightAnimations.FLYING_TURN_KICK);
+        }
+    }
+
     public static boolean tryConsumeHeavenlyBurstStamina(Player player)
     {
         ServerPlayerPatch patch = EpicFightCapabilities.getEntityPatch(player, ServerPlayerPatch.class);

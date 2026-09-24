@@ -1,6 +1,7 @@
 package com.darkness.jujutsukaisenzone.event;
 
 import com.darkness.jujutsukaisenzone.JuJutsuKaisenZone;
+import com.darkness.jujutsukaisenzone.technique.skill.StarFlightSkillLogic;
 import com.darkness.jujutsukaisenzone.technique.skill.StarMarkRules;
 import com.darkness.jujutsukaisenzone.technique.skill.StarMarkSkillLogic;
 import com.darkness.jujutsukaisenzone.technique.skillset.LoveRendezvousTechniqueSkillSet;
@@ -41,6 +42,12 @@ public final class StarMarkEvents
         {
             List<StarMarkSkillLogic.ResolvedMark> resolved = StarMarkSkillLogic.resolveAndRender(player);
             StarMarkRules.apply(player, resolved);
+            /*
+             * 「飞行，穿越」的位移结算挂在同一处：它是纯粹的服务端位移（每 tick 一次位置包），
+             * 与标记力学没有耦合，所以放在 apply 之后单独走一步——穿越途中星域已被收掉，
+             * 标记力学那一段本来也就只剩尾迹。
+             */
+            StarFlightSkillLogic.tick(player);
         }
     }
 

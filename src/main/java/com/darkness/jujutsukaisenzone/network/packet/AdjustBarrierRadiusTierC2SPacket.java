@@ -9,15 +9,13 @@ import net.minecraftforge.network.NetworkEvent;
 import java.util.function.Supplier;
 
 /**
- * 客户端调整结界半径档位（档位索引：0→8, 1→16, 2→32, 3→64）。
+ * 客户端调整结界半径档位。
+ * <p>
+ * 档位与半径的对应表只保存在 {@link BarrierTechniqueServerLogic} 一份，本包不再复制；
+ * 调整后回读实际半径用于反馈，避免两处数值各自漂移。
  */
 public class AdjustBarrierRadiusTierC2SPacket
 {
-    /** 可用半径档位，index 即 tier。 */
-    private static final int[] RADIUS_VALUES = {8, 16, 32, 64};
-    private static final int MIN_TIER = 0;
-    private static final int MAX_TIER = RADIUS_VALUES.length - 1;
-
     private final int delta;
 
     public AdjustBarrierRadiusTierC2SPacket(int delta)
@@ -51,7 +49,7 @@ public class AdjustBarrierRadiusTierC2SPacket
                 return;
             }
             int tier = BarrierTechniqueServerLogic.staticAdjustBarrierRadiusTier(player, safeDelta);
-            int radius = RADIUS_VALUES[tier];
+            int radius = BarrierTechniqueServerLogic.staticGetBarrierRadius(player);
             player.displayClientMessage(Component.literal("结界半径档位：" + (tier + 1) + "（半径 " + radius + "）"), true);
         });
         context.setPacketHandled(true);

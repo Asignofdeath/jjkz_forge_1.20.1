@@ -6,6 +6,7 @@ import com.darkness.jujutsukaisenzone.entity.util.GeometryUtils;
 import com.darkness.jujutsukaisenzone.photon.OwnerOnlyShrineSlashFx;
 import com.darkness.jujutsukaisenzone.registry.ModEntities;
 import com.darkness.jujutsukaisenzone.registry.ModSounds;
+import com.darkness.jujutsukaisenzone.technique.TechniqueDamageSources;
 import com.darkness.jujutsukaisenzone.technique.scaling.ShrineSkillGrowth;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
@@ -206,7 +207,7 @@ public class ShrineKaiArrowBehavior extends EffectBehavior
             if (!target.isAlive()) continue;
             if (!GeometryUtils.aabbIntersectsSphere(sample.x, sample.y, sample.z, rSqr, target.getBoundingBox())) continue;
             if (owner != null && target.getUUID().equals(owner.getUUID())) continue;
-            if (target.hurt(entity.damageSources().magic(), ShrineSkillGrowth.kaiColumnDamage(owner)))
+            if (TechniqueDamageSources.deal(target, owner, ShrineSkillGrowth.kaiColumnDamage(owner)))
             {
                 SoundEvent hitSound = this.slashType == 2
                         ? ModSounds.SHRINE_SLASH_KAI_2_HIT.get()

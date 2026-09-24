@@ -69,6 +69,20 @@ public final class BarrierTechniqueServerLogic extends AbstractBarrierTechnique
     /** 静态委托方法，保持向后兼容。 */
     public static int staticAdjustBarrierRadiusTier(ServerPlayer player, int delta) { return INSTANCE.adjustBarrierRadiusTier(player, delta); }
 
+    /**
+     * 静态委托方法：该玩家当前的结界半径（格），即「结界尺寸调节器」的当下档位。
+     * <p>
+     * 这是全项目「可调尺寸」的唯一出口——除结界本体外，星间飞行的禁行星域也托管到这里，
+     * 因此中键切到「结界半径」调档时两者同步变化。
+     */
+    public static int staticGetBarrierRadius(ServerPlayer player) { return INSTANCE.getBarrierRadius(player); }
+
+    /** 静态委托方法：默认档位的半径（格），供描述文本等无法拿到服务端档位的地方兜底。 */
+    public static int staticGetDefaultRadius() { return INSTANCE.getRadiusOfTier(DEFAULT_RADIUS_TIER); }
+
+    /** 静态委托方法：最大档位的半径（格），供描述文本使用。 */
+    public static int staticGetMaxRadius() { return INSTANCE.getRadiusOfTier(MAX_RADIUS_TIER); }
+
     /** 静态委托方法，保持向后兼容。 */
     public static void staticRepairBarrierGaps(ServerPlayer player) { INSTANCE.repairBarrierGaps(player); }
 
@@ -476,6 +490,18 @@ public final class BarrierTechniqueServerLogic extends AbstractBarrierTechnique
         int newTier = Math.max(MIN_RADIUS_TIER, Math.min(MAX_RADIUS_TIER, currentTier + delta));
         BARRIER_RADIUS_TIER.put(player.getUUID(), newTier);
         return newTier;
+    }
+
+    /** 档位对应的半径（格）；越界自动夹到有效区间。 */
+    public int getRadiusOfTier(int tier)
+    {
+        return RADIUS_VALUES[Math.max(MIN_RADIUS_TIER, Math.min(MAX_RADIUS_TIER, tier))];
+    }
+
+    /** 该玩家当前档位对应的半径（格）；从未调整过时取默认档位。 */
+    public int getBarrierRadius(ServerPlayer player)
+    {
+        return getRadiusOfTier(BARRIER_RADIUS_TIER.getOrDefault(player.getUUID(), DEFAULT_RADIUS_TIER));
     }
 
     // ==================== 私有辅助方法 ====================

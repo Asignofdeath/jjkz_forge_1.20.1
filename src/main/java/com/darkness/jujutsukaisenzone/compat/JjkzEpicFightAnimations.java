@@ -38,6 +38,10 @@ public final class JjkzEpicFightAnimations
     public static AnimationAccessor<JjkzTechniqueCastAnimation> JUDGMENT_DOMAIN_LOOKDOWN;
     /** {@code assets/jujutsukaisenzone/animmodels/animations/swing_the_gavel.json}，开庭敲槌 */
     public static AnimationAccessor<JjkzTechniqueCastAnimation> SWING_THE_GAVEL;
+    /** {@code assets/jujutsukaisenzone/animmodels/animations/flying_turn.json}，「飞行，穿越」起手（飞踢前摇） */
+    public static AnimationAccessor<JjkzTechniqueCastAnimation> FLYING_TURN;
+    /** {@code assets/jujutsukaisenzone/animmodels/animations/flying_turn_kick.json}，「飞行，穿越」踢击 */
+    public static AnimationAccessor<JjkzTechniqueCastAnimation> FLYING_TURN_KICK;
 
     private JjkzEpicFightAnimations()
     {
@@ -83,6 +87,12 @@ public final class JjkzEpicFightAnimations
                 accessor -> new JjkzTechniqueCastAnimation(accessor, Armatures.BIPED));
         SWING_THE_GAVEL = builder.nextAccessor(
                 "swing_the_gavel",
+                accessor -> new JjkzTechniqueCastAnimation(accessor, Armatures.BIPED));
+        FLYING_TURN = builder.nextAccessor(
+                "flying_turn",
+                accessor -> new JjkzTechniqueCastAnimation(accessor, Armatures.BIPED));
+        FLYING_TURN_KICK = builder.nextAccessor(
+                "flying_turn_kick",
                 accessor -> new JjkzTechniqueCastAnimation(accessor, Armatures.BIPED));
     }
 }
