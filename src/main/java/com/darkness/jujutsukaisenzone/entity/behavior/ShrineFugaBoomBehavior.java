@@ -11,6 +11,8 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
+import com.darkness.jujutsukaisenzone.technique.TechniqueDamageSources;
+import com.darkness.jujutsukaisenzone.technique.skillset.SkillDamageType;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
@@ -200,11 +202,11 @@ public class ShrineFugaBoomBehavior extends EffectBehavior
                     : entity.damageSources().magic();
             if (target instanceof Player)
             {
-                target.hurt(source, damage);
+                TechniqueDamageSources.runWithType(SkillDamageType.TECHNIQUE, () -> target.hurt(source, damage));
             }
             else
             {
-                target.hurt(source, damage);
+                TechniqueDamageSources.runWithType(SkillDamageType.TECHNIQUE, () -> target.hurt(source, damage));
                 if (!target.isAlive())
                 {
                     target.discard();

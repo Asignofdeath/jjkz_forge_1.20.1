@@ -88,3 +88,13 @@
   - 审判 3 条——`judgment_gavel_forms`「三式法槌」（前置 `judgment_gavel`、150）/ `judgment_sentencing`「量刑」（前置 `judgment_trial`、150）/ `judgment_aggravation`「从重论处」（前置 `judgment_sentencing`、200）。门控只有两处：`JudgmentWeaponLogic#cycleGavelForm` 开头（未解锁不切换形态），以及 `JudgmentTrialSkillLogic#rollGuiltyVerdictType(caster, target, crimeBonusPercent)` 这个**私有重载**（未解锁「量刑」→ 直接 `return CONFISCATION`；未解锁「从重论处」→ debuff 与重罪加成一律归零）。后一处即三路全覆盖：「审判」「指控」「领域审理」都经由它掷骰。
 - ⚠️ **降级形态做成「减法」，不是新逻辑**：门控只让既有行为少发生（形态数变 1 / 不掷死刑 / 加成归零），不引入新分支。附带连带（未解锁量刑 ⇒ 不判死刑 ⇒ 不发【处刑人之剑】）是自然结果，不需要额外门控。
 - ⚠️ **门控点优先选「多条路径共用的那个唯一结算点」**，而不是在每个调用点各写一遍——审判两条机制因此只动了一个方法。
+
+## 伤害乘区管线（2026-09-24 起）
+- **汇合点 = `event/TechniqueDamageZoneEvents`**（`LivingHurtEvent` @HIGH）：术式（`deal`→`hurt`）与 EpicFight 体术都在此结算乘区。区序：①施术者增强（`TechniqueDamageBoosts` 分型匹配「下一击增伤」）→ ②目标减免（ZONE 减伤）。
+- 优先级链（勿乱动）：处刑人 HIGHEST（伤害量**改写**）→ 管线 HIGH → 罪恶者 ×1.5 / 黑闪 pow(2.5) / 蓄力打断 NORMAL。黑闪 pow 刻意最后 ⇒ 黑闪区放大一切前置乘区。乘法交换律 ⇒ 乘算类迁移位置不改数值。
+- **分型 = 叙事标签**（与通道解耦）：术式能力→TECHNIQUE；体术能力→MARTIAL；同一次叠加两者→COMPOSITE。挂法：`deal(..., type)` 或 `runWithType`/`callWithType`（thrown / explode / mobProjectile 等保留原通道时）。`currentDamageType()` 在 deal/runWithType 栈内有值。
+- **结算现场判定**（`TechniqueDamageZoneEvents#resolveDamageType`）：ThreadLocal 优先 → 处刑剑+死刑挥击→COMPOSITE → 必定黑闪的 EF 基础攻击→COMPOSITE → EF `isBasicAttack`→MARTIAL → 赫飞块 `TAG_RED_DEBRIS`→TECHNIQUE → 其余 null。随机黑闪在 NORMAL 才掷骰，管线 HIGH 时仍按体术消耗加成（已知边界）。
+- **技能描述**：正文写「N 点术式/体术伤害」等；**禁止**技能级 `damageTypes` 字段与悬停「伤害类型」标题行。分型只挂在出伤结算点。
+- `TechniqueDamageBoosts`：纯内存 Map（`push/consume/clear`），「下一击」瞬时增益**不落盘、不进 copyProgressionFrom**；登出在 `BlackFlashEvents#onPlayerLoggedOut` 清。消耗严格匹配：TECHNIQUE 击只耗 TECHNIQUE 登记，COMPOSITE 击一次耗三类。
+- 消耗语义：同分型多次 push 加算叠加（乘区内加算、乘区间乘算）。
+- ⚠️ 新乘区（易伤/克制/标签抗性）一律加进 `TechniqueDamageZoneEvents` 并写明顺序，别再开裸 `setAmount`。武器特有条件判定（如法槌对罪恶者）留在各自 Events，不进通用管线。

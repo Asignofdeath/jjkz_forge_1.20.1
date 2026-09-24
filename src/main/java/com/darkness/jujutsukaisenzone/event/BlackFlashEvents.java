@@ -8,6 +8,7 @@ import com.darkness.jujutsukaisenzone.player.PlayerCursedEnergyData;
 import com.darkness.jujutsukaisenzone.player.PlayerCursedGradeData;
 import com.darkness.jujutsukaisenzone.player.PlayerShrineBlackFlashMilestoneData;
 import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
+import com.darkness.jujutsukaisenzone.technique.TechniqueDamageBoosts;
 import com.darkness.jujutsukaisenzone.technique.development.SkillUnlockLogic;
 import com.darkness.jujutsukaisenzone.technique.skillset.ShrineTechniqueSkillSet;
 import com.darkness.jujutsukaisenzone.entity.SpecialEffectEntity;
@@ -81,13 +82,7 @@ public final class BlackFlashEvents
             return;
         }
 
-        // Zone 伤害吸收：处于 Zone 状态的玩家减少受到的伤害
-        if (target instanceof ServerPlayer zonePlayer
-                && EpicFightCompat.isBattleMode(zonePlayer)
-                && PlayerBlackFlashData.isZoneActive(zonePlayer))
-        {
-            event.setAmount(event.getAmount() * (float) (1.0D - Config.blackFlashZoneDefenseBonus));
-        }
+        // （Zone 伤害吸收已迁入 TechniqueDamageZoneEvents 统一乘区管线，判定与数值不变）
 
         // 受击打断：被体术命中的玩家连击清零（只对 EpicFight 战斗模式中的有效体术攻击生效）
         if (target instanceof ServerPlayer victim
@@ -300,6 +295,7 @@ public final class BlackFlashEvents
         if (event.getEntity() instanceof ServerPlayer player)
         {
             PlayerBlackFlashData.resetAll(player);
+            TechniqueDamageBoosts.clear(player);
         }
     }
 

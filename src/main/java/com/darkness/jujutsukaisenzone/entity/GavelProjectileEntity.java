@@ -2,7 +2,9 @@ package com.darkness.jujutsukaisenzone.entity;
 
 import com.darkness.jujutsukaisenzone.registry.ModEntities;
 import com.darkness.jujutsukaisenzone.registry.ModItems;
+import com.darkness.jujutsukaisenzone.technique.TechniqueDamageSources;
 import com.darkness.jujutsukaisenzone.technique.skill.GavelFormStats;
+import com.darkness.jujutsukaisenzone.technique.skillset.SkillDamageType;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
@@ -17,6 +19,8 @@ import net.minecraft.world.phys.Vec3;
 
 /**
  * 法槌投射物：右键即时射出，弹道类似箭（重力 + 高速），落点小范围爆炸（不破坏方块）。
+ * <p>
+ * 直击与爆炸均为<strong>术式</strong>伤害（审判术式能力）；手持近战挥击另算体术，不在本类。
  */
 public class GavelProjectileEntity extends ThrowableItemProjectile
 {
@@ -52,14 +56,16 @@ public class GavelProjectileEntity extends ThrowableItemProjectile
     {
         if (!this.level().isClientSide)
         {
-            detonateAt(result.getLocation());
-            Entity hit = result.getEntity();
-            Entity owner = this.getOwner();
-            if (hit instanceof LivingEntity living && hit != owner)
-            {
-                DamageSource source = this.damageSources().thrown(this, owner);
-                living.hurt(source, GavelFormStats.getProjectileDamage(this.getItem()));
-            }
+            TechniqueDamageSources.runWithType(SkillDamageType.TECHNIQUE, () -> {
+                detonateAt(result.getLocation());
+                Entity hit = result.getEntity();
+                Entity owner = this.getOwner();
+                if (hit instanceof LivingEntity living && hit != owner)
+                {
+                    DamageSource source = this.damageSources().thrown(this, owner);
+                    living.hurt(source, GavelFormStats.getProjectileDamage(this.getItem()));
+                }
+            });
         }
         this.discard();
     }
@@ -69,7 +75,8 @@ public class GavelProjectileEntity extends ThrowableItemProjectile
     {
         if (!this.level().isClientSide)
         {
-            detonateAt(result.getLocation());
+            TechniqueDamageSources.runWithType(SkillDamageType.TECHNIQUE,
+                    () -> detonateAt(result.getLocation()));
         }
         this.discard();
     }

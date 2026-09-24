@@ -1,6 +1,7 @@
 package com.darkness.jujutsukaisenzone.technique;
 
 import com.darkness.jujutsukaisenzone.JuJutsuKaisenZone;
+import com.darkness.jujutsukaisenzone.technique.skillset.SkillDamageType;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraftforge.event.entity.living.LivingKnockBackEvent;
@@ -9,6 +10,7 @@ import net.minecraftforge.fml.common.Mod;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.IdentityHashMap;
+import java.util.function.Supplier;
 
 /**
  * 术式伤害的统一入口。
@@ -36,6 +38,10 @@ import java.util.IdentityHashMap;
  * ⚠️ 刻意<b>不</b>填 {@code directEntity}：{@code getSourcePosition()} 只在
  * {@code isDamageSourceBlocked}（举盾格挡）里被用到，填了就等于让盾牌能挡下术式，
  * 这是设定外的改动。保持 null ⇒ 术式依旧无视盾牌。
+ * <p>
+ * 分型（{@link SkillDamageType}）是<strong>叙事元数据</strong>，与通道解耦：不改穿甲 / 盾牌，
+ * 仅在结算期间写入 {@link #ACTIVE_DAMAGE_TYPE}。走 {@code thrown} / {@code explode} /
+ * EpicFight 等通道时，用 {@link #runWithType} / {@link #callWithType} 包住出伤即可挂上分型。
  */
 @Mod.EventBusSubscriber(modid = JuJutsuKaisenZone.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public final class TechniqueDamageSources
@@ -46,6 +52,15 @@ public final class TechniqueDamageSources
      */
     private static final ThreadLocal<IdentityHashMap<LivingEntity, Boolean>> KNOCKBACK_GUARD =
             ThreadLocal.withInitial(IdentityHashMap::new);
+
+    /**
+     * 正在结算的伤害分型。只在 {@link #deal} / {@link #runWithType} 调用栈存活期间有值，
+     * 供 {@code LivingHurtEvent} 监听器读取「这一击算体 / 术 / 复」。
+     */
+    private static final ThreadLocal<SkillDamageType> ACTIVE_DAMAGE_TYPE = new ThreadLocal<>();
+
+    /** 赫击飞方块的 persistentData 标记：落地砸人仍算术式伤害。 */
+    public static final String TAG_RED_DEBRIS = "jujutsukaisenzone_red_debris";
 
     private TechniqueDamageSources()
     {
@@ -62,23 +77,85 @@ public final class TechniqueDamageSources
      */
     public static boolean deal(LivingEntity target, @Nullable LivingEntity owner, float amount)
     {
-        if (owner == null)
-        {
-            return target.hurt(target.damageSources().magic(), amount);
-        }
+        return deal(target, owner, amount, SkillDamageType.TECHNIQUE);
+    }
 
-        DamageSource source = new DamageSource(owner.damageSources().magic().typeHolder(), null, owner);
+    /**
+     * 对目标造成一次指定分型的伤害。
+     * <p>
+     * 分型只是「随伤害带出去的元数据」：不改伤害类型（依旧复用 {@code MAGIC} 的
+     * {@link DamageSource#typeHolder()}）、不改穿甲 / 抗性 / 盾牌语义，仅在结算期间写入
+     * {@link #ACTIVE_DAMAGE_TYPE}，供乘区管线（{@code TechniqueDamageZoneEvents}）按分型挑加成。
+     *
+     * @param damageType 这一击的叙事分型；传 {@link SkillDamageType#TECHNIQUE} 与旧三参重载等价
+     */
+    public static boolean deal(LivingEntity target, @Nullable LivingEntity owner, float amount, SkillDamageType damageType)
+    {
+        return callWithType(damageType, () -> {
+            if (owner == null)
+            {
+                return target.hurt(target.damageSources().magic(), amount);
+            }
 
-        IdentityHashMap<LivingEntity, Boolean> guard = KNOCKBACK_GUARD.get();
-        guard.put(target, Boolean.TRUE);
+            DamageSource source = new DamageSource(owner.damageSources().magic().typeHolder(), null, owner);
+
+            IdentityHashMap<LivingEntity, Boolean> guard = KNOCKBACK_GUARD.get();
+            guard.put(target, Boolean.TRUE);
+            try
+            {
+                return target.hurt(source, amount);
+            }
+            finally
+            {
+                guard.remove(target);
+            }
+        });
+    }
+
+    /**
+     * 在任意出伤通道上挂叙事分型（不改 DamageSource 本身）。
+     * 用于 {@code thrown} / {@code explode} / {@code mobProjectile} 等不能或不该改走 {@link #deal} 的路径。
+     */
+    public static void runWithType(SkillDamageType damageType, Runnable action)
+    {
+        callWithType(damageType, () -> {
+            action.run();
+            return null;
+        });
+    }
+
+    /**
+     * 同 {@link #runWithType}，带回返回值（如 {@code hurt} 的 boolean）。
+     */
+    public static <T> T callWithType(SkillDamageType damageType, Supplier<T> action)
+    {
+        SkillDamageType previousType = ACTIVE_DAMAGE_TYPE.get();
+        ACTIVE_DAMAGE_TYPE.set(damageType);
         try
         {
-            return target.hurt(source, amount);
+            return action.get();
         }
         finally
         {
-            guard.remove(target);
+            if (previousType == null)
+            {
+                ACTIVE_DAMAGE_TYPE.remove();
+            }
+            else
+            {
+                ACTIVE_DAMAGE_TYPE.set(previousType);
+            }
         }
+    }
+
+    /**
+     * 当前结算中的伤害分型。只在 {@link #deal} / {@link #runWithType} 调用栈内有值；
+     * 通道外的伤害由 {@code TechniqueDamageZoneEvents} 另行判定（如 EpicFight 基础攻击 → 体术）。
+     */
+    @Nullable
+    public static SkillDamageType currentDamageType()
+    {
+        return ACTIVE_DAMAGE_TYPE.get();
     }
 
     /**

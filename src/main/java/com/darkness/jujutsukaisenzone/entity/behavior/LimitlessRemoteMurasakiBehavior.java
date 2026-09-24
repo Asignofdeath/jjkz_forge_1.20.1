@@ -17,6 +17,8 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
+import com.darkness.jujutsukaisenzone.technique.TechniqueDamageSources;
+import com.darkness.jujutsukaisenzone.technique.skillset.SkillDamageType;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
@@ -574,11 +576,13 @@ public class LimitlessRemoteMurasakiBehavior extends EffectBehavior
             DamageSource source = owner != null
                     ? entity.damageSources().mobProjectile(entity, owner)
                     : entity.damageSources().magic();
-            target.hurt(source, dmg);
-            if (!(target instanceof Player) && !target.isAlive())
-            {
-                target.discard();
-            }
+            TechniqueDamageSources.runWithType(SkillDamageType.TECHNIQUE, () -> {
+                target.hurt(source, dmg);
+                if (!(target instanceof Player) && !target.isAlive())
+                {
+                    target.discard();
+                }
+            });
         }
     }
 

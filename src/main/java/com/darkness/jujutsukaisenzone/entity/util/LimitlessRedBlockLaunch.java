@@ -3,6 +3,7 @@ package com.darkness.jujutsukaisenzone.entity.util;
 import com.darkness.jujutsukaisenzone.entity.SpecialEffectEntity;
 import com.darkness.jujutsukaisenzone.entity.behavior.LimitlessRedArrowBehavior;
 import com.darkness.jujutsukaisenzone.entity.data.LimitlessRedConfig;
+import com.darkness.jujutsukaisenzone.technique.TechniqueDamageSources;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
@@ -77,6 +78,7 @@ public final class LimitlessRedBlockLaunch
             flying.xo = spawn.x;
             flying.yo = spawn.y;
             flying.zo = spawn.z;
+            flying.getPersistentData().putBoolean(TechniqueDamageSources.TAG_RED_DEBRIS, true);
             flying.setHurtsEntities(
                     LimitlessRedConfig.BLOCK_LAUNCH_HURT_DAMAGE_PER_DISTANCE,
                     LimitlessRedConfig.BLOCK_LAUNCH_HURT_MAX);

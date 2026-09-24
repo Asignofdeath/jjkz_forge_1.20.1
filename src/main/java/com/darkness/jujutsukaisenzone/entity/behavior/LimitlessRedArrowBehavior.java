@@ -3,7 +3,9 @@ package com.darkness.jujutsukaisenzone.entity.behavior;
 import com.darkness.jujutsukaisenzone.entity.SpecialEffectEntity;
 import com.darkness.jujutsukaisenzone.entity.data.LimitlessRedConfig;
 import com.darkness.jujutsukaisenzone.technique.config.SkillCombatConfigRegistry;
+import com.darkness.jujutsukaisenzone.technique.TechniqueDamageSources;
 import com.darkness.jujutsukaisenzone.technique.scaling.LimitlessRedSkillGrowth;
+import com.darkness.jujutsukaisenzone.technique.skillset.SkillDamageType;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
@@ -103,8 +105,9 @@ public class LimitlessRedArrowBehavior extends EffectBehavior
             ownerLiving.getPersistentData().putBoolean(TAG_TEMP_RED_EXPLOSION_IMMUNE, true);
         }
 
-        entity.level().explode(entity, entity.getX(), entity.getY(), entity.getZ(),
-                this.explosionPower, false, ExplosionInteraction.TNT);
+        TechniqueDamageSources.runWithType(SkillDamageType.TECHNIQUE, () ->
+                entity.level().explode(entity, entity.getX(), entity.getY(), entity.getZ(),
+                        this.explosionPower, false, ExplosionInteraction.TNT));
 
         if (ownerLiving != null)
         {

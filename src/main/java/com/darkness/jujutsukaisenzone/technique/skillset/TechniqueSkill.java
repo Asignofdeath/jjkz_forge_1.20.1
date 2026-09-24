@@ -9,6 +9,9 @@ import net.minecraft.network.chat.Component;
  * 玩家在 {@code SkillBarConfigScreen} 中将技能拖到快捷栏位（1~9）完成配置。
  * <p>
  * {@link #defaultSlot()} 仅用于首次加载时自动填充空栏位的默认值，不影响后续玩家自由拖拽配置。
+ * <p>
+ * 伤害分型（体 / 术 / 复）是<strong>每一次出伤</strong>的叙事标签，挂在结算点上，
+ * 不在本类做技能级字段；描述正文直接写「N 点术式伤害」等。
  */
 public final class TechniqueSkill
 {
@@ -22,13 +25,7 @@ public final class TechniqueSkill
     private final String cooldownTag;
     private final String unlockTag;
     private final String levelTag;
-    private final SkillDamageType damageType;
 
-    /**
-     * 默认分型为 {@link SkillDamageType#TECHNIQUE}（术式）。
-     * 只有体术 / 复合技能才需要改用
-     * {@link #TechniqueSkill(String, int, Component, String, int, int, int, String, String, String, SkillDamageType)}。
-     */
     public TechniqueSkill(
             String skillId,
             int defaultSlot,
@@ -41,24 +38,6 @@ public final class TechniqueSkill
             String unlockTag,
             String levelTag)
     {
-        this(skillId, defaultSlot, displayName, iconPath, cost, cooldownTicks,
-                maxOutputChargeTicks, cooldownTag, unlockTag, levelTag, SkillDamageType.TECHNIQUE);
-    }
-
-    public TechniqueSkill(
-            String skillId,
-            int defaultSlot,
-            Component displayName,
-            String iconPath,
-            int cost,
-            int cooldownTicks,
-            int maxOutputChargeTicks,
-            String cooldownTag,
-            String unlockTag,
-            String levelTag,
-            SkillDamageType damageType)
-    {
-        this.damageType = damageType;
         this.skillId = skillId;
         this.defaultSlot = defaultSlot;
         this.displayName = displayName;
@@ -121,11 +100,5 @@ public final class TechniqueSkill
     public String levelTag()
     {
         return levelTag;
-    }
-
-    /** 该技能的伤害分型，默认 {@link SkillDamageType#TECHNIQUE}。 */
-    public SkillDamageType damageType()
-    {
-        return damageType;
     }
 }

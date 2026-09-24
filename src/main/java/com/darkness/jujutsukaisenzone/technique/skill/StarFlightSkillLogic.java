@@ -6,6 +6,7 @@ import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
 import com.darkness.jujutsukaisenzone.player.StarMark;
 import com.darkness.jujutsukaisenzone.player.StarMarkType;
 import com.darkness.jujutsukaisenzone.technique.TechniqueDamageSources;
+import com.darkness.jujutsukaisenzone.technique.skillset.SkillDamageType;
 import com.darkness.jujutsukaisenzone.technique.development.SkillUnlockLogic;
 import com.darkness.jujutsukaisenzone.technique.skillset.LoveRendezvousTechniqueSkillSet;
 import net.minecraft.commands.arguments.EntityAnchorArgument;
@@ -671,7 +672,7 @@ public final class StarFlightSkillLogic
             }
             if (entity instanceof LivingEntity living)
             {
-                TechniqueDamageSources.deal(living, player, PATH_DAMAGE);
+                TechniqueDamageSources.deal(living, player, PATH_DAMAGE, SkillDamageType.MARTIAL);
             }
             StarMarkRules.flightRam(player, entity, from, PATH_KNOCK);
         }
@@ -719,7 +720,7 @@ public final class StarFlightSkillLogic
         if (mark == null)
         {
             /* 飞行途中标记被清掉了：只兑现冲撞这一脚 */
-            boolean hit = TechniqueDamageSources.deal(target, player, damage);
+            boolean hit = TechniqueDamageSources.deal(target, player, damage, SkillDamageType.MARTIAL);
             notifyPlayer(player, "★飞行，穿越 · " + name
                     + (hit ? " 冲撞 " + Math.round(damage) : " 已被拦下"));
             return;
@@ -730,7 +731,7 @@ public final class StarFlightSkillLogic
         StarMarkDetonation.Result result = StarMarkDetonation.detonate(player, mark, center);
 
         /* ② 冲撞伤害（按穿越段数放大），并给目标补上「当前选中」的那颗印记 */
-        boolean hit = TechniqueDamageSources.deal(target, player, damage);
+        boolean hit = TechniqueDamageSources.deal(target, player, damage, SkillDamageType.MARTIAL);
         StarMarkType applied = applySelectedMark(player, target);
 
         /*

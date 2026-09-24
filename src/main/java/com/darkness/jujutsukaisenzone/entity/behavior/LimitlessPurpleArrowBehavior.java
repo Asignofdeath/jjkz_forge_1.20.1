@@ -6,6 +6,8 @@ import com.darkness.jujutsukaisenzone.entity.util.GeometryUtils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.util.Mth;
+import com.darkness.jujutsukaisenzone.technique.TechniqueDamageSources;
+import com.darkness.jujutsukaisenzone.technique.skillset.SkillDamageType;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
@@ -112,15 +114,17 @@ public class LimitlessPurpleArrowBehavior extends EffectBehavior
             DamageSource source = owner != null
                     ? entity.damageSources().mobProjectile(entity, owner)
                     : entity.damageSources().magic();
-            if (target instanceof Player)
-            {
-                target.hurt(source, dmg);
-            }
-            else
-            {
-                target.hurt(source, dmg);
-                if (!target.isAlive()) target.discard();
-            }
+            TechniqueDamageSources.runWithType(SkillDamageType.TECHNIQUE, () -> {
+                if (target instanceof Player)
+                {
+                    target.hurt(source, dmg);
+                }
+                else
+                {
+                    target.hurt(source, dmg);
+                    if (!target.isAlive()) target.discard();
+                }
+            });
         }
     }
 

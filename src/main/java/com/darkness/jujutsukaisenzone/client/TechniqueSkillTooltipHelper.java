@@ -1,6 +1,7 @@
 package com.darkness.jujutsukaisenzone.client;
 
 import com.darkness.jujutsukaisenzone.technique.aerial.AerialCombatSkills;
+import com.darkness.jujutsukaisenzone.technique.description.SkillDescriptionDamageColors;
 import com.darkness.jujutsukaisenzone.technique.description.TechniqueSkillDescriptionKeys;
 import com.darkness.jujutsukaisenzone.technique.description.TechniqueSkillDescriptionView;
 import com.darkness.jujutsukaisenzone.technique.description.TechniqueSkillDescriptions;
@@ -21,6 +22,7 @@ import java.util.List;
  * 术式技能悬停描述框：将 {@link TechniqueSkillDescriptionView} 格式化为多行 tooltip。
  * <p>
  * 阶段 3/4 的快捷栏配置界面与术式开发界面应统一调用此类。
+ * 伤害分型写在描述正文里（「N 点术式伤害」），术式伤害蓝色、体术伤害黄色。
  */
 @OnlyIn(Dist.CLIENT)
 public final class TechniqueSkillTooltipHelper
@@ -125,7 +127,7 @@ public final class TechniqueSkillTooltipHelper
         if (!view.description().getString().isBlank())
         {
             lines.add(Component.empty());
-            lines.add(view.description().copy().withStyle(ChatFormatting.DARK_GRAY));
+            lines.add(SkillDescriptionDamageColors.apply(view.description()));
         }
         return Collections.unmodifiableList(lines);
     }
@@ -162,7 +164,7 @@ public final class TechniqueSkillTooltipHelper
         if (!view.description().getString().isBlank())
         {
             lines.add(Component.empty());
-            lines.add(view.description().copy().withStyle(ChatFormatting.DARK_GRAY));
+            lines.add(SkillDescriptionDamageColors.apply(view.description()));
         }
         return Collections.unmodifiableList(lines);
     }
