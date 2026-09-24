@@ -49,6 +49,11 @@
   - ① 力学一律**增量速度** + `hurtMarked=true`，同标记用质心；成员池 = `apply(owner, marks)` 里**该施术者自己的标记**（非全局）。
   - ② 制导**用「加力」不用「转向」**（加力才免费得到「越快越难命中」），且**绝不乘星位 / 半径倍率**。
   - ③ 跨序斥力（芝诺墙）**约束位移不约束速度**。限速**绝不能加到通用 `push`**（`flightKick`/`flightRam`/`burstKick` 的 1.40 起步会被削成渣）。
+- ⭐ **引力弹弓**（域外专属，`StarMarkRules#slingBalls`）：被弹飞的球掠过**同星方块**（`SLING_RANGE=2.5` 内）→ 水平速 `+SLING_BOOST(0.6)` 并夹 `MAX_BALL_SPEED(3.4)`、航向改指「下一个可撞目标」（找不到则退回原航向）、`+SLING_LIFT(0.30)` 上抛、刷新 `TAG_BURST_UNTIL`。
+  - **与域内制导是 if/else 互斥分支**（域内=必中终结，与「续航」语义互斥，且域内撞击即摘球身份）。
+  - **两道闸共用 `TAG_SLING_USED`（球身 `long[]`，元素 `BlockPos#asLong()`）**：数组长度=借力次数（上限 `SLING_MAX_PER_BALL=2`），同时充当「同一方块只弹一次」的黑名单。**每次重新踢出即清空**——收敛在 `markAsBall`（`burstNeighbors` / `flightKick` 两处共用）。
+  - 速度是伤害**唯一**乘数 ⇒ **速限是硬要求**，不封顶即「一记即死」。
+  - ⚠️ **未验前提**：方块锚点在方块上方 `BLOCK_MARK_HEIGHT`(1.15) 格，「掠过不撞」只在**锚点意义**成立；**原版方块物理碰撞仍在**，球贴地飞会怼在方块侧面。需实机确认「掠过 vs 撞停」。
 
 ## 术式开发界面 / IDEA
 - LDLib `drawInBackground` 按 `addWidget` 顺序绘制 ⇒ 层级只靠加入顺序。⚠️ 点选回调不能当场 `clearAllWidgets()`，登记 pending 到 `updateScreen()`；重建用 `rebuildGraph(false)` 才不重置平移缩放。
@@ -59,3 +64,27 @@
   - 现有 4 个（全在星间飞行）：`..._star_mark_controls`「快捷操作」/ `..._star_mark_effects`「星的效果」/ `..._star_gate_collision`「星星大碰撞！」/ `..._star_flight_details`「相会细则」。
   - 加节点**不用动画布尺寸**：`TechniqueDevelopmentCanvasWidget` 每次重建都按 visibleNodes 重跑 `SkillTreeLayoutEngine`。
   - 判断「哪些描述太长」：临时脚本统计 `skill.jujutsukaisenzone.*.desc` 字数排名（注意 lang 里 `%s` 个数必须与 `TechniqueSkillDescriptions` 注入的 args 一一对应，删句记得同步删 args）。
+
+## 技能描述的「简洁 / 完整」两页
+- 形态：**默认简洁页**（无任何数值，几句叙事）；**按住 Shift** 换成完整页（原描述，数值照旧）。简洁页在标题下多一行 `shift_for_details`（`gui.jujutsukaisenzone.skill.shift_for_details`）。
+- ⛔ **LDLib 的 tooltip 没有分页 / 点击能力**——`Widget` 里就是 `List<Component> tooltipTexts` + `drawTooltipTexts`（`javap` 查 deobf jar 确认）。所以分页只能做成「每帧读键盘状态」：`SkillTreeNodeWidget#updateScreen` 本来就每帧调 `refreshHoverTooltips()`，`Screen.hasShiftDown()` 直接放里面。别想着做可点击 tab。
+- 判定「有没有简洁页」**只看 `brief` 键在不在**（`TechniqueSkillTooltipHelper#hasBrief`：`translatable` 结果落回键名即视为缺失 ⇒ 回退完整页）。好处：不必维护一份"哪些技能有两页"的名单，新技能写下 `.brief` 就自动带简洁页；没写的（空战能力、咒力强化）自动显示完整页，也不会冒出裸键名。
+- 简洁文案走**无参** `Component.translatable`（**不吃 `%s`**，因为不显示数值）⇒ **不需要在 `TechniqueSkillDescriptions` 注册解析器**。键名 `skill.jujutsukaisenzone.<skillId>.brief`。
+- 覆盖面：**21 个技能节点全部**（含 5 个机制型，机制型的浅紫「机制型技能」标注在简洁页照旧保留）。说明节点 / 特别招式节点走各自的 tooltip 分支，**不参与**分页。
+- 未解锁节点仍只显示 `???`（`SKILL_LOCKED` 分支压根不调 `build`）⇒ 简洁页不会提前泄露未解锁技能。
+- 两个调用点共用同一入口：`SkillTreeNodeWidget`（开发树）与 `SkillBarConfigScreen`（快捷栏配置），改 `TechniqueSkillTooltipHelper#build` 即两处同时生效。
+
+## 机制型技能（可解锁的非主动机制）
+- 落点：**复用普通 `SKILL` 节点，不要新增节点种类**。技能定义放进技能集的 `getMechanicSkills()`（`IInnateTechniqueSkillSet` 的默认方法），**不进** `getConfigurableSkills()`。
+  - 于是它天然不出现在 `SkillBarConfigScreen` / `fillDefaults` 里；`defaultSlot = 0`（与真实槽位 1~9 永不相等）⇒ `TechniqueSkillKeyEvents#resolveConfiguredSkillId` 匹配不到它；`cost` / `cooldownTicks` / `levelTag` 填 0 与空串，只有 `unlockTag` 是实质字段。
+  - ⚠️ **`SkillUnlockLogic#findSkillDefinition` 必须能查到它**：那是「节点 → 技能定义」的唯一解析路径（`isSkillNodeUnlocked` / `getVisualState` / tooltip 全靠它）。因此该方法改成 **configurable + mechanic 两路合并检索**。漏了这步 ⇒ 节点永远显示未解锁且点不动。
+  - `validateAgainstSkills` 只做**单向**校验（技能 → 节点），所以要把 `SKILLS + MECHANICS` 一起传进去，少写节点会在类加载时就抛。
+- 查询入口：`SkillUnlockLogic.isSkillUnlockedById(player, techniqueId, skillId)`（运行时门控，手里只有 skillId 时用）/ `isMechanicSkill(techniqueId, skillId)`（展示层区分）。
+- 展示层：`TechniqueSkillTooltipHelper` 对机制型技能**只渲染名字 + 描述**，不出现「咒力消耗：0 / 冷却：0 秒」。空战能力（滞空 / 多段跳）当初是逐个特判的，新写法按 `isMechanicSkill` 判定，以后加机制不用再加分支。
+- 描述数值照旧注入 `TechniqueSkillDescriptions`，直接引用常量（为此把 `StarMarkRules` 的 `SLING_RANGE` / `SLING_BOOST` / `MAX_BALL_SPEED` / `SLING_MAX_PER_BALL` 提成 `public`，与 `MARK_RANGE` 同立场）。
+- ⛔ **只门控「能力型」机制，绝不门控「约束型」机制**：星位衰减、芝诺墙、持有上限这类是**限制**，做成可解锁 ⇒ 解锁前反而更强，方向是反的。可门控的是「新增收益 / 新选项」：引力弹弓、引爆传染、域内连锁拉满、依次穿越链、制导加力。
+- 现有 5 个：
+  - 星间飞行 2 条——`love_rendezvous_star_sling`「引力弹弓」（前置 `love_rendezvous_star_gate`、300 情报），门控在 `StarMarkRules#apply` 的 `else if (isSlingUnlocked(owner))`（未解锁则不扫同星方块）；`love_rendezvous_star_chain`「在星间穿梭」（前置 `love_rendezvous_star_flight`、450 情报），门控在 `StarFlightSkillLogic#cast` 的 `mask` 快照读取口（未解锁 ⇒ mask 恒 0 ⇒ 不排折线、单段突进）。**做这类技能优先找「已实现机制 + 单一门控点」，而不是新写玩法**——折线（`planChain`）本就存在。
+  - 审判 3 条——`judgment_gavel_forms`「三式法槌」（前置 `judgment_gavel`、150）/ `judgment_sentencing`「量刑」（前置 `judgment_trial`、150）/ `judgment_aggravation`「从重论处」（前置 `judgment_sentencing`、200）。门控只有两处：`JudgmentWeaponLogic#cycleGavelForm` 开头（未解锁不切换形态），以及 `JudgmentTrialSkillLogic#rollGuiltyVerdictType(caster, target, crimeBonusPercent)` 这个**私有重载**（未解锁「量刑」→ 直接 `return CONFISCATION`；未解锁「从重论处」→ debuff 与重罪加成一律归零）。后一处即三路全覆盖：「审判」「指控」「领域审理」都经由它掷骰。
+- ⚠️ **降级形态做成「减法」，不是新逻辑**：门控只让既有行为少发生（形态数变 1 / 不掷死刑 / 加成归零），不引入新分支。附带连带（未解锁量刑 ⇒ 不判死刑 ⇒ 不发【处刑人之剑】）是自然结果，不需要额外门控。
+- ⚠️ **门控点优先选「多条路径共用的那个唯一结算点」**，而不是在每个调用点各写一遍——审判两条机制因此只动了一个方法。

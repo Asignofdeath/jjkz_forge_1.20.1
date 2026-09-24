@@ -23,6 +23,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 /**
  * 星间飞行（Love Rendezvous）术式招式组。
@@ -38,11 +39,15 @@ import java.util.Optional;
  * 槽位 4「飞行，穿越」：与目标身上一颗<b>星位叠满</b>的标记相距 20 格以内时，先收掉全部星域，
  * 再以高速<b>追踪平移</b>直取目标；撞上后先引爆旧印记，随即结算冲撞伤害并补上「当前选中」的那颗印记，
  * 最后看这颗新印记与施术者自身标记是否跨序——是才把目标弹飞（永远是施术者弹飞目标）。
- * <b>若施放时正站在自己的星域里</b>，起飞之前还会按星序依次穿过去这一轮已解锁的每一颗星位
- * （路标取离施术者最近的已标记实体 / 方块 / 掉落物），每穿一颗踢击伤害 +40%、上限 +200%；
  * 飞行途中撞到的其他实体各挨一次伤害与击退。见 {@link StarFlightSkillLogic}。
  * <p>
  * 三态力学（同标记吸引 / 相邻无效果 / 跨序逐级解锁）见 {@link StarMarkRules}。
+ * <p>
+ * 不占槽位、不能主动释放的<b>机制型技能</b>见 {@link #getMechanicSkills()}：它们只提供一个解锁状态，
+ * 用来逐级打开本术式既有的行为，而不是多给一个按键。目前两项——
+ * 「引力弹弓」（{@link #SKILL_STAR_SLING}：域外飞行的球掠过同星方块时借力加速）与
+ * 「在星间穿梭」（{@link #SKILL_STAR_CHAIN}：解锁后「飞行，穿越」起飞前才会先按星序穿过这一轮已解锁的
+ * 星位，每穿一颗踢击伤害 +40%、上限 +200%；未解锁时这一脚是直取目标的单段突进）。
  * <p>
  * 不占槽位的特别招式见 {@link #SPECIAL_MOVES}：目前只有「禁行（原地）」——<b>Shift + 技能键</b>
  * 把星域锚在释放那一刻的坐标，不随施术者移动；经济与跟随版同源（照常扣 60 咒力、吃同一份冷却）。
@@ -69,6 +74,32 @@ public final class LoveRendezvousTechniqueSkillSet extends AbstractInnateTechniq
     public static final String SKILL_STAR_PULL = "love_rendezvous_star_pull";
     public static final String SKILL_STAR_GATE = "love_rendezvous_star_gate";
     public static final String SKILL_STAR_FLIGHT = "love_rendezvous_star_flight";
+    /**
+     * 机制型技能：引力弹弓。
+     * <p>
+     * <b>不占槽位、不能主动释放</b>，只能在术式开发树里解锁；解锁后域外飞行的球才会真的去检测
+     * 同星方块并借力（门控在 {@code StarMarkRules#apply}，实现在 {@code StarMarkRules#slingBalls}）。
+     * 这是本术式第一个「机制型技能」，也是这套东西的样板：{@link #MECHANICS} 里的条目一律
+     * 不进快捷栏、没有自己的经济，只提供一个解锁状态。
+     */
+    public static final String SKILL_STAR_SLING = "love_rendezvous_star_sling";
+    /**
+     * 机制型技能：在星间穿梭。
+     * <p>
+     * 「依次穿越链」的解锁开关——未解锁时「飞行，穿越」是<b>单段突进</b>（直取目标），解锁后起飞前
+     * 才会排出折线、逐颗穿过这一轮已解锁的星位，并按穿过的颗数放大踢击伤害（门控在
+     * {@code StarFlightSkillLogic#cast}，实现在 {@code StarFlightSkillLogic#planChain}）。
+     * <p>
+     * 与 {@link #SKILL_STAR_SLING} 同一立场：它的价值全在「多出一条路线」，而不是多给一个按键，
+     * 所以同样只做一个解锁标记。两者的差别在学习位置上——弹弓是<b>域外</b>的球该怎么飞，
+     * 本项是<b>域内</b>星序跑完之后那一脚该怎么打，因此挂在终结技之后。
+     */
+    public static final String SKILL_STAR_CHAIN = "love_rendezvous_star_chain";
+
+    /** 引力弹弓的解锁标记（机制型技能唯一的实质字段）。命名照 {@code *_unlock*} 约定，随登录同步到客户端。 */
+    private static final String TAG_SLING_UNLOCK = "jujutsukaisenzone_love_rendezvous_sling_unlock";
+    /** 「在星间穿梭」的解锁标记，命名与同步方式同上。 */
+    private static final String TAG_CHAIN_UNLOCK = "jujutsukaisenzone_love_rendezvous_chain_unlock";
 
     private static final int SLOT_STAR_MARK = 1;
     private static final int SLOT_STAR_PULL = 2;
@@ -105,6 +136,43 @@ public final class LoveRendezvousTechniqueSkillSet extends AbstractInnateTechniq
             new TechniqueSkill(SKILL_STAR_FLIGHT, SLOT_STAR_FLIGHT, Component.literal("飞行，穿越"), ICON_STAR_FLIGHT,
                     STAR_FLIGHT_COST, STAR_FLIGHT_COOLDOWN_TICKS, 0,
                     tag("cooldown", SLOT_STAR_FLIGHT), tag("unlock", SLOT_STAR_FLIGHT), tag("level", SLOT_STAR_FLIGHT)));
+
+    /**
+     * 机制型技能定义（不占槽位、不进技能栏、不能主动释放，见
+     * {@link IInnateTechniqueSkillSet#getMechanicSkills()}）。
+     * <p>
+     * 各字段的取值不是随手填的 0：{@code defaultSlot = 0} 让按键解析（按 defaultSlot 匹配槽位）
+     * 永远命中不到它；咒力 / 冷却 / 等级填 0 与空串是因为它没有自己的经济——解锁一次即永久生效，
+     * 不做「每次触发扣咒力」那种事。唯一实质内容是 {@code unlockTag}。
+     * <p>
+     * 图标暂借「飞行，穿越」的星标，待补美术后替换（与该套其余技能同样处理）。
+     */
+    private static final TechniqueSkill MECHANIC_SLING = new TechniqueSkill(
+            SKILL_STAR_SLING,
+            0,
+            Component.literal("引力弹弓"),
+            ICON_STAR_FLIGHT,
+            0,
+            0,
+            0,
+            "",
+            TAG_SLING_UNLOCK,
+            "");
+
+    /** 机制型技能「在星间穿梭」，字段口径与 {@link #MECHANIC_SLING} 完全一致，只有解锁标记不同。 */
+    private static final TechniqueSkill MECHANIC_CHAIN = new TechniqueSkill(
+            SKILL_STAR_CHAIN,
+            0,
+            Component.literal("在星间穿梭"),
+            ICON_STAR_FLIGHT,
+            0,
+            0,
+            0,
+            "",
+            TAG_CHAIN_UNLOCK,
+            "");
+
+    private static final List<TechniqueSkill> MECHANICS = List.of(MECHANIC_SLING, MECHANIC_CHAIN);
 
     private static final TechniqueSkillTree SKILL_TREE = TechniqueSkillTree.builder(PlayerTechniqueData.TECHNIQUE_LOVE_RENDEZVOUS)
             .node(SkillTreeNodeDef.skill("love_rendezvous_star_mark", SKILL_STAR_MARK).autoGranted().build())
@@ -154,6 +222,22 @@ public final class LoveRendezvousTechniqueSkillSet extends AbstractInnateTechniq
                     .visibleWhen(UnlockCondition.alwaysVisible())
                     .build())
             /*
+             * 机制型技能「引力弹弓」：<b>不占槽位、不能主动释放</b>，解锁即永久生效——它改的是
+             * 「球掠过同星方块」这条既有行为，而不是多给一个按键。
+             *
+             * 前置取「禁行」：球是星域展开时被弹射出来的（见 {@code StarMarkRules#burstNeighbors}），
+             * 所以「先见过弹射、再学怎么借力」才是这个术式真正的学习顺序；
+             * 情报消耗压在「禁行」(300) 与「飞行，穿越」(400) 之间，让它可以先于终结技买到，
+             * 玩家不必先走完终结技才能理解弹弓。
+             *
+             * 节点仍是普通 SKILL 节点：解锁流程、前置、情报消耗、连线、tooltip 全部复用现成那套，
+             * 所以这里不需要新的节点种类（机制型技能的「特殊」只体现在技能定义那一侧）。
+             */
+            .node(SkillTreeNodeDef.skill("love_rendezvous_star_sling", SKILL_STAR_SLING)
+                    .requires("love_rendezvous_star_gate")
+                    .intelCost(300)
+                    .build())
+            /*
              * 终结技「飞行，穿越」：把上面几件素材（自身标记 / 目标印记 / 跨序关系）拧成一次出手。
              * 挂在「禁行」之后，因为它末段弹飞的判据正是「跨序之星」——这套关系由星域那一步教会；
              * 但前置条件只要求「目标星位叠满」，跨不跨序由玩家切换当前标记来决定，
@@ -162,6 +246,21 @@ public final class LoveRendezvousTechniqueSkillSet extends AbstractInnateTechniq
             .node(SkillTreeNodeDef.skill("love_rendezvous_star_flight", SKILL_STAR_FLIGHT)
                     .requires("love_rendezvous_star_gate")
                     .intelCost(400)
+                    .build())
+            /*
+             * 机制型技能「在星间穿梭」：<b>不占槽位、不能主动释放</b>，解锁即永久生效——它把
+             * 「飞行，穿越」起飞前那段折线（依次穿越链）打开，并按穿过的颗数放大踢击伤害，
+             * 而不是多给一个按键。
+             *
+             * 前置取终结技本身，而不是与它平级：折线本就是这一脚的一部分（先穿星位、最后才撞目标），
+             * 没学会飞就谈不上穿梭。情报消耗压在终结技之上，作为它的深化；玩家仍可先买更便宜的
+             * 「引力弹弓」练手，两条机制互不依赖。
+             *
+             * 与「引力弹弓」同为普通 SKILL 节点：解锁流程、前置、情报消耗、连线、tooltip 全部复用现成那套。
+             */
+            .node(SkillTreeNodeDef.skill("love_rendezvous_star_chain", SKILL_STAR_CHAIN)
+                    .requires("love_rendezvous_star_flight")
+                    .intelCost(450)
                     .build())
             /*
              * 说明节点：「相会」的前提、可控性与中断条件——三段纯静态文案从「飞行，穿越」的
@@ -174,6 +273,24 @@ public final class LoveRendezvousTechniqueSkillSet extends AbstractInnateTechniq
                     .descriptionKey("skill_tree.jujutsukaisenzone.love_rendezvous_star_flight_details.desc")
                     .requires("love_rendezvous_star_flight")
                     .visibleWhen(UnlockCondition.alwaysVisible())
+                    .build())
+            /*
+             * 说明节点：「爱与幽会」领域展开——域内独有的三条强化（撞击即引爆、引爆传染升级成连锁、
+             * 飞行中的球改走完全制导），见 {@code LoveRendezvousDomainExpansion} 与
+             * {@code StarMarkRules} 的域内分支。与另外三个术式的领域说明节点同一立场：只讲领域
+             * <b>额外</b>给了什么，领域本身的展开 / 维持 / 崩解走通用那套，不在这里重复。
+             *
+             * 文案同样必须是纯静态（说明节点不吃 %s），域内的规则变化全部写成定性描述。
+             *
+             * 前置取终结技「飞行，穿越」：领域放大的正是那一脚踢出去的球，与无量空处挂「茈」、
+             * 伏魔神龛挂「捌」同一做法——领域节点挂在术式的招牌大招之后，而不是树的最后一级。
+             */
+            .node(SkillTreeNodeDef.info("love_rendezvous_domain_aiyuyouhui")
+                    .titleKey("skill_tree.jujutsukaisenzone.love_rendezvous_domain_aiyuyouhui.title")
+                    .iconPath("textures/item/love_rendezvous.png")
+                    .descriptionKey("skill_tree.jujutsukaisenzone.love_rendezvous_domain_aiyuyouhui.desc")
+                    .requires("love_rendezvous_star_flight")
+                    .visibleWhen(UnlockCondition.hasDomainExpansion())
                     .build())
             .build();
 
@@ -189,7 +306,11 @@ public final class LoveRendezvousTechniqueSkillSet extends AbstractInnateTechniq
 
     static
     {
-        SKILL_TREE.validateAgainstSkills(SKILLS);
+        /*
+         * 机制型技能与槽位技能一样，在树上都是一个 SKILL 节点，所以一并校验：
+         * 少写节点会在这里直接抛异常，而不是等到某天玩家点开开发树才变成「XXX / 无描述」。
+         */
+        SKILL_TREE.validateAgainstSkills(Stream.concat(SKILLS.stream(), MECHANICS.stream()).toList());
     }
 
     @Override
@@ -225,6 +346,13 @@ public final class LoveRendezvousTechniqueSkillSet extends AbstractInnateTechniq
     public List<TechniqueSkill> getConfigurableSkills()
     {
         return SKILLS;
+    }
+
+    /** 机制型技能：不占槽位、不进技能栏，只能靠开发树解锁（见 {@link #SKILL_STAR_SLING}）。 */
+    @Override
+    public List<TechniqueSkill> getMechanicSkills()
+    {
+        return MECHANICS;
     }
 
     @Override

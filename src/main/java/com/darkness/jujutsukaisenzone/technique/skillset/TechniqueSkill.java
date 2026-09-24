@@ -22,7 +22,13 @@ public final class TechniqueSkill
     private final String cooldownTag;
     private final String unlockTag;
     private final String levelTag;
+    private final SkillDamageType damageType;
 
+    /**
+     * 默认分型为 {@link SkillDamageType#TECHNIQUE}（术式）。
+     * 只有体术 / 复合技能才需要改用
+     * {@link #TechniqueSkill(String, int, Component, String, int, int, int, String, String, String, SkillDamageType)}。
+     */
     public TechniqueSkill(
             String skillId,
             int defaultSlot,
@@ -35,6 +41,24 @@ public final class TechniqueSkill
             String unlockTag,
             String levelTag)
     {
+        this(skillId, defaultSlot, displayName, iconPath, cost, cooldownTicks,
+                maxOutputChargeTicks, cooldownTag, unlockTag, levelTag, SkillDamageType.TECHNIQUE);
+    }
+
+    public TechniqueSkill(
+            String skillId,
+            int defaultSlot,
+            Component displayName,
+            String iconPath,
+            int cost,
+            int cooldownTicks,
+            int maxOutputChargeTicks,
+            String cooldownTag,
+            String unlockTag,
+            String levelTag,
+            SkillDamageType damageType)
+    {
+        this.damageType = damageType;
         this.skillId = skillId;
         this.defaultSlot = defaultSlot;
         this.displayName = displayName;
@@ -97,5 +121,11 @@ public final class TechniqueSkill
     public String levelTag()
     {
         return levelTag;
+    }
+
+    /** 该技能的伤害分型，默认 {@link SkillDamageType#TECHNIQUE}。 */
+    public SkillDamageType damageType()
+    {
+        return damageType;
     }
 }

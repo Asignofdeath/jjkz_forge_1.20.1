@@ -128,6 +128,33 @@ public interface IInnateTechniqueSkillSet
     }
 
     /**
+     * 返回该术式的「机制型技能」：<b>不占快捷栏、不能主动释放</b>，只能在术式开发树里解锁，
+     * 解锁后改变某个既有机制的行为（例：星间飞行的「引力弹弓」）。
+     * <p>
+     * 与 {@link #getConfigurableSkills()} 的分工是硬的，两者不能互相混：
+     * <ul>
+     *   <li><b>不占槽位</b>——这里返回的条目不会进 {@code SkillBarConfigScreen}，
+     *       也不会被 {@code PlayerSkillBarConfig.fillDefaults} 自动填进栏位，所以
+     *       {@link TechniqueSkill#defaultSlot()} 一律填 0（0 不与任何真实槽位 1~9 相等，
+     *       {@code TechniqueSkillKeyEvents#resolveConfiguredSkillId} 因此永远匹配不到它）。</li>
+     *   <li><b>不进技能栏</b>——不覆写 {@link #isSkillVisibleInSkillBar} 也看不见，
+     *       因为它根本不在 {@code getConfigurableSkills()} 里。</li>
+     *   <li><b>仍需数值字段</b>——{@code cost} / {@code cooldownTicks} / {@code levelTag} 填 0 与空串，
+     *       它没有自己的经济；但 {@code unlockTag} <b>必须给</b>，那是它唯一的解锁状态存储；
+     *       {@code displayName} / {@code iconPath} 决定它在开发树里的名字与图标。</li>
+     * </ul>
+     * 开发树节点仍是普通的 {@code SKILL} 节点（不需要新节点种类）：解锁流程、前置、情报消耗、
+     * 连线、tooltip 全部复用现成那一套。查询入口见
+     * {@code SkillUnlockLogic#isSkillUnlockedById} / {@code SkillUnlockLogic#isMechanicSkill}。
+     * <p>
+     * 默认空列表——绝大多数术式没有机制型技能。
+     */
+    default List<TechniqueSkill> getMechanicSkills()
+    {
+        return Collections.emptyList();
+    }
+
+    /**
      * 返回以 {@code baseSkillId} 为原技能的特别招式声明列表（不占槽位的修饰键变体）。
      * <p>
      * 这些变体不需要在 {@link #getSkillTree()} 里手写节点：注册时

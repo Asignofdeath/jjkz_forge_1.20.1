@@ -24,6 +24,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 /**
  * 技能解锁图运行时逻辑：前置、条件、术式情报门槛与 unlockTag 读写。
@@ -246,6 +247,15 @@ public final class SkillUnlockLogic
         return SkillUnlockResult.SUCCESS;
     }
 
+    /**
+     * 按 skillId 找技能定义，槽位技能优先。
+     * <p>
+     * 两个来源都要查：{@link IInnateTechniqueSkillSet#getConfigurableSkills()}（占快捷栏的招式）
+     * 与 {@link IInnateTechniqueSkillSet#getMechanicSkills()}（不占槽位的机制型技能）。
+     * 机制型技能刻意不放进前者——那会让它出现在技能栏配置界面；但开发树节点 -> 技能定义的解析
+     * （{@code isSkillNodeUnlocked} / {@code getVisualState} / tooltip）必须能找到它，
+     * 所以这里把两者并成一条检索路径。
+     */
     public static Optional<TechniqueSkill> findSkillDefinition(String techniqueId, String skillId)
     {
         Optional<TechniqueSkill> aerial = AerialCombatSkillRegistry.find(skillId);
@@ -259,9 +269,44 @@ public final class SkillUnlockLogic
             return common;
         }
         return TechniqueSkillSetRegistry.get(techniqueId)
-                .flatMap(set -> set.getConfigurableSkills().stream()
+                .flatMap(set -> Stream.concat(
+                                set.getConfigurableSkills().stream(),
+                                set.getMechanicSkills().stream())
                         .filter(skill -> skill.skillId().equals(skillId))
                         .findFirst());
+    }
+
+    /**
+     * 机制型技能是否已解锁——<b>运行时门控的入口</b>。
+     * <p>
+     * 与 {@link #isSkillUnlocked} 的差别只在「不需要调用方自己拿到 {@link TechniqueSkill} 实例」：
+     * 机制型技能没有槽位、不进技能栏，服务端逻辑（如 {@code StarMarkRules} 的引力弹弓）手里
+     * 只有 skillId，因此由这里代为解析。解析不到时返回 {@code false}——把「查不到」当未解锁，
+     * 好过当已解锁：写错一个 id 只会让机制不生效，不会让它无条件生效。
+     */
+    public static boolean isSkillUnlockedById(Player player, String techniqueId, String skillId)
+    {
+        return findSkillDefinition(techniqueId, skillId)
+                .map(skill -> isSkillUnlocked(player, techniqueId, skillId, skill))
+                .orElse(false);
+    }
+
+    /**
+     * skillId 是否属于该术式的机制型技能（{@link IInnateTechniqueSkillSet#getMechanicSkills()}）。
+     * <p>
+     * 供展示层区分「机制型技能」与普通招式：机制型技能没有咒力与冷却，tooltip 不该出现
+     * 「咒力消耗：0 / 冷却：0 秒」两行（见 {@code TechniqueSkillTooltipHelper}）。
+     */
+    public static boolean isMechanicSkill(String techniqueId, String skillId)
+    {
+        if (skillId == null || skillId.isBlank())
+        {
+            return false;
+        }
+        return TechniqueSkillSetRegistry.get(techniqueId)
+                .map(set -> set.getMechanicSkills().stream()
+                        .anyMatch(skill -> skill.skillId().equals(skillId)))
+                .orElse(false);
     }
 
     /** 当前可拖入快捷栏、可释放的已解锁技能列表。 */

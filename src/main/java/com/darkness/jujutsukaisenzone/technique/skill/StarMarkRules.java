@@ -6,6 +6,8 @@ import com.darkness.jujutsukaisenzone.player.StarMark;
 import com.darkness.jujutsukaisenzone.player.StarMarkType;
 import com.darkness.jujutsukaisenzone.technique.BarrierTechniqueServerLogic;
 import com.darkness.jujutsukaisenzone.technique.TechniqueDamageSources;
+import com.darkness.jujutsukaisenzone.technique.development.SkillUnlockLogic;
+import com.darkness.jujutsukaisenzone.technique.skillset.LoveRendezvousTechniqueSkillSet;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
@@ -36,6 +38,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * 还会额外吃一份「制导」横向加力，朝同星拐一点——「踢足球」的手感来源，见 {@link #GUIDANCE_IMPULSE}。
  * <b>撞击伤害</b>：被弹飞的球撞上另一条标记时双方各受一次「速度 × 系数」的术式伤害
  * （见 {@link #resolveImpacts}）——这才是弹射机制的收益点，缓慢靠拢的同星相吸撞不痛。<br>
+ * <b>引力弹弓</b>：被弹飞的球掠过<b>同星方块</b>时被那颗「大质量天体」加速并刷新球身份
+ * （见 {@link #slingBalls}）。方块撞不出伤害，本该是条死路，这里把它改写成加速带。<br>
  * <b>相邻</b>：无效果。<br>
  * <b>跨序</b>：仅当「禁行」星域生效时无法靠近；但可以「逐级经过」化解，见下。
  * <p>
@@ -81,9 +85,10 @@ import java.util.concurrent.ConcurrentHashMap;
  * 三条实现纪律：
  * <ul>
  *   <li>力度一律用**增量**速度（{@code setDeltaMovement(dm.add(impulse))}），不覆盖既有速度，
- *       否则会和 EpicFight 的移动 / 闪避互相吃掉。<b>两处例外</b>：跨序斥力压的是位移
+ *       否则会和 EpicFight 的移动 / 闪避互相吃掉。<b>三处例外</b>：跨序斥力压的是位移
  *       （见 {@link #zenoWall}），「爱与幽会」域内的完全制导直接改写速度方向
- *       （见 {@link #homeBalls}）——两者都是领域级的重定义，不是常规施力。</li>
+ *       （见 {@link #homeBalls}），「引力弹弓」也改写水平速度方向并夹上速限
+ *       （见 {@link #slingBalls}）——三者都是结构性动作，不是常规施力。</li>
  *   <li>同标记用**质心**而不是两两成对，天然收敛、不会自激。</li>
  *   <li>方块是静态锚点，只对「会动的一侧」施力；方块之间不参与判定。</li>
  * </ul>
@@ -200,6 +205,51 @@ public final class StarMarkRules
      * 「辅助而非必中」的手感在域外原样保留。
      */
     private static final double DOMAIN_HOMING_SPEED = 0.60D;
+    /**
+     * 「引力弹弓」的影响球半径（格）：球与同星方块锚点的距离进到这个范围内即触发。
+     * <p>
+     * 类比航天器借力：方块是静态的大质量天体，被弹飞的球是航天器。撞击结算只认
+     * {@link LivingEntity}（方块撞不出伤害，见 {@link #resolveImpacts}），所以球掠过方块本该是条死路——
+     * {@link #nearestStrikeable} 甚至刻意把方块排除在制导目标之外。本机制把这条死路改写成加速带。
+     * <p>
+     * 取 2.5：比 {@link #BURST_RANGE}（4.0，弹射分家）小、比 {@link #MIN_SEPARATION}（1.5）大。
+     * 再大就变成「到处是自动加速带」，失去「贴着天体掠过」的观感。
+     * <p>
+     * 下面四个 {@code SLING_*} 常量取 {@code public} 只为让技能描述能注入它们
+     * （见 {@code TechniqueSkillDescriptions#registerLoveRendezvousSkills}），
+     * 与 {@link #MARK_RANGE} 同一立场——不是给外部改的旋钮。
+     */
+    public static final double SLING_RANGE = 2.5D;
+    /**
+     * 「引力弹弓」的加速量（格/tick，<b>加法</b>）。
+     * <p>
+     * 为什么用加法：满级初速已经是 {@code BURST_IMPULSE_NEAR(1.40) × burstStackScale(MAX_STACKS)(2.0) = 2.8}，
+     * 而速度是撞击伤害<b>唯一</b>的乘数（{@link #IMPACT_DAMAGE_PER_SPEED}）。乘法会让一次借力
+     * 直接把伤害推到失控；加法可控，且对「本来就慢的球」帮助更大。
+     */
+    public static final double SLING_BOOST = 0.6D;
+    /**
+     * 弹弓加速后的水平速度上限（格/tick）——<b>硬要求</b>。
+     * <p>
+     * 速度直接换算伤害（{@code 速度 × 12}，见 {@link #IMPACT_DAMAGE_PER_SPEED}），不封顶就不是
+     * 「更疼」而是「一记即死」。取 3.4：比满级初速 2.8 略高，正好留一次借力的余量（约 41 点）。
+     */
+    public static final double MAX_BALL_SPEED = 3.4D;
+    /**
+     * 弹弓附带的轻微上抛（格/tick）。
+     * <p>
+     * 「续航」不只是刷新 {@link #TAG_BURST_UNTIL}：只刷新标签、球却贴地磨停，那只是延长了一段
+     * 「趴着不动」。这一记上抛把球重新掀离地面（落地摩擦每 tick 吃掉约 45%，离地后只衰减 9%）。
+     * 比 {@link #BURST_LIFT}（0.42）更轻——借力是中途补给，不是又一次发射。
+     */
+    private static final double SLING_LIFT = 0.30D;
+    /**
+     * 同一颗球整段飞行里能被借力的次数上限。
+     * <p>
+     * 防「几颗同星方块接力、球永远不落地」。它与「同一方块只弹一次」（见 {@link #TAG_SLING_USED}）
+     * 是两道独立的闸：前者限总量，后者防球停在影响球里每 tick 重弹。
+     */
+    public static final int SLING_MAX_PER_BALL = 2;
     /** 牵引的每 tick 增量速度。 */
     private static final double PULL_IMPULSE = 0.070D;
     /** 跨序斥力的作用距离（格）：同时是芝诺墙的外沿，见 {@link #ZENO_INWARD_CAP}。 */
@@ -400,6 +450,17 @@ public final class StarMarkRules
     private static final String TAG_BURST_UNTIL = "jujutsukaisenzone_love_rendezvous_burst_until";
     /** 该实体上一次撞击结算的游戏刻，用于 {@link #IMPACT_COOLDOWN_TICKS} 去抖。 */
     private static final String TAG_IMPACT_AT = "jujutsukaisenzone_love_rendezvous_impact_at";
+    /**
+     * 这颗球已经借过力的方块（{@code long[]}，元素为 {@code BlockPos#asLong()}）。
+     * <p>
+     * 与 {@link #TAG_BURST_UNTIL} / {@link #TAG_IMPACT_AT} 一样存在<b>球自己</b>身上。两个作用：
+     * ①「同一方块只弹一次」——否则球停在影响球内会每 tick 被弹一次；
+     * ② 数组长度天然就是「借了几次」的计数，无需另存一个 int。
+     * <p>
+     * 每次被重新踢出（见 {@link #markAsBall}）即整个清空——新的一脚是新的额度，
+     * 否则同一只生物第二次飞行会因为「方块都用过」而借不到力。
+     */
+    private static final String TAG_SLING_USED = "jujutsukaisenzone_love_rendezvous_sling_used";
 
     private StarMarkRules()
     {
@@ -575,7 +636,7 @@ public final class StarMarkRules
                  */
                 if (mover.entity() != null)
                 {
-                    mover.entity().getPersistentData().putLong(TAG_BURST_UNTIL, now + BURST_FLIGHT_TICKS);
+                    markAsBall(mover.entity(), now + BURST_FLIGHT_TICKS);
                 }
                 kicked++;
             }
@@ -609,7 +670,22 @@ public final class StarMarkRules
         }
         double impulse = BURST_IMPULSE_NEAR * burstStackScale(StarMark.MAX_STACKS);
         push(mover, burstKick(from, mover.position(), impulse), owner, true);
-        mover.getPersistentData().putLong(TAG_BURST_UNTIL, gameTime(owner) + BURST_FLIGHT_TICKS);
+        markAsBall(mover, gameTime(owner) + BURST_FLIGHT_TICKS);
+    }
+
+    /**
+     * 给实体盖上「被弹飞出去的球」的身份，并清空它上一轮的弹弓记账。
+     * <p>
+     * 两件事必须一起做：{@link #TAG_BURST_UNTIL} 是球身份（撞击结算与域内制导都认它），
+     * {@link #TAG_SLING_USED} 是这颗球的借力账本。同一只生物会被反复踢（先被展开弹开、
+     * 再被终结技踢飞），若沿用旧账，第二次飞行会因为「方块都用过 / 次数已满」而借不到力。
+     * 新的一脚 = 新份额度。
+     */
+    private static void markAsBall(Entity entity, long until)
+    {
+        CompoundTag data = entity.getPersistentData();
+        data.putLong(TAG_BURST_UNTIL, until);
+        data.remove(TAG_SLING_USED);
     }
 
     /**
@@ -1233,20 +1309,30 @@ public final class StarMarkRules
         }
 
         /*
-         * 「爱与幽会」领域：域内飞行的球改为完全制导（必中），必须排在撞击结算之前——
-         * 这一 tick 掰过去的速度就是撞击扫掠判定读到的那一段位移。
+         * 「引力弹弓」：域外飞行的球掠过同星方块时被加速 + 续航。同样必须排在撞击结算之前——
+         * 这一 tick 改写过的速度就是撞击扫掠判定读到的那一段位移。
+         *
+         * 与下面的域内制导是<b>互斥分支</b>：域内的定位是「必中终结」，与「续航」语义互斥
+         * （域内撞击成功即摘掉球身份、一颗球只换一击，见 resolveImpacts），两者同时生效会互相抵消。
+         * 做成 if/else 而不是两个独立 if，是为了让「球只会被其中一边接管」在代码结构上就成立。
          */
         if (isRendezvousDomainActive(owner))
         {
+            /*
+             * 「爱与幽会」领域：域内飞行的球改为完全制导（必中）。
+             */
             homeBalls(owner, marks);
         }
+        else if (isSlingUnlocked(owner))
+        {
+            /*
+             * 域外弹弓是<b>机制型技能</b>：没解锁就整条分支不进，球照旧只会被同星吸引慢慢拽过去。
+             * 判定放在调用点而不是 {@link #slingBalls} 内部——没解锁时连「遍历球、找同星方块」这一趟
+             * 扫描都不必做。
+             */
+            slingBalls(owner, marks);
+        }
 
-        /*
-         * 撞击结算：传完整的 marks 而不是上面那份 simulated。
-         * 球是往远处飞的，而 simulated 按「离施术者最近」截断到 MAX_SIMULATED 条，
-         * 恰恰最可能把飞远的球剔出去。开销不成问题——外层只对「正在飞的球」进入内层，
-         * 平时一次内层循环都不会开。
-         */
         resolveImpacts(owner, marks);
 
         /*
@@ -1677,11 +1763,151 @@ public final class StarMarkRules
     private static StarMarkSkillLogic.ResolvedMark nearestStrikeable(
             StarMarkSkillLogic.ResolvedMark ball, List<StarMarkSkillLogic.ResolvedMark> marks)
     {
+        return nearestStrikeableFrom(ball.position(), ball.entity(), marks);
+    }
+
+    /**
+     * 从 {@code origin} 出发，找最近的、<b>撞得响</b>的另一条标记。
+     * <p>
+     * 两个调用方共用同一口径：{@link #homeBalls} 拿球自己的位置当原点（域内必中），
+     * {@link #slingExit} 拿方块锚点当原点（域外借力后要挑「下一个靶子」）。
+     *
+     * @param exclude 要排除的实体（球自己）；方块锚点传 {@code null} 即不排除任何实体
+     */
+    @Nullable
+    private static StarMarkSkillLogic.ResolvedMark nearestStrikeableFrom(
+            Vec3 origin, @Nullable Entity exclude, List<StarMarkSkillLogic.ResolvedMark> marks)
+    {
         StarMarkSkillLogic.ResolvedMark nearest = null;
         double best = Double.MAX_VALUE;
         for (StarMarkSkillLogic.ResolvedMark other : marks)
         {
-            if (other.entity() == ball.entity() || !(other.entity() instanceof LivingEntity))
+            if (other.entity() == exclude || !(other.entity() instanceof LivingEntity))
+            {
+                continue;
+            }
+            double distance = other.position().distanceToSqr(origin);
+            if (distance < best)
+            {
+                best = distance;
+                nearest = other;
+            }
+        }
+        return nearest;
+    }
+
+    /**
+     * 施术者是否已解锁「引力弹弓」这个<b>机制型技能</b>。
+     * <p>
+     * 机制型技能不占槽位、没有自己的咒力与冷却，唯一的状态就是那个解锁标记，所以运行时门控只看这一条
+     * （技能定义见 {@code LoveRendezvousTechniqueSkillSet#SKILL_STAR_SLING}）。术式 id 写死星间飞行——
+     * 本类是它的专属力学实现，{@code apply} 收到的就是这一套标记。
+     * <p>
+     * 走 {@link SkillUnlockLogic#isSkillUnlockedById} 而不是自己读 tag：节点 -&gt; 技能定义的解析在那边
+     * 统一收口，这里就少一份「tag 名写错却没人发现」的机会。
+     */
+    private static boolean isSlingUnlocked(ServerPlayer owner)
+    {
+        return SkillUnlockLogic.isSkillUnlockedById(
+                owner,
+                PlayerTechniqueData.TECHNIQUE_LOVE_RENDEZVOUS,
+                LoveRendezvousTechniqueSkillSet.SKILL_STAR_SLING);
+    }
+
+    /**
+     * 「引力弹弓」：域外飞行的球掠过<b>同星方块</b>时，被那颗「大质量天体」加速并续命。
+     * <p>
+     * 动机是把死路改写成玩法：撞击结算只认 {@link LivingEntity}，方块撞不出伤害，
+     * 所以被同星吸过去的球只会停在方块旁干等标签过期。本方法给方块补上它缺失的角色——
+     * <b>方块不是靶子，是加速带</b>。
+     * <p>
+     * 触发要同时满足四条：球身份未过期、借力次数没用完、有<b>同星</b>方块落在
+     * {@link #SLING_RANGE} 内、且那颗方块这一轮还没被这颗球借过。结算三件事：
+     * 水平速度按 {@link #SLING_BOOST} 加并夹到 {@link #MAX_BALL_SPEED}，方向朝「下一个能撞的目标」
+     * （见 {@link #slingExit}），再补一记 {@link #SLING_LIFT} 上抛，最后刷新 {@link #TAG_BURST_UNTIL}。
+     * <p>
+     * <b>只认同星</b>：方块是你主动摆下的天体，摆哪颗星由你决定；若任意方块都作数，
+     * 全图都会变成加速带，这个机制就失去了「刻意布场」的意味。
+     * <p>
+     * <b>解锁门槛</b>：这是<b>机制型技能</b>，未解锁时本方法根本不会被调用（门控见 {@link #isSlingUnlocked}）；
+     * 解锁之后永久生效，不再消耗咒力、也没有冷却——所以玩家的学习顺序是「先学会弹射，再学会借力」，
+     * 而不是一上手就默认拥有。
+     * <p>
+     * ⚠️ <b>前提待验收</b>：方块锚点在方块正上方 {@code BLOCK_MARK_HEIGHT}（1.15）格，球瞄的是这个
+     * 空中点，所以「掠过而不撞上」在<b>锚点意义上</b>成立；但原版物理碰撞仍在——方块若是实心块、
+     * 球又贴地飞，球箱会怼在方块侧面停住。这是本机制唯一需要在实机上确认的前提。
+     */
+    private static void slingBalls(ServerPlayer owner, List<StarMarkSkillLogic.ResolvedMark> marks)
+    {
+        long now = owner.level().getGameTime();
+        for (StarMarkSkillLogic.ResolvedMark ballMark : marks)
+        {
+            Entity ball = ballMark.entity();
+            /* 方块锚点没有实体、掉落物不是 LivingEntity——都当不了球 */
+            if (!(ball instanceof LivingEntity))
+            {
+                continue;
+            }
+            CompoundTag data = ball.getPersistentData();
+            if (data.getLong(TAG_BURST_UNTIL) <= now)
+            {
+                continue;
+            }
+            long[] used = data.getLongArray(TAG_SLING_USED);
+            if (used.length >= SLING_MAX_PER_BALL)
+            {
+                continue;
+            }
+            StarMarkSkillLogic.ResolvedMark well = nearestGravityWell(ballMark, marks);
+            if (well == null)
+            {
+                continue;
+            }
+            long key = well.mark().pos().asLong();
+            if (containsLong(used, key))
+            {
+                continue;
+            }
+            Vec3 direction = slingExit(ballMark, well, marks);
+            if (direction == null)
+            {
+                continue;
+            }
+
+            Vec3 velocity = ball.getDeltaMovement();
+            double speed = Math.min(horizontalSpeed(ball) + SLING_BOOST, MAX_BALL_SPEED);
+            ball.setDeltaMovement(direction.x * speed, velocity.y + SLING_LIFT, direction.z * speed);
+            ball.hurtMarked = true;
+            ball.hasImpulse = true;
+            ball.fallDistance = 0.0F;
+
+            /* 记这一笔（方块 + 次数共用同一个数组），并把球的身份续到下一个窗口 */
+            data.putLongArray(TAG_SLING_USED, appendLong(used, key));
+            data.putLong(TAG_BURST_UNTIL, now + BURST_FLIGHT_TICKS);
+
+            owner.displayClientMessage(Component.literal("★引力弹弓 · 借「"
+                    + well.mark().type().displayName() + "」方块加速至 "
+                    + Math.round(speed * 100.0D) / 100.0D + " 格/刻，续航刷新（"
+                    + (used.length + 1) + "/" + SLING_MAX_PER_BALL + "）"), true);
+        }
+    }
+
+    /**
+     * 离球最近的、落在 {@link #SLING_RANGE} 内的<b>同星方块</b>标记——弹弓里的那颗大质量天体。
+     * <p>
+     * 与 {@link #nearestStrikeable} 恰成互补：那边只认 {@link LivingEntity}（撞得响的靶子），
+     * 这边只认方块（借得动的天体）。两者合起来正好把「三类标记」的角色分完。
+     */
+    @Nullable
+    private static StarMarkSkillLogic.ResolvedMark nearestGravityWell(
+            StarMarkSkillLogic.ResolvedMark ball, List<StarMarkSkillLogic.ResolvedMark> marks)
+    {
+        StarMarkSkillLogic.ResolvedMark nearest = null;
+        double best = SLING_RANGE * SLING_RANGE;
+        for (StarMarkSkillLogic.ResolvedMark other : marks)
+        {
+            if (other.mark().kind() != StarMark.Kind.BLOCK
+                    || other.mark().type() != ball.mark().type())
             {
                 continue;
             }
@@ -1693,6 +1919,61 @@ public final class StarMarkRules
             }
         }
         return nearest;
+    }
+
+    /**
+     * 借力后的航向：从方块锚点指向「下一个能撞的目标」，找不到目标时退回球原本的航向。
+     * <p>
+     * <b>先找目标</b>：方块是路标而不是终点，所以借力不只是踩油门，还把球重新瞄准下一个靶子——
+     * 摆一排同星方块、再放几颗对岸的星，球就会一路借着飞过去。这正是「弹弓」而非「加速带」。
+     * <b>找不到也不空转</b>：没有可撞目标时沿原航向继续（只加速、不改向）。若在这里返回零向量，
+     * 球会当场停住——那比不加速更糟。
+     *
+     * @return 单位水平航向；既无目标、球又原本静止时返回 {@code null}（这一 tick 作废）
+     */
+    @Nullable
+    private static Vec3 slingExit(StarMarkSkillLogic.ResolvedMark ball,
+            StarMarkSkillLogic.ResolvedMark well, List<StarMarkSkillLogic.ResolvedMark> marks)
+    {
+        StarMarkSkillLogic.ResolvedMark next = nearestStrikeableFrom(well.position(), ball.entity(), marks);
+        if (next != null)
+        {
+            Vec3 to = next.position().subtract(well.position());
+            Vec3 flat = new Vec3(to.x, 0.0D, to.z);
+            if (flat.lengthSqr() > 1.0E-6D)
+            {
+                return flat.normalize();
+            }
+        }
+        Entity entity = ball.entity();
+        if (entity == null)
+        {
+            return null;
+        }
+        Vec3 velocity = entity.getDeltaMovement();
+        Vec3 flat = new Vec3(velocity.x, 0.0D, velocity.z);
+        return flat.lengthSqr() > 1.0E-6D ? flat.normalize() : null;
+    }
+
+    /** {@code long[]} 里是否已含某个键（用于 {@link #TAG_SLING_USED} 的「同一方块只弹一次」）。 */
+    private static boolean containsLong(long[] values, long key)
+    {
+        for (long value : values)
+        {
+            if (value == key)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** 追加一个键并返回新数组（{@code long[]} 定长，只能复制）；见 {@link #TAG_SLING_USED}。 */
+    private static long[] appendLong(long[] values, long key)
+    {
+        long[] grown = Arrays.copyOf(values, values.length + 1);
+        grown[values.length] = key;
+        return grown;
     }
 
     /**

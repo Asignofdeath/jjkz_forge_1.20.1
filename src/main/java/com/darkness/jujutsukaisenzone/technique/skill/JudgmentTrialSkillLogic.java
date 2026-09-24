@@ -10,6 +10,7 @@ import com.darkness.jujutsukaisenzone.player.JudgmentTrialTargetData;
 import com.darkness.jujutsukaisenzone.player.PlayerCrimeRecordData;
 import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
 import com.darkness.jujutsukaisenzone.registry.ModEntities;
+import com.darkness.jujutsukaisenzone.technique.development.SkillUnlockLogic;
 import com.darkness.jujutsukaisenzone.technique.skillset.JudgmentTechniqueSkillSet;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
@@ -458,22 +459,58 @@ public final class JudgmentTrialSkillLogic
                 JudgmentCrimeLibrary.getDeathSentenceBonusPercent(accusationChinese));
     }
 
+    /**
+     * 掷骰的实际实现，也是<b>两个机制型技能唯一的门控点</b>（见
+     * {@link JudgmentTechniqueSkillSet#SKILL_SENTENCING} / {@link JudgmentTechniqueSkillSet#SKILL_AGGRAVATION}）。
+     * <p>
+     * 「审判」「指控」「领域审理」三条路径都经由本方法掷骰，因此门控收在这里即三路全覆盖，
+     * 不必在每个调用点各写一遍。
+     * <ul>
+     *   <li><b>未解锁「量刑」</b>：有罪一律判【没收】，不掷【死刑】——先让玩家把「有罪 = 没收」
+     *       这一步立住，第一次见到【死刑】才是件有分量的事。</li>
+     *   <li><b>未解锁「从重论处」</b>：【死刑】只吃 {@link #DEATH_SENTENCE_CHANCE_PERCENT} 基础概率，
+     *       罪状库的重罪加成与目标身上每个 harmful debuff 的加成一律不计（含「附加了没收的死刑」
+     *       那一档的 debuff 加成）。</li>
+     * </ul>
+     */
     private static JudgmentVerdictType rollGuiltyVerdictType(
             ServerPlayer caster,
             LivingEntity target,
             double crimeBonusPercent)
     {
-        double deathSentenceChance = computeDeathSentenceChancePercent(target, crimeBonusPercent);
+        if (!isSentencingUnlocked(caster))
+        {
+            return JudgmentVerdictType.CONFISCATION;
+        }
+
+        boolean aggravating = isAggravationUnlocked(caster);
+        double deathSentenceChance = aggravating
+                ? computeDeathSentenceChancePercent(target, crimeBonusPercent)
+                : DEATH_SENTENCE_CHANCE_PERCENT;
         if (caster.getRandom().nextDouble() * 100.0D >= deathSentenceChance)
         {
             return JudgmentVerdictType.CONFISCATION;
         }
 
         double deathWithConfiscationChance = DEATH_SENTENCE_WITH_CONFISCATION_CHANCE_PERCENT
-                + computeDebuffDeathSentenceBonusPercent(target);
+                + (aggravating ? computeDebuffDeathSentenceBonusPercent(target) : 0.0D);
         return caster.getRandom().nextDouble() * 100.0D < deathWithConfiscationChance
                 ? JudgmentVerdictType.DEATH_SENTENCE_WITH_CONFISCATION
                 : JudgmentVerdictType.DEATH_SENTENCE;
+    }
+
+    /** 机制型技能「量刑」是否已解锁；未解锁时有罪一律只判【没收】。 */
+    private static boolean isSentencingUnlocked(ServerPlayer caster)
+    {
+        return SkillUnlockLogic.isSkillUnlockedById(caster, PlayerTechniqueData.TECHNIQUE_JUDGMENT,
+                JudgmentTechniqueSkillSet.SKILL_SENTENCING);
+    }
+
+    /** 机制型技能「从重论处」是否已解锁；未解锁时【死刑】只吃基础概率。 */
+    private static boolean isAggravationUnlocked(ServerPlayer caster)
+    {
+        return SkillUnlockLogic.isSkillUnlockedById(caster, PlayerTechniqueData.TECHNIQUE_JUDGMENT,
+                JudgmentTechniqueSkillSet.SKILL_AGGRAVATION);
     }
 
     /** 施法者当前「审判」技能随行的审判者；不存在或已失效时返回 null。 */

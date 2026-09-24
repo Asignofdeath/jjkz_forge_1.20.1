@@ -229,6 +229,28 @@ public final class TechniqueSkillDescriptions
                         TechniqueSkillStatFormat.formatNumber(
                                 JudgmentTrialSkillLogic.MAX_DEATH_SENTENCE_DEBUFF_BONUS_PERCENT)
                 });
+
+        /* 机制型技能：文案里没有数值，但同样注册——保持「每个技能都有注册项」这一条不出现例外。 */
+        TechniqueSkillDescriptionRegistry.register(
+                JudgmentTechniqueSkillSet.SKILL_GAVEL_FORMS,
+                (player, techniqueId, skill) -> new Object[0]);
+
+        TechniqueSkillDescriptionRegistry.register(
+                JudgmentTechniqueSkillSet.SKILL_SENTENCING,
+                (player, techniqueId, skill) -> new Object[] {
+                        /* 顺序必须与 lang 里 %s 的出现次序一致：死刑基础概率 */
+                        TechniqueSkillStatFormat.formatNumber(JudgmentTrialSkillLogic.DEATH_SENTENCE_CHANCE_PERCENT)
+                });
+
+        TechniqueSkillDescriptionRegistry.register(
+                JudgmentTechniqueSkillSet.SKILL_AGGRAVATION,
+                (player, techniqueId, skill) -> new Object[] {
+                        /* 顺序必须与 lang 里 %s 的出现次序一致：每个 debuff 的加成 → 加成上限 */
+                        TechniqueSkillStatFormat.formatNumber(
+                                JudgmentTrialSkillLogic.DEATH_SENTENCE_BONUS_PER_DEBUFF_PERCENT),
+                        TechniqueSkillStatFormat.formatNumber(
+                                JudgmentTrialSkillLogic.MAX_DEATH_SENTENCE_DEBUFF_BONUS_PERCENT)
+                });
     }
 
     private static void registerLoveRendezvousSkills()
@@ -267,13 +289,38 @@ public final class TechniqueSkillDescriptions
         TechniqueSkillDescriptionRegistry.register(
                 LoveRendezvousTechniqueSkillSet.SKILL_STAR_FLIGHT,
                 (player, techniqueId, skill) -> new Object[] {
-                        /* 顺序必须与 lang 里 %s 的出现次序一致：射程 → 每颗加成 → 加成上限 → 冲撞伤害 → 引爆单体伤害 → 路径伤害 */
+                        /* 顺序必须与 lang 里 %s 的出现次序一致：射程 → 冲撞伤害 → 引爆单体伤害 → 路径伤害
+                           （「依次穿越」的加成数值已随折线一并搬到机制型技能「在星间穿梭」的描述里） */
                         TechniqueSkillStatFormat.formatNumber(StarFlightSkillLogic.CAST_RANGE),
-                        TechniqueSkillStatFormat.formatNumber(StarFlightSkillLogic.PASS_BONUS_PER_STAR * 100.0D),
-                        TechniqueSkillStatFormat.formatNumber(StarFlightSkillLogic.PASS_BONUS_CAP * 100.0D),
                         TechniqueSkillStatFormat.formatNumber(StarFlightSkillLogic.RAM_DAMAGE),
                         TechniqueSkillStatFormat.formatNumber(StarMarkDetonation.DETONATION_DAMAGE),
                         TechniqueSkillStatFormat.formatNumber(StarFlightSkillLogic.PATH_DAMAGE)
+                });
+        /*
+         * 机制型技能「在星间穿梭」：与「引力弹弓」同一形态——不占槽位、没有咒力与冷却，
+         * tooltip 只渲染名字与这段描述（见 {@code TechniqueSkillTooltipHelper} 对机制型技能的特判），
+         * 所以这里的 %s 就是描述里要用到的全部数值。
+         */
+        TechniqueSkillDescriptionRegistry.register(
+                LoveRendezvousTechniqueSkillSet.SKILL_STAR_CHAIN,
+                (player, techniqueId, skill) -> new Object[] {
+                        /* 顺序必须与 lang 里 %s 的出现次序一致：每颗加成 → 加成上限 */
+                        TechniqueSkillStatFormat.formatNumber(StarFlightSkillLogic.PASS_BONUS_PER_STAR * 100.0D),
+                        TechniqueSkillStatFormat.formatNumber(StarFlightSkillLogic.PASS_BONUS_CAP * 100.0D)
+                });
+        /*
+         * 机制型技能「引力弹弓」：不占槽位、没有咒力与冷却，tooltip 只渲染名字与这段描述
+         * （见 {@code TechniqueSkillTooltipHelper} 对机制型技能的特判），所以这里的 %s 就是描述里
+         * 要用到的全部数值。数值一律从 StarMarkRules 的常量取，调参时描述跟着走，不会对不上。
+         */
+        TechniqueSkillDescriptionRegistry.register(
+                LoveRendezvousTechniqueSkillSet.SKILL_STAR_SLING,
+                (player, techniqueId, skill) -> new Object[] {
+                        /* 顺序必须与 lang 里 %s 的出现次序一致：影响半径 → 加速量 → 速度上限 → 借力次数 */
+                        TechniqueSkillStatFormat.formatNumber(StarMarkRules.SLING_RANGE),
+                        TechniqueSkillStatFormat.formatNumber(StarMarkRules.SLING_BOOST),
+                        TechniqueSkillStatFormat.formatNumber(StarMarkRules.MAX_BALL_SPEED),
+                        Integer.toString(StarMarkRules.SLING_MAX_PER_BALL)
                 });
     }
 

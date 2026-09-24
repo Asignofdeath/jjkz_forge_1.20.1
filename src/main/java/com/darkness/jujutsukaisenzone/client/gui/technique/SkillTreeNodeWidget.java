@@ -6,8 +6,11 @@ import com.lowdragmc.lowdraglib.utils.Rect;
 import com.lowdragmc.lowdraglib.utils.Size;
 import com.darkness.jujutsukaisenzone.client.TechniqueSkillTooltipHelper;
 import com.darkness.jujutsukaisenzone.network.ModNetwork;
+import com.darkness.jujutsukaisenzone.technique.description.TechniqueSkillDescriptionKeys;
 import com.darkness.jujutsukaisenzone.technique.development.SkillUnlockLogic;
 import com.darkness.jujutsukaisenzone.technique.development.SkillTreeNodeDef;
+import com.darkness.jujutsukaisenzone.technique.development.UnlockCondition;
+import com.darkness.jujutsukaisenzone.technique.development.UnlockConditionType;
 import com.darkness.jujutsukaisenzone.technique.skillset.TechniqueSpecialMove;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
@@ -185,6 +188,16 @@ public final class SkillTreeNodeWidget extends com.lowdragmc.lowdraglib.gui.widg
         {
             Component title = TechniqueSkillTreeViewHelper.getDisplayName(player, techniqueId, nodeDef);
             Component body = Component.translatable(nodeDef.infoDescriptionKey()).withStyle(ChatFormatting.GRAY);
+            if (isDomainInfoNode(nodeDef))
+            {
+                setHoverTooltips(
+                        title.copy().withStyle(ChatFormatting.AQUA),
+                        Component.translatable(TechniqueSkillDescriptionKeys.DOMAIN_EXPANSION_TAG)
+                                .withStyle(ChatFormatting.RED),
+                        Component.empty(),
+                        body);
+                return;
+            }
             setHoverTooltips(
                     title.copy().withStyle(ChatFormatting.AQUA),
                     body);
@@ -247,6 +260,24 @@ public final class SkillTreeNodeWidget extends com.lowdragmc.lowdraglib.gui.widg
                 Component.translatable("gui.jujutsukaisenzone.skill_tree.special_move_inherit",
                                 TechniqueSkillTreeViewHelper.baseSkillDisplayName(techniqueId, move.baseSkillId()))
                         .withStyle(ChatFormatting.DARK_GRAY));
+    }
+
+    /**
+     * 判定说明节点是不是「领域说明节点」——即它的可见性条件声明了「已习得领域展开」。
+     * <p>
+     * 按条件判定而不是按节点 id：领域节点在各术式里命名各异（诛伏赐死 / 无量空处 / 伏魔神龛 /
+     * 爱与幽会），唯一的共同点是这条可见性条件；将来新增领域说明节点会自动带上标注，不必回来登记。
+     */
+    private static boolean isDomainInfoNode(SkillTreeNodeDef nodeDef)
+    {
+        for (UnlockCondition condition : nodeDef.visibilityConditions())
+        {
+            if (condition.type() == UnlockConditionType.HAS_DOMAIN_EXPANSION)
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void clearHoverTooltips()

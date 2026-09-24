@@ -2,9 +2,12 @@ package com.darkness.jujutsukaisenzone.technique.skill;
 
 import com.darkness.jujutsukaisenzone.compat.EpicFightCompat;
 import com.darkness.jujutsukaisenzone.player.PlayerStarMarkData;
+import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
 import com.darkness.jujutsukaisenzone.player.StarMark;
 import com.darkness.jujutsukaisenzone.player.StarMarkType;
 import com.darkness.jujutsukaisenzone.technique.TechniqueDamageSources;
+import com.darkness.jujutsukaisenzone.technique.development.SkillUnlockLogic;
+import com.darkness.jujutsukaisenzone.technique.skillset.LoveRendezvousTechniqueSkillSet;
 import net.minecraft.commands.arguments.EntityAnchorArgument;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
@@ -332,9 +335,13 @@ public final class StarFlightSkillLogic
          * ① 快照必须在关域之前取：星位的解锁进度（通行证）存在那一轮星域里，deactivateGate 会把整份
          * 记录删掉，而本技能必然关域——晚一步就永远读不到了。快照只活在 Flight 里，不落盘。
          * 读的是自身标记那一份，与「星星标记」状态提示里那句「自身标记本轮已解锁 ★…」是同一份数据。
+         * <p>
+         * 「在星间穿梭」是这条快照的<b>唯一消费者</b>：未解锁时干脆不读（mask 恒 0），于是折线不排、
+         * 这一脚退化成直取目标的单段突进。门控刻意放在<b>读取口</b>而不是排折线那一行——这样
+         * 「没有折线」只有一个成因，也不必白查一次星域。
          */
         int mask = 0;
-        if (StarMarkRules.insideOwnGate(player))
+        if (isChainUnlocked(player) && StarMarkRules.insideOwnGate(player))
         {
             StarMark self = PlayerStarMarkData.findTarget(player,
                     StarMarkSkillLogic.markOfEntity(player, player));
@@ -427,6 +434,24 @@ public final class StarFlightSkillLogic
             cursor = best.position();
         }
         return legs;
+    }
+
+    /**
+     * 施术者是否已解锁「在星间穿梭」这个<b>机制型技能</b>。
+     * <p>
+     * 机制型技能不占槽位、没有自己的咒力与冷却，唯一的状态就是那个解锁标记，所以运行时门控只看这一条
+     * （技能定义见 {@code LoveRendezvousTechniqueSkillSet#SKILL_STAR_CHAIN}）。术式 id 写死星间飞行——
+     * 本类就是它的终结技实现。
+     * <p>
+     * 与 {@code StarMarkRules#isSlingUnlocked} 同一写法：走 {@link SkillUnlockLogic#isSkillUnlockedById}
+     * 而不是自己读 tag，把「节点 -&gt; 技能定义」的解析统一收口在那边，这里就少一份「tag 名写错却没人发现」的机会。
+     */
+    private static boolean isChainUnlocked(ServerPlayer player)
+    {
+        return SkillUnlockLogic.isSkillUnlockedById(
+                player,
+                PlayerTechniqueData.TECHNIQUE_LOVE_RENDEZVOUS,
+                LoveRendezvousTechniqueSkillSet.SKILL_STAR_CHAIN);
     }
 
     /**

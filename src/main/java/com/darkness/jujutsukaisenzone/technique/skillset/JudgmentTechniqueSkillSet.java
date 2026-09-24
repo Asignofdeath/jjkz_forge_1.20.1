@@ -19,6 +19,7 @@ import net.minecraft.world.entity.player.Player;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 /**
  * 审判术式招式组。
@@ -48,6 +49,39 @@ public final class JudgmentTechniqueSkillSet extends AbstractInnateTechniqueSkil
     public static final String SKILL_ACCUSE = "judgment_accuse";
     public static final String SKILL_VIEW_FILE = "judgment_view_file";
 
+    /**
+     * 机制型技能：三式法槌。
+     * <p>
+     * <b>不占槽位、不能主动释放</b>，只能在术式开发树里解锁；解锁后「法槌」再按一次才会循环形态
+     * （标准 → 长柄 → 大锤），未解锁时法槌恒为标准形态（门控在
+     * {@code JudgmentWeaponLogic#cycleGavelForm}）。
+     * <p>
+     * 形态是审判术式最外显的一课：拿到法槌就能看见「它还有别的样子」，因此定价最低、前置只要
+     * 自动授予的法槌本身，是全术式的引导第一课。
+     */
+    public static final String SKILL_GAVEL_FORMS = "judgment_gavel_forms";
+    /**
+     * 机制型技能：量刑。
+     * <p>
+     * 「裁决分档」的开关——未解锁时有罪一律只判【没收】，解锁后才会掷【死刑】骰
+     * （门控在 {@code JudgmentTrialSkillLogic#rollGuiltyVerdictType}）。
+     * <p>
+     * 它把「有罪之后会怎样」拆成两步教：「有罪 = 没收」先立住，再让玩家第一次见到【死刑】。
+     * 由于「审判」「指控」「领域审理」三条路径共用同一个掷骰入口，这一处门控即三路全覆盖。
+     */
+    public static final String SKILL_SENTENCING = "judgment_sentencing";
+    /**
+     * 机制型技能：从重论处。
+     * <p>
+     * 「重罪与 debuff 加成」的开关——未解锁时【死刑】只吃基础概率，罪状库的重罪加成与目标身上
+     * 每个 harmful debuff 的加成一律不计（门控在 {@code JudgmentTrialSkillLogic#rollGuiltyVerdictType}，
+     * 与 {@link #SKILL_SENTENCING} 同一处）。
+     * <p>
+     * 这是全术式最晦涩的一块数值，所以放在最后：玩家先见过【死刑】，才会好奇「怎么让它更容易发生」。
+     * 前置取 {@link #SKILL_SENTENCING}——没有死刑就没有「从重」可言。
+     */
+    public static final String SKILL_AGGRAVATION = "judgment_aggravation";
+
     private static final String TAG_JUDGMENT_UNLOCK_SLOT_1 = "jujutsukaisenzone_judgment_unlock_slot_1";
     private static final String TAG_JUDGMENT_LEVEL_SLOT_1 = "jujutsukaisenzone_judgment_level_slot_1";
     private static final String TAG_JUDGMENT_COOLDOWN_SLOT_1 = "jujutsukaisenzone_judgment_cooldown_slot_1";
@@ -61,11 +95,22 @@ public final class JudgmentTechniqueSkillSet extends AbstractInnateTechniqueSkil
     private static final String TAG_JUDGMENT_LEVEL_SLOT_4 = "jujutsukaisenzone_judgment_level_slot_4";
     private static final String TAG_JUDGMENT_COOLDOWN_SLOT_4 = "jujutsukaisenzone_judgment_cooldown_slot_4";
 
+    /** 机制型技能的解锁标记（各自唯一的实质字段）。命名照 {@code *_unlock} 约定，随登录同步到客户端。 */
+    private static final String TAG_GAVEL_FORMS_UNLOCK = "jujutsukaisenzone_judgment_gavel_forms_unlock";
+    private static final String TAG_SENTENCING_UNLOCK = "jujutsukaisenzone_judgment_sentencing_unlock";
+    private static final String TAG_AGGRAVATION_UNLOCK = "jujutsukaisenzone_judgment_aggravation_unlock";
+
+    /** 机制型技能的图标：暂借同套主动技能的图标，待补美术后替换。 */
+    private static final String ICON_GAVEL = "textures/gui/technique/gavel.png";
+    private static final String ICON_TRIAL = "textures/gui/technique/trial.png";
+    private static final String ICON_ACCUSE = "textures/gui/technique/accuse.png";
+
     private static final List<TechniqueSkill> SKILLS = Arrays.asList(
             new TechniqueSkill(SKILL_GAVEL, SLOT_GAVEL, Component.literal("法槌"),
                     "textures/gui/technique/gavel.png",
                     GAVEL_COST, GAVEL_COOLDOWN_TICKS, 0,
-                    TAG_JUDGMENT_COOLDOWN_SLOT_1, TAG_JUDGMENT_UNLOCK_SLOT_1, TAG_JUDGMENT_LEVEL_SLOT_1),
+                    TAG_JUDGMENT_COOLDOWN_SLOT_1, TAG_JUDGMENT_UNLOCK_SLOT_1, TAG_JUDGMENT_LEVEL_SLOT_1,
+                    SkillDamageType.MARTIAL),
             new TechniqueSkill(SKILL_TRIAL, SLOT_TRIAL, Component.literal("审判"),
                     "textures/gui/technique/trial.png",
                     TRIAL_COST, TRIAL_COOLDOWN_TICKS, 0,
@@ -78,6 +123,36 @@ public final class JudgmentTechniqueSkillSet extends AbstractInnateTechniqueSkil
                     "textures/gui/technique/viewfile.png",
                     VIEW_FILE_COST, VIEW_FILE_COOLDOWN_TICKS, 0,
                     TAG_JUDGMENT_COOLDOWN_SLOT_4, TAG_JUDGMENT_UNLOCK_SLOT_4, TAG_JUDGMENT_LEVEL_SLOT_4));
+
+    /**
+     * 机制型技能定义（不占槽位、不进技能栏、不能主动释放，见
+     * {@link IInnateTechniqueSkillSet#getMechanicSkills()}）。
+     * <p>
+     * 字段口径与 {@code LoveRendezvousTechniqueSkillSet} 的同名列表一致：{@code defaultSlot = 0}
+     * 让按键解析（按 defaultSlot 匹配槽位）永远命中不到；咒力 / 冷却 / 等级填 0 与空串，因为它没有
+     * 自己的经济——解锁一次即永久生效。唯一实质内容是 {@code unlockTag}。
+     * <p>
+     * 三个机制的降级形态互为前提，构成审判术式的学习阶梯：
+     * <ol>
+     *   <li>{@link #SKILL_GAVEL_FORMS}——法槌恒为标准形态；</li>
+     *   <li>{@link #SKILL_SENTENCING}——有罪只判【没收】，不会出现【死刑】；</li>
+     *   <li>{@link #SKILL_AGGRAVATION}——【死刑】只吃基础概率，重罪与 debuff 加成不计。</li>
+     * </ol>
+     */
+    private static final TechniqueSkill MECHANIC_GAVEL_FORMS = new TechniqueSkill(
+            SKILL_GAVEL_FORMS, 0, Component.literal("三式法槌"), ICON_GAVEL, 0, 0, 0, "",
+            TAG_GAVEL_FORMS_UNLOCK, "");
+
+    private static final TechniqueSkill MECHANIC_SENTENCING = new TechniqueSkill(
+            SKILL_SENTENCING, 0, Component.literal("量刑"), ICON_TRIAL, 0, 0, 0, "",
+            TAG_SENTENCING_UNLOCK, "");
+
+    private static final TechniqueSkill MECHANIC_AGGRAVATION = new TechniqueSkill(
+            SKILL_AGGRAVATION, 0, Component.literal("从重论处"), ICON_ACCUSE, 0, 0, 0, "",
+            TAG_AGGRAVATION_UNLOCK, "");
+
+    private static final List<TechniqueSkill> MECHANICS =
+            List.of(MECHANIC_GAVEL_FORMS, MECHANIC_SENTENCING, MECHANIC_AGGRAVATION);
 
     private static final TechniqueSkillTree SKILL_TREE = TechniqueSkillTree.builder(PlayerTechniqueData.TECHNIQUE_JUDGMENT)
             .node(SkillTreeNodeDef.skill("judgment_gavel", SKILL_GAVEL).autoGranted().build())
@@ -108,11 +183,45 @@ public final class JudgmentTechniqueSkillSet extends AbstractInnateTechniqueSkil
                     .requires("judgment_trial")
                     .visibleWhen(UnlockCondition.hasDomainExpansion())
                     .build())
+            /*
+             * 机制型技能「三式法槌」：<b>不占槽位、不能主动释放</b>，解锁即永久生效——它改的是
+             * 「法槌再按一次会怎样」这条既有行为，而不是多给一个按键。
+             *
+             * 前置取「法槌」本身（自动授予、零情报），是全术式的引导第一课；定价也最低。
+             */
+            .node(SkillTreeNodeDef.skill("judgment_gavel_forms", SKILL_GAVEL_FORMS)
+                    .requires("judgment_gavel")
+                    .intelCost(150)
+                    .build())
+            /*
+             * 机制型技能「量刑」：把「有罪之后会怎样」拆成两步的第一半——先只会【没收】。
+             *
+             * 前置取「审判」：裁决只在有罪之后发生，而有罪由审判 / 指控 / 领域审理产生，
+             * 没学会其中任意一条就还见不到「有罪」这个词，此时开放裁决分档没有意义。
+             */
+            .node(SkillTreeNodeDef.skill("judgment_sentencing", SKILL_SENTENCING)
+                    .requires("judgment_trial")
+                    .intelCost(150)
+                    .build())
+            /*
+             * 机制型技能「从重论处」：第二半——【死刑】的概率怎么被推高。
+             *
+             * 前置取「量刑」而不是与它平级：没有死刑就没有「从重」可言，顺序不可颠倒。
+             * 它也是三条里最晦涩的一块（罪状库 + debuff 两层加成），因此定价最高、放在最后。
+             */
+            .node(SkillTreeNodeDef.skill("judgment_aggravation", SKILL_AGGRAVATION)
+                    .requires("judgment_sentencing")
+                    .intelCost(200)
+                    .build())
             .build();
 
     static
     {
-        SKILL_TREE.validateAgainstSkills(SKILLS);
+        /*
+         * 机制型技能与槽位技能一样，在树上都是一个 SKILL 节点，所以一并校验：
+         * 少写节点会在这里直接抛异常，而不是等到某天玩家点开开发树才变成「XXX / 无描述」。
+         */
+        SKILL_TREE.validateAgainstSkills(Stream.concat(SKILLS.stream(), MECHANICS.stream()).toList());
     }
 
     private JudgmentTechniqueSkillSet()
@@ -129,6 +238,13 @@ public final class JudgmentTechniqueSkillSet extends AbstractInnateTechniqueSkil
     public List<TechniqueSkill> getConfigurableSkills()
     {
         return SKILLS;
+    }
+
+    /** 机制型技能：不占槽位、不进技能栏，只能靠开发树解锁（见 {@link #SKILL_GAVEL_FORMS}）。 */
+    @Override
+    public List<TechniqueSkill> getMechanicSkills()
+    {
+        return MECHANICS;
     }
 
     @Override

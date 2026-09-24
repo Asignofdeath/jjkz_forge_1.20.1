@@ -1,10 +1,15 @@
 package com.darkness.jujutsukaisenzone.technique.skill;
 
-import com.darkness.jujutsukaisenzone.registry.ModItems;
-import com.darkness.jujutsukaisenzone.network.ModNetwork;
 import com.darkness.jujutsukaisenzone.compat.EpicFightCompat;
 import com.darkness.jujutsukaisenzone.effect.SinfulOneEffect;
+import com.darkness.jujutsukaisenzone.network.ModNetwork;
+import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
+import com.darkness.jujutsukaisenzone.registry.ModItems;
+import com.darkness.jujutsukaisenzone.technique.development.SkillUnlockLogic;
+import com.darkness.jujutsukaisenzone.technique.skillset.JudgmentTechniqueSkillSet;
+import net.minecraft.ChatFormatting;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.LivingEntity;
@@ -232,8 +237,23 @@ public final class JudgmentWeaponLogic
         return true;
     }
 
+    /**
+     * 循环法槌形态（标准 → 长柄 → 大锤）。
+     * <p>
+     * <b>机制型技能「三式法槌」的门控点</b>：未解锁时法槌恒为标准形态，这里提示一句便返回，
+     * 不写任何标签——于是「再按一次没反应」在代码层面就是「可切换形态数 = 1」，
+     * 而不是靠界面拦着。解锁后照旧 {@link #GAVEL_FORM_COUNT} 种循环。
+     */
     private static void cycleGavelForm(ServerPlayer player)
     {
+        if (!gavelFormVariantsUnlocked(player))
+        {
+            player.displayClientMessage(
+                    Component.literal("法槌仅有标准形态——可在术式开发树解锁「三式法槌」")
+                            .withStyle(ChatFormatting.YELLOW),
+                    true);
+            return;
+        }
         int slot = findGavelSlotToCycle(player);
         if (slot < 0)
         {
@@ -248,6 +268,13 @@ public final class JudgmentWeaponLogic
             EpicFightCompat.refreshGavelWeaponHeldItem(player, hand, oldStack, newStack);
         }
         player.inventoryMenu.broadcastChanges();
+    }
+
+    /** 机制型技能「三式法槌」是否已解锁；未解锁时法槌恒为标准形态（见 {@link #cycleGavelForm}）。 */
+    private static boolean gavelFormVariantsUnlocked(ServerPlayer player)
+    {
+        return SkillUnlockLogic.isSkillUnlockedById(player, PlayerTechniqueData.TECHNIQUE_JUDGMENT,
+                JudgmentTechniqueSkillSet.SKILL_GAVEL_FORMS);
     }
 
     private static int findGavelSlotToCycle(ServerPlayer player)
