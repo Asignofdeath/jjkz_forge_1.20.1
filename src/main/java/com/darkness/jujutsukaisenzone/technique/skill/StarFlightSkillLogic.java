@@ -6,21 +6,26 @@ import com.darkness.jujutsukaisenzone.player.StarMark;
 import com.darkness.jujutsukaisenzone.player.StarMarkType;
 import com.darkness.jujutsukaisenzone.technique.TechniqueDamageSources;
 import net.minecraft.commands.arguments.EntityAnchorArgument;
+import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
- * 「飞行，穿越」——星间飞行的终结技：一次高速追踪的直线穿越。
+ * 「飞行，穿越」——星间飞行的终结技：一次高速追踪的折线穿越。
  * <p>
  * <b>前置条件两条</b>（缺一不可，全部在扣咒力<b>之前</b>校验，见
  * {@code LoveRendezvousTechniqueSkillSet#useSkill}）：
@@ -31,34 +36,40 @@ import java.util.UUID;
  * </ol>
  * 注意这里<b>不要求两颗星跨序</b>——目标身上那颗只负责「够格挨这一脚」，弹不弹飞是打完才决定的，见下。
  * <p>
- * <b>一次施放 = 四件事</b>：
+ * <b>一次施放 = 五个阶段</b>：
  * <ol>
+ *   <li><b>取快照</b>——若此刻正站在自己的星域里（{@link StarMarkRules#insideOwnGate}），
+ *       先把「这一轮解锁了哪些星位」读出来，见下；</li>
  *   <li><b>收域</b>——立刻关掉施术者自己的全部星域（跟随 / 固定一并解除）。本技能<b>不需要星域</b>，
  *       星域只是它的素材来源，出手前一律清场；</li>
- *   <li><b>穿越</b>——播放起手动画（{@code flying_turn}）后，以高速<b>平移</b>冲向目标，每 tick
- *       按目标的<b>当前位置</b>重算方向与步长，因此目标跑动时这一脚会拐着弯追上去；</li>
- *   <li><b>引爆</b>——抵达瞬间先引爆目标身上那颗满级标记（{@link StarMarkDetonation#detonate}，
- *       标记被消耗、爆心单体伤害照常结算）。<b>顺序是有意的</b>：旧印记必须先清场，
- *       紧接着补上的那颗才是干净的新印记；</li>
- *   <li><b>冲撞 + 补印记 + 弹飞</b>——播放踢击动画（{@code flying_turn_kick}）并结算
- *       {@link #RAM_DAMAGE} 点冲撞伤害，<b>同时</b>把施术者<b>当前选中</b>的那颗印记打到目标身上
- *       （{@link #applySelectedMark}）；再看这颗新印记与施术者自身那颗标记<b>是否互为克制</b>
- *       （{@link #isCounter}）——是就把它踢飞出去（{@link StarMarkRules#flightKick}，
- *       <b>永远由施术者弹飞目标</b>，不看双方生命值），不是就不弹。</li>
+ *   <li><b>依次穿越</b>（仅当取到快照）——按星序扫过快照里解锁的每一颗星位，每位取<b>最近的</b>已标记目标
+ *       作为一段路标（方块 / 掉落物 / 实体都可以，够不着的位直接跳过，找到几颗算几颗），逐段飞过去。
+ *       每穿过一颗，这一脚的踢击伤害 +{@link #PASS_BONUS_PER_STAR}，封顶 +{@link #PASS_BONUS_CAP}；</li>
+ *   <li><b>追踪</b>——每一段都以高速<b>平移</b>推进，每 tick 按锚点的<b>当前位置</b>重算方向与步长，
+ *       所以目标跑动时这一脚会拐着弯追上去；</li>
+ *   <li><b>抵达结算</b>（{@link #arrive}）——引爆旧印记 → 冲撞伤害（受穿越加成放大）+ 补上「当前选中」印记
+ *       → 看两颗星是否互为克制（{@link #isCounter}），是才把目标按克制弹飞
+ *       （{@link StarMarkRules#flightKick}，<b>永远由施术者弹飞目标</b>，不看双方生命值）。</li>
  * </ol>
  * <p>
- * <b>为什么弹飞改成条件触发</b>：这一脚踢出去的那颗新印记，正是目标接下来当「球」的身份——
+ * <b>为什么必须取快照</b>：星位的解锁进度（通行证）存在<b>那一轮星域</b>里，而本技能必然关域——
+ * {@link StarMarkRules#deactivateGate} 会把整份记录删掉，所以位图只能在关域<b>之前</b>读
+ * （{@link StarMarkRules#unlockMaskOf}）。这就是「一份独立的记录」：它只活在 {@link Flight} 里，
+ * 随这次飞行一起消失，不落盘。读的是<b>自身标记</b>那一份，与「星星标记」状态提示里那句
+ * 「自身标记本轮已解锁 ★…」同源，玩家自己就能核对这一趟会穿几颗。
+ * <p>
+ * <b>为什么弹飞是条件触发</b>：这一脚踢出去的那颗新印记，正是目标接下来当「球」的身份——
  * 同星制导与撞击伤害都要求它留在施术者的标记池里（{@link StarMarkRules#apply} 的成员池就是这张表）。
  * 引爆必然吃掉旧标记，所以补打的这一颗既是新印记、也是重新获得的「球籍」。
  * 弹不弹则取决于两颗星的顺序关系（{@link #isCounter}）：玩家可以靠切换当前标记来决定「这一脚要不要踢飞」，
  * 而不是被前置条件锁死。
  * <p>
  * <b>为什么是「平移」而不是瞬移</b>：瞬移只有起点与终点两帧，撞上的一瞬间没有任何铺垫；
- * 这里每 tick 推进一小段，方向随目标实时修正，于是「冲过去 → 追上 → 撞上」是一个连续的过程，
+ * 这里每 tick 推进一小段，方向随锚点实时修正，于是「冲过去 → 追上 → 撞上」是一个连续的过程，
  * 起手动画正好铺满整段飞行。位移全部由服务端结算（{@link #tick}），客户端不参与。
  * <p>
  * <b>飞行状态是内存态</b>（{@link #FLIGHTS}，按玩家 UUID 索引），不落盘：它描述的是「正在进行中的一次动画」，
- * 而不是玩家属性。因此死亡、换维度、掉线都不会留下残留——{@link Flight#deadline} 是最后的兜底。
+ * 而不是玩家属性。因此死亡、换维度、掉线都不会留下残留——每一段重挂的 {@code deadline} 是最后的兜底。
  */
 public final class StarFlightSkillLogic
 {
@@ -67,6 +78,31 @@ public final class StarFlightSkillLogic
 
     /** 撞上目标那一刻的冲撞伤害（点）。引爆的爆心伤害另计，见 {@link StarMarkDetonation#DETONATION_DAMAGE}。 */
     public static final float RAM_DAMAGE = 12.0F;
+
+    /**
+     * 「依次穿越」每穿过一颗星位给踢击伤害的加成（比例）。
+     * <p>
+     * 加的是<b>最后那一脚</b>（{@link #RAM_DAMAGE}），不是路径伤害——路径伤害是沿途的顺带一下，
+     * 与穿了几颗无关。
+     */
+    public static final double PASS_BONUS_PER_STAR = 0.40D;
+
+    /**
+     * 上述加成的封顶（比例）。
+     * <p>
+     * 0.40 × 5 = 2.00：星位一共只有 {@link StarMarkType#count()} 颗，所以这个上限天然等于
+     * 「把这一轮解锁的星位全穿一遍」。真触顶时踢击是基础值的 3 倍。
+     */
+    public static final double PASS_BONUS_CAP = 2.00D;
+
+    /** 飞行途中撞到挡路实体时结算的伤害（点）。同一个实体整趟只挨一次。 */
+    public static final float PATH_DAMAGE = 6.0F;
+
+    /** 路径击退的力度：刻意小于弹射初速，这是「绕路撞人」，不是「踢飞」。 */
+    private static final double PATH_KNOCK = 0.80D;
+
+    /** 路径撞击的判定半径（格）：在扫掠包围盒之外再向外放宽这么多。 */
+    private static final double PATH_RADIUS = 1.5D;
 
     /** 到达判定（格）：锚点距离进到这里就结算，不必真贴到零距离。 */
     private static final double ARRIVE_DISTANCE = 1.6D;
@@ -111,32 +147,49 @@ public final class StarFlightSkillLogic
     {
     }
 
-    /** 一次穿越锁定的目标：目标身上那颗满级、跨序、够得着的标记，以及它对应的实体。 */
+    /** 一次穿越锁定的目标：目标身上那颗满级标记，以及它对应的实体。 */
     public record Target(StarMark mark, LivingEntity entity)
+    {
+    }
+
+    /**
+     * 飞行折线上的一段。
+     * <p>
+     * 段目标可以是<b>三类标记里的任何一种</b>——「依次穿越」要吃的正是方块与掉落物，
+     * 所以这里存 {@link StarMark} 加一个可空实体：方块只有坐标，实体每 tick 现查位置
+     * （见 {@link #legAnchor(ServerLevel, Leg, boolean)}）。折线的最后一段恒为 {@link #pickTarget} 选出的真实目标。
+     */
+    private record Leg(StarMark mark, @Nullable Entity entity)
     {
     }
 
     /**
      * 进行中的一次穿越。
      * <p>
-     * 只存「接下来怎么走」需要的量：目标实体 id（每 tick 现查，目标换维度 / 消失即失效）、
-     * 单 tick 步长（把总距离均摊到 {@link #remaining} 个 tick 上）、以及兜底寿命。
+     * 只存「接下来怎么走」需要的量：折线（{@link #legs}）、当前走到第几段（{@link #index}）、
+     * 单 tick 步长（把这一段距离均摊到 {@link #remaining} 个 tick 上），以及兜底寿命。
+     * <p>
+     * {@link #passes} 是已经穿过的星位数，只用来算踢击加成；{@link #rammed} 是路径撞击的去重表。
+     * 两者都只描述「这一次飞行」，所以随 {@link Flight} 一起躺在内存里、不落盘。
      */
     private static final class Flight
     {
-        private final int targetEntityId;
-        private final double step;
-        private final StarMarkType star;
-        private final long deadline;
+        private final List<Leg> legs;
+        /** 最终目标的实体 id：路径撞击要放过它，它由 {@link #arrive} 单独结算。 */
+        private final int finalEntityId;
+        /** 已被路径撞过的实体 id：步长小、半径大，同一个实体注定连着几 tick 都落在判定盒里。 */
+        private final Set<Integer> rammed = new HashSet<>();
+        private int index;
+        private int passes;
         private int remaining;
+        private double step;
+        private long deadline;
 
-        private Flight(ServerPlayer player, LivingEntity target, int ticks, double step, StarMarkType star)
+        private Flight(List<Leg> legs, int finalEntityId, long now)
         {
-            this.targetEntityId = target.getId();
-            this.step = step;
-            this.remaining = ticks;
-            this.star = star;
-            this.deadline = player.level().getGameTime() + FLIGHT_TIMEOUT_TICKS;
+            this.legs = legs;
+            this.finalEntityId = finalEntityId;
+            this.deadline = now + FLIGHT_TIMEOUT_TICKS;
         }
     }
 
@@ -260,7 +313,7 @@ public final class StarFlightSkillLogic
     // ======================== 释放 ========================
 
     /**
-     * 开始一次穿越：收掉星域、播起手动画、把飞行状态挂上去。
+     * 开始一次穿越：取快照 → 收域 → 排折线 → 播起手动画 → 把飞行状态挂上去。
      * <p>
      * 咒力 / 冷却 / 解锁 / 等级由调用方在 {@link #pickTarget} 通过之后按技能经济结算完毕，
      * 本方法只管演出与状态——因此它<b>只可能发生在扣费之后</b>，这是 {@code useSkill} 里的先后顺序，
@@ -275,25 +328,123 @@ public final class StarFlightSkillLogic
             return;
         }
 
-        /* 「无需星域」：本技能与域无关，出手前把施术者自己的域全收掉，避免穿越途中还在结算域内的斥力 */
+        /*
+         * ① 快照必须在关域之前取：星位的解锁进度（通行证）存在那一轮星域里，deactivateGate 会把整份
+         * 记录删掉，而本技能必然关域——晚一步就永远读不到了。快照只活在 Flight 里，不落盘。
+         * 读的是自身标记那一份，与「星星标记」状态提示里那句「自身标记本轮已解锁 ★…」是同一份数据。
+         */
+        int mask = 0;
+        if (StarMarkRules.insideOwnGate(player))
+        {
+            StarMark self = PlayerStarMarkData.findTarget(player,
+                    StarMarkSkillLogic.markOfEntity(player, player));
+            if (self != null)
+            {
+                mask = StarMarkRules.unlockMaskOf(player, self);
+            }
+        }
+
+        /* ② 「无需星域」：本技能与域无关，出手前把施术者自己的域全收掉，避免穿越途中还在结算域内斥力 */
         StarMarkRules.deactivateGate(player);
 
-        double distance = player.position().distanceTo(entity.position());
-        int ticks = flightTicks(distance);
-        FLIGHTS.put(player.getUUID(),
-                new Flight(player, entity, ticks, distance / ticks, target.mark().type()));
+        /* ③ 折线：先依次穿越已解锁的星位（找到几颗算几颗），最后一段才是真实目标 */
+        List<Leg> legs = new ArrayList<>();
+        if (mask != 0)
+        {
+            legs.addAll(planChain(player, mask, target.mark()));
+        }
+        legs.add(new Leg(target.mark(), entity));
+
+        Flight flight = new Flight(legs, entity.getId(), player.level().getGameTime());
+        FLIGHTS.put(player.getUUID(), flight);
+        beginLeg(player, flight, player.position());
 
         EpicFightCompat.playFlyingTurnAnimation(player);
-        notifyPlayer(player, "★飞行，穿越 · 向 " + entity.getName().getString() + " 飞去");
+        String name = entity.getName().getString();
+        notifyPlayer(player, legs.size() > 1
+                ? "★飞行，穿越 · 依次穿越 " + (legs.size() - 1) + " 颗星，最后向 " + name + " 飞去"
+                : "★飞行，穿越 · 向 " + name + " 飞去");
+    }
+
+    /**
+     * 排定「依次穿越」的星位顺序。
+     * <p>
+     * 按星序从 {@code ordinal 0} 一路走到<b>位图里解锁的最大星位</b>（位图本身是逐级推进的，
+     * 所以逐位判一遍就是「从第一颗走到解锁的最远那一颗」），每一位取<b>最近的</b>已标记目标作为一段；
+     * 某一位找不到合用的目标就跳过它——找到几颗算几颗。
+     * <p>
+     * 目标只要求「已被标记」，<b>不</b>要求星位叠满（满级是最后那一段的门槛，不是路过星位的门槛），
+     * 也不分方块 / 掉落物 / 实体：穿越段吃的正是这三类。
+     * <p>
+     * 三处排除：
+     * <ul>
+     *   <li><b>施术者自己</b>——自身标记是这套判定的基准，穿自己没有意义；</li>
+     *   <li><b>最终目标</b>——它排在最后一段，先穿过去再回头踢很怪；</li>
+     *   <li><b>超过 {@link #CAST_RANGE} 的目标</b>——不是「没找到」，而是够不着。这条同时是
+     *       {@link #MAX_FLIGHT_TICKS} 那条连续性硬约束的前提：每段都被夹在射程内，单步长才留得住。</li>
+     * </ul>
+     * 距离按<b>上一段的锚点</b>逐段推进计算，所以整条折线是「就近串起来」，而不是「离起点最近的几颗」。
+     */
+    private static List<Leg> planChain(ServerPlayer player, int mask, StarMark finalMark)
+    {
+        List<StarMarkSkillLogic.ResolvedMark> marks = StarMarkSkillLogic.resolveAll(player);
+        List<Leg> legs = new ArrayList<>();
+        Vec3 cursor = player.position();
+
+        for (int ordinal = 0; ordinal < StarMarkType.count(); ordinal++)
+        {
+            if ((mask & (1 << ordinal)) == 0)
+            {
+                continue;
+            }
+            StarMarkType type = StarMarkType.values()[ordinal];
+            StarMarkSkillLogic.ResolvedMark best = null;
+            double bestDistance = Double.MAX_VALUE;
+            for (StarMarkSkillLogic.ResolvedMark resolved : marks)
+            {
+                if (resolved.mark().type() != type)
+                {
+                    continue;
+                }
+                /* 自身标记与最终目标都不参与穿越；同一目标至多一条标记，所以不会重复串到同一段 */
+                if (resolved.entity() == player || resolved.mark().sameTargetAs(finalMark))
+                {
+                    continue;
+                }
+                double distance = cursor.distanceTo(resolved.position());
+                if (distance > CAST_RANGE || distance >= bestDistance)
+                {
+                    continue;
+                }
+                best = resolved;
+                bestDistance = distance;
+            }
+            if (best == null)
+            {
+                continue;
+            }
+            legs.add(new Leg(best.mark(), best.entity()));
+            cursor = best.position();
+        }
+        return legs;
     }
 
     /**
      * 每 tick 推进一次穿越；由 {@code StarMarkEvents#onPlayerTick} 调用。
      * <p>
-     * 方向与步长<b>每 tick 现算</b>——这就是「带追踪」的全部实现：目标挪了，下一 tick 的朝向与落点
+     * 方向与步长<b>每 tick 现算</b>——这就是「带追踪」的全部实现：锚点挪了，下一 tick 的朝向与落点
      * 跟着挪，不需要任何预测。位移走 {@link ServerPlayer#teleportTo(double, double, double)}：
      * 服务端玩家的位置由客户端权威，直接改 {@code deltaMovement} 会被客户端的移动包覆盖掉，
      * 所以「高速平移」只能用每 tick 的位置包来推。
+     * <p>
+     * 走到一段的尽头就交给 {@link #resolveLeg}：中间段是「穿越」（给加成、接着飞下一段），
+     * 末段才是踢击。三种「走不到」的处置各不相同：
+     * <ul>
+     *   <li><b>段目标失效</b>（方块被挖 / 实体消失）——中间段跳过，末段判中断；</li>
+     *   <li><b>跑出两倍射程</b>——同上；</li>
+     *   <li><b>这一段飞完了还没贴上锚点</b>——末段照旧就地结算（与单段时代一致），
+     *       中间段则算「没穿过去」，跳过、不给加成，这才对得起「穿越」两个字。</li>
+     * </ul>
      */
     public static void tick(ServerPlayer player)
     {
@@ -310,45 +461,201 @@ public final class StarFlightSkillLogic
             return;
         }
 
-        Entity target = level.getEntity(flight.targetEntityId);
-        if (!(target instanceof LivingEntity living) || !living.isAlive())
+        boolean last = flight.index == flight.legs.size() - 1;
+        Leg leg = flight.legs.get(flight.index);
+        Vec3 anchor = legAnchor(level, leg, last);
+        if (anchor == null)
         {
-            abort(player, "目标已失，穿越中断");
+            if (last)
+            {
+                abort(player, "目标已失，穿越中断");
+            }
+            else
+            {
+                advance(player, flight, "★" + leg.mark().type().starName() + " 已失，跳过");
+            }
             return;
         }
 
         Vec3 from = player.position();
-        Vec3 delta = living.position().subtract(from);
+        Vec3 delta = anchor.subtract(from);
         double distance = delta.length();
 
         if (distance <= ARRIVE_DISTANCE)
         {
-            FLIGHTS.remove(player.getUUID());
-            arrive(player, living);
+            resolveLeg(player, flight, anchor, last);
             return;
         }
-        if (flight.remaining <= 0 || distance > CAST_RANGE * 2.0D)
+        if (distance > CAST_RANGE * 2.0D)
         {
-            FLIGHTS.remove(player.getUUID());
-            if (distance <= CAST_RANGE * 2.0D)
+            if (last)
             {
-                arrive(player, living);
+                abort(player, "目标跑得太远，穿越中断");
             }
             else
             {
-                abort(player, "目标跑得太远，穿越中断");
+                advance(player, flight, "★" + leg.mark().type().starName() + " 已跑远，跳过");
+            }
+            return;
+        }
+        if (flight.remaining <= 0)
+        {
+            if (last)
+            {
+                resolveLeg(player, flight, anchor, true);
+            }
+            else
+            {
+                advance(player, flight, "★" + leg.mark().type().starName() + " 未及穿越，跳过");
             }
             return;
         }
 
         Vec3 next = from.add(delta.scale(Math.min(flight.step, distance) / distance));
-        /* 先转头再传送：位置包会把当前朝向一并带过去，观感上就是一路盯着目标飞 */
-        player.lookAt(EntityAnchorArgument.Anchor.EYES, living.position());
+        /* 先转头再传送：位置包会把当前朝向一并带过去，观感上就是一路盯着锚点飞 */
+        player.lookAt(EntityAnchorArgument.Anchor.EYES, anchor);
         player.teleportTo(next.x, next.y, next.z);
-        /* 空中连传送不吃坠落伤害；尾迹用自身那颗星的星色，与标记火花同源 */
+        /* 空中连传送不吃坠落伤害；尾迹用这一段那颗星的星色，与标记火花同源 */
         player.resetFallDistance();
-        StarMarkSkillLogic.spawnSpark(level, player.position().add(0.0D, 1.0D, 0.0D), flight.star, TRAIL_SCALE);
+        ramPath(player, flight, from, next);
+        StarMarkSkillLogic.spawnSpark(level, player.position().add(0.0D, 1.0D, 0.0D), leg.mark().type(), TRAIL_SCALE);
         flight.remaining--;
+    }
+
+    // ======================== 折线的段 ========================
+
+    /**
+     * 现算某一段的锚点；段目标已失效时返回 {@code null}（方块被挖 / 区块未加载、实体消失）。
+     * <p>
+     * <b>末段与穿越段的锚点不是同一个点</b>，这是刻意的：
+     * <ul>
+     *   <li><b>穿越段</b>瞄 {@link StarMarkSkillLogic#anchorOf}——也就是火花所在的位置（方块正上方 / 实体头顶）。
+     *       「穿过那颗星」在视觉上就是穿过火花中心；</li>
+     *   <li><b>末段</b>瞄实体的 {@link Entity#position()}，即脚下。这一脚是要贴到身上去踢的，
+     *       瞄头顶会让施术者悬在目标上方结算，落点差出两格多——这是从单段时代沿用的手感，不改。</li>
+     * </ul>
+     */
+    @Nullable
+    private static Vec3 legAnchor(ServerLevel level, Leg leg, boolean last)
+    {
+        Entity entity = leg.entity();
+        if (entity != null)
+        {
+            if (entity.isRemoved() || !entity.isAlive())
+            {
+                return null;
+            }
+            return last ? entity.position() : StarMarkSkillLogic.anchorOf(leg.mark(), entity);
+        }
+        BlockPos pos = leg.mark().pos();
+        if (!level.isLoaded(pos) || level.getBlockState(pos).isAir())
+        {
+            return null;
+        }
+        return StarMarkSkillLogic.anchorOf(leg.mark(), null);
+    }
+
+    /**
+     * 开始第 {@code flight.index} 段：按「当前位置 → 该段锚点」重算步长与时长，并把兜底寿命重挂一次。
+     * <p>
+     * 每一段都重挂 {@link #FLIGHT_TIMEOUT_TICKS}，所以多段飞行的总时长上限是「段数 × 该值」——
+     * 它既是「这一段追不上」的出口，也是掉线 / 服务端卡顿之后清理残留状态的唯一机会
+     * （{@link #FLIGHTS} 不落盘，没有别的机会）。
+     */
+    private static void beginLeg(ServerPlayer player, Flight flight, Vec3 from)
+    {
+        Leg leg = flight.legs.get(flight.index);
+        boolean last = flight.index == flight.legs.size() - 1;
+        Vec3 anchor = legAnchor(player.serverLevel(), leg, last);
+        double distance = anchor == null ? 0.0D : from.distanceTo(anchor);
+        int ticks = flightTicks(distance);
+        flight.remaining = ticks;
+        flight.step = distance / ticks;
+        flight.deadline = player.level().getGameTime() + FLIGHT_TIMEOUT_TICKS;
+    }
+
+    /**
+     * 推进到下一段（丢弃当前段）。{@code note} 非空时把「为什么跳过」报在动作栏里。
+     * <p>
+     * 位置不动——跳过的段只是不作数，不补飞也不补伤害。
+     */
+    private static void advance(ServerPlayer player, Flight flight, @Nullable String note)
+    {
+        flight.index++;
+        beginLeg(player, flight, player.position());
+        if (note != null)
+        {
+            notifyPlayer(player, note);
+        }
+    }
+
+    /**
+     * 一段走到头时的结算：中间段是「穿越」，末段是踢击。
+     * <p>
+     * 穿越段<b>不消耗、也不引爆</b>路过的那颗标记：它只是路标，改动的只有最后那一脚的力度。
+     * 结算完立刻推进到下一段，位置不动——「穿越」是贴着星擦过去，不是停下来看。
+     */
+    private static void resolveLeg(ServerPlayer player, Flight flight, Vec3 anchor, boolean last)
+    {
+        Leg leg = flight.legs.get(flight.index);
+
+        if (last)
+        {
+            if (leg.entity() instanceof LivingEntity living)
+            {
+                arrive(player, living, flight.passes);
+            }
+            else
+            {
+                abort(player, "目标已失，穿越中断");
+            }
+            return;
+        }
+
+        flight.passes++;
+        StarMarkSkillLogic.spawnBurst(player.serverLevel(), anchor, leg.mark().type(), 2.0D);
+        notifyPlayer(player, "★穿越 · " + leg.mark().type().displayName()
+                + "（第 " + flight.passes + " 颗）踢击 "
+                + Math.round(damageScale(flight.passes) * 100.0D) + "%");
+        advance(player, flight, null);
+    }
+
+    /**
+     * 路径撞击：把这一小段位移<b>扫过</b>的实体撞开，并结算 {@link #PATH_DAMAGE}。
+     * <p>
+     * 用<b>扫掠包围盒</b>（起点 → 终点的 AABB 再向外放宽 {@link #PATH_RADIUS}）而不是「以当前位置为圆心」：
+     * 单步 1.25 格虽然没有撞击伤害那种 2.8 格/tick 的隧穿风险，但按点判定会让「擦身而过」变得随机，
+     * 扫掠则稳定地把整段路径都算进去。
+     * <p>
+     * 排除两处：施术者自己（由 {@code getEntities} 的 except 参数挡掉），以及<b>本次飞行的最终目标</b>
+     * ——后者由 {@link #arrive} 的踢击单独结算，不该在撞上去的前一 tick 先吃一记路径伤害。
+     * 路过的星位目标照打不误（它们只有这一段）。
+     * <p>
+     * 每实体<b>整趟只结算一次</b>（{@link Flight#rammed}）：步长小、半径大，同一个实体注定连着几 tick
+     * 都落在盒子里。
+     */
+    private static void ramPath(ServerPlayer player, Flight flight, Vec3 from, Vec3 to)
+    {
+        AABB sweep = new AABB(from, to).inflate(PATH_RADIUS);
+        for (Entity entity : player.serverLevel().getEntities(player, sweep,
+                victim -> victim.isAlive() && victim.getId() != flight.finalEntityId))
+        {
+            if (!flight.rammed.add(entity.getId()))
+            {
+                continue;
+            }
+            if (entity instanceof LivingEntity living)
+            {
+                TechniqueDamageSources.deal(living, player, PATH_DAMAGE);
+            }
+            StarMarkRules.flightRam(player, entity, from, PATH_KNOCK);
+        }
+    }
+
+    /** 踢击伤害倍率：每穿越一颗星位 +{@link #PASS_BONUS_PER_STAR}，封顶 +{@link #PASS_BONUS_CAP}。 */
+    private static double damageScale(int passes)
+    {
+        return 1.0D + Math.min(passes * PASS_BONUS_PER_STAR, PASS_BONUS_CAP);
     }
 
     /**
@@ -367,24 +674,29 @@ public final class StarFlightSkillLogic
      * 顺带一提：补上的新印记把被踢飞的目标<b>重新送回了施术者的标记池</b>
      * （{@link StarMarkRules#apply} 的成员池就是这张表），所以它飞出去之后仍然是「一颗球」——
      * 会被同星制导，撞上别的标记照常结算撞击伤害。
+     *
+     * @param passes 本次飞行已经穿过的星位数，只用来放大冲撞那一下（{@link #damageScale(int)}）
      */
-    private static void arrive(ServerPlayer player, LivingEntity target)
+    private static void arrive(ServerPlayer player, LivingEntity target, int passes)
     {
+        FLIGHTS.remove(player.getUUID());
         EpicFightCompat.stopFlyingTurnAnimation(player);
         EpicFightCompat.playFlyingTurnKickAnimation(player);
         /* 位置每 tick 被传送覆盖，速度分量可能残留；停下来时清零，免得落地还滑一段 */
         player.setDeltaMovement(Vec3.ZERO);
         player.resetFallDistance();
 
+        /* 穿越加成只作用于冲撞这一脚；引爆的爆心伤害是标记自己的账，与飞了几段无关 */
+        float damage = (float) (RAM_DAMAGE * damageScale(passes));
         String name = target.getName().getString();
         StarMark mark = PlayerStarMarkData.findTarget(player,
                 StarMarkSkillLogic.markOfEntity(player, target));
         if (mark == null)
         {
             /* 飞行途中标记被清掉了：只兑现冲撞这一脚 */
-            boolean hit = TechniqueDamageSources.deal(target, player, RAM_DAMAGE);
+            boolean hit = TechniqueDamageSources.deal(target, player, damage);
             notifyPlayer(player, "★飞行，穿越 · " + name
-                    + (hit ? " 冲撞 " + Math.round(RAM_DAMAGE) : " 已被拦下"));
+                    + (hit ? " 冲撞 " + Math.round(damage) : " 已被拦下"));
             return;
         }
 
@@ -392,8 +704,8 @@ public final class StarFlightSkillLogic
         Vec3 center = StarMarkSkillLogic.anchorOf(mark, target);
         StarMarkDetonation.Result result = StarMarkDetonation.detonate(player, mark, center);
 
-        /* ② 冲撞伤害，并给目标补上「当前选中」的那颗印记 */
-        boolean hit = TechniqueDamageSources.deal(target, player, RAM_DAMAGE);
+        /* ② 冲撞伤害（按穿越段数放大），并给目标补上「当前选中」的那颗印记 */
+        boolean hit = TechniqueDamageSources.deal(target, player, damage);
         StarMarkType applied = applySelectedMark(player, target);
 
         /*
@@ -407,15 +719,20 @@ public final class StarFlightSkillLogic
             StarMarkRules.flightKick(player, target, player.position());
         }
 
-        StringBuilder message = new StringBuilder("★飞行，穿越 · ").append(name).append("：")
-                .append(mark.type().displayName()).append(" 引爆");
+        StringBuilder message = new StringBuilder("★飞行，穿越 · ").append(name).append("：");
+        if (passes > 0)
+        {
+            message.append("穿越 ").append(passes).append(" 颗（")
+                    .append(Math.round(damageScale(passes) * 100.0D)).append("%）；");
+        }
+        message.append(mark.type().displayName()).append(" 引爆");
         if (result.damaged())
         {
             message.append(" 单体 ").append(Math.round(StarMarkDetonation.DETONATION_DAMAGE));
         }
         if (hit)
         {
-            message.append("；冲撞 ").append(Math.round(RAM_DAMAGE));
+            message.append("；冲撞 ").append(Math.round(damage));
         }
         message.append("；").append(applied.displayName()).append(" 印记叠加");
         if (self == null)

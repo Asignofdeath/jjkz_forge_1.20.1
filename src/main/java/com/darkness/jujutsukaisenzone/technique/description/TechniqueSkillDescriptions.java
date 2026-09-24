@@ -24,7 +24,6 @@ import com.darkness.jujutsukaisenzone.technique.skill.StarMarkDetonation;
 import com.darkness.jujutsukaisenzone.technique.skill.StarMarkRules;
 import com.darkness.jujutsukaisenzone.player.PlayerStarMarkData;
 import com.darkness.jujutsukaisenzone.player.StarMark;
-import com.darkness.jujutsukaisenzone.player.StarMarkType;
 import com.darkness.jujutsukaisenzone.technique.scaling.ShrineSkillGrowth;
 import com.darkness.jujutsukaisenzone.technique.skillset.ShrineTechniqueSkillSet;
 import com.darkness.jujutsukaisenzone.technique.skillset.TechniqueSkill;
@@ -238,10 +237,10 @@ public final class TechniqueSkillDescriptions
                 LoveRendezvousTechniqueSkillSet.SKILL_STAR_MARK,
                 (player, techniqueId, skill) -> new Object[] {
                         /* 顺序必须与 lang 里 %s 的出现次序一致：
-                           持有上限 → 距离 → 星数 → 等级 → 衰减 → 引爆半径 → 引爆单体伤害 */
+                           持有上限 → 距离 → 等级 → 衰减 → 引爆半径 → 引爆单体伤害
+                           （星种数量与其效果已搬到开发树的说明节点，不再注入） */
                         Integer.toString(PlayerStarMarkData.MAX_MARKS),
                         TechniqueSkillStatFormat.formatNumber(StarMarkRules.MARK_RANGE),
-                        Integer.toString(StarMarkType.count()),
                         Integer.toString(StarMark.MAX_STACKS),
                         Integer.toString(StarMarkRules.STACK_DECAY_TICKS / 20),
                         TechniqueSkillStatFormat.formatNumber(StarMarkDetonation.RADIUS),
@@ -268,10 +267,13 @@ public final class TechniqueSkillDescriptions
         TechniqueSkillDescriptionRegistry.register(
                 LoveRendezvousTechniqueSkillSet.SKILL_STAR_FLIGHT,
                 (player, techniqueId, skill) -> new Object[] {
-                        /* 顺序必须与 lang 里 %s 的出现次序一致：射程 → 冲撞伤害 → 引爆单体伤害 */
+                        /* 顺序必须与 lang 里 %s 的出现次序一致：射程 → 每颗加成 → 加成上限 → 冲撞伤害 → 引爆单体伤害 → 路径伤害 */
                         TechniqueSkillStatFormat.formatNumber(StarFlightSkillLogic.CAST_RANGE),
+                        TechniqueSkillStatFormat.formatNumber(StarFlightSkillLogic.PASS_BONUS_PER_STAR * 100.0D),
+                        TechniqueSkillStatFormat.formatNumber(StarFlightSkillLogic.PASS_BONUS_CAP * 100.0D),
                         TechniqueSkillStatFormat.formatNumber(StarFlightSkillLogic.RAM_DAMAGE),
-                        TechniqueSkillStatFormat.formatNumber(StarMarkDetonation.DETONATION_DAMAGE)
+                        TechniqueSkillStatFormat.formatNumber(StarMarkDetonation.DETONATION_DAMAGE),
+                        TechniqueSkillStatFormat.formatNumber(StarFlightSkillLogic.PATH_DAMAGE)
                 });
     }
 

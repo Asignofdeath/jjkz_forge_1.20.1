@@ -114,6 +114,21 @@ public record StarMark(Kind kind, ResourceKey<Level> dimension, BlockPos pos,
         return new StarMark(kind, dimension, pos, entityId, type, newStacks, lastMarkedAt);
     }
 
+    /**
+     * 把星位等级直接钉到满级，并<b>把打标时刻挪到当下</b>。
+     * <p>
+     * 与 {@link #withStacks(int)} 的唯一区别就在时刻上，而这正是它存在的原因：
+     * {@code StarMarkRules#decayedStacks} 只认「距 {@link #lastMarkedAt()} 过了多久」，
+     * 只改等级、不刷新时刻的话，满级会在同一个 tick 被衰减结算按回原样，一秒都站不住。
+     * <p>
+     * 供「爱与幽会」领域的引爆传播使用：域内炸开时，半径内的标记被直接拉满
+     * （见 {@code StarMarkDetonation#spreadMark}），使被波及的目标当场成为下一个可燃点。
+     */
+    public StarMark maxed(long now)
+    {
+        return new StarMark(kind, dimension, pos, entityId, type, MAX_STACKS, now);
+    }
+
     /** 目标描述，用于动作栏提示。 */
     public String targetLabel()
     {

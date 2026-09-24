@@ -38,7 +38,9 @@ import java.util.Optional;
  * 槽位 4「飞行，穿越」：与目标身上一颗<b>星位叠满</b>的标记相距 20 格以内时，先收掉全部星域，
  * 再以高速<b>追踪平移</b>直取目标；撞上后先引爆旧印记，随即结算冲撞伤害并补上「当前选中」的那颗印记，
  * 最后看这颗新印记与施术者自身标记是否跨序——是才把目标弹飞（永远是施术者弹飞目标）。
- * 见 {@link StarFlightSkillLogic}。
+ * <b>若施放时正站在自己的星域里</b>，起飞之前还会按星序依次穿过去这一轮已解锁的每一颗星位
+ * （路标取离施术者最近的已标记实体 / 方块 / 掉落物），每穿一颗踢击伤害 +40%、上限 +200%；
+ * 飞行途中撞到的其他实体各挨一次伤害与击退。见 {@link StarFlightSkillLogic}。
  * <p>
  * 三态力学（同标记吸引 / 相邻无效果 / 跨序逐级解锁）见 {@link StarMarkRules}。
  * <p>
@@ -107,7 +109,7 @@ public final class LoveRendezvousTechniqueSkillSet extends AbstractInnateTechniq
     private static final TechniqueSkillTree SKILL_TREE = TechniqueSkillTree.builder(PlayerTechniqueData.TECHNIQUE_LOVE_RENDEZVOUS)
             .node(SkillTreeNodeDef.skill("love_rendezvous_star_mark", SKILL_STAR_MARK).autoGranted().build())
             /*
-             * 说明节点：把「星星标记」描述里那三段修饰键操作搬出来——它们全是静态文案
+             * 说明节点：把「星星标记」描述里的修饰键操作与当前标记的切换方式搬出来——它们全是静态文案
              * （不含任何 %s），正好适合放进说明节点，让技能描述本身只留机制与数值。
              * 说明节点不参与连线与解锁判定，requires 在这里只是自动布局的锚点，
              * 但 visibilityConditions 必须给（{@code TechniqueSkillTree#validate} 强制要求）。
@@ -116,6 +118,18 @@ public final class LoveRendezvousTechniqueSkillSet extends AbstractInnateTechniq
                     .titleKey("skill_tree.jujutsukaisenzone.love_rendezvous_star_mark_controls.title")
                     .iconPath(ICON_STAR_MARK)
                     .descriptionKey("skill_tree.jujutsukaisenzone.love_rendezvous_star_mark_controls.desc")
+                    .requires("love_rendezvous_star_mark")
+                    .visibleWhen(UnlockCondition.alwaysVisible())
+                    .build())
+            /*
+             * 说明节点：五颗星各自的负面效果。原本挂在「星星标记」描述末尾，属于查阅型信息，
+             * 而不是每次打标都要读一遍的操作说明，因此独立成节点。
+             * 同样是纯静态文案——星种有增减时这里必须手动同步（说明节点吃不掉 %s）。
+             */
+            .node(SkillTreeNodeDef.info("love_rendezvous_star_mark_effects")
+                    .titleKey("skill_tree.jujutsukaisenzone.love_rendezvous_star_mark_effects.title")
+                    .iconPath(ICON_STAR_MARK)
+                    .descriptionKey("skill_tree.jujutsukaisenzone.love_rendezvous_star_mark_effects.desc")
                     .requires("love_rendezvous_star_mark")
                     .visibleWhen(UnlockCondition.alwaysVisible())
                     .build())
@@ -148,6 +162,18 @@ public final class LoveRendezvousTechniqueSkillSet extends AbstractInnateTechniq
             .node(SkillTreeNodeDef.skill("love_rendezvous_star_flight", SKILL_STAR_FLIGHT)
                     .requires("love_rendezvous_star_gate")
                     .intelCost(400)
+                    .build())
+            /*
+             * 说明节点：「相会」的前提、可控性与中断条件——三段纯静态文案从「飞行，穿越」的
+             * 技能描述里搬出来，让那条终结技的描述只留机制与数值。挂在 flight 之后，
+             * 因为它讲的全是这一脚的成与不成。
+             */
+            .node(SkillTreeNodeDef.info("love_rendezvous_star_flight_details")
+                    .titleKey("skill_tree.jujutsukaisenzone.love_rendezvous_star_flight_details.title")
+                    .iconPath(ICON_STAR_FLIGHT)
+                    .descriptionKey("skill_tree.jujutsukaisenzone.love_rendezvous_star_flight_details.desc")
+                    .requires("love_rendezvous_star_flight")
+                    .visibleWhen(UnlockCondition.alwaysVisible())
                     .build())
             .build();
 
@@ -254,6 +280,8 @@ public final class LoveRendezvousTechniqueSkillSet extends AbstractInnateTechniq
              * pickTarget 返回 null 时已经在动作栏报明原因，这里直接 return，不进 castWithSkillEconomy——
              * 否则「没瞄到符合条件的星」会白扣 80 咒力 + 白上一次 45 秒冷却。
              * 「跨序」不在前置里：它决定的是末段弹不弹飞，不影响这次出手能不能成行。
+             * 「依次穿越」同样不在前置里：要不要走那条链路取决于**施放那一刻**是否站在自己的星域里，
+             * 由 cast 里现取快照决定（而且位图必须在关域之前读，见 StarFlightSkillLogic#cast）。
              * 目标在同一 tick 内不会失效，所以扣费之后 cast 里不再重复这套校验。
              */
             StarFlightSkillLogic.Target target = StarFlightSkillLogic.pickTarget(player);
@@ -469,6 +497,7 @@ public final class LoveRendezvousTechniqueSkillSet extends AbstractInnateTechniq
                         ? "；单体 " + (int) StarMarkDetonation.DETONATION_DAMAGE + " 伤害" : "")
                         + "；波及 " + result.affected() + " 个目标"
                         + (result.spread() > 0 ? "，标记传染 " + result.spread() + " 个" : "")
+                        + (result.empowered() > 0 ? "，同星拉满 " + result.empowered() + " 个" : "")
                         + (result.evicted() > 0 ? "，顶掉最旧 " + result.evicted() + " 条" : "")), true);
     }
 

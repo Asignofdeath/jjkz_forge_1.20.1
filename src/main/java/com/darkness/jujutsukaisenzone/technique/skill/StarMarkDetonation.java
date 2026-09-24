@@ -28,7 +28,8 @@ import java.util.List;
  *   <li><b>消耗</b>——中心目标的标记被清零（不是回落到某一级），所以想再炸一次就必须从头叠满；</li>
  *   <li><b>单体伤害</b>——<b>只有爆心的原目标</b>受到 {@link #DETONATION_DAMAGE}（见 {@link #damageCore}）；</li>
  *   <li><b>赋效果</b>——半径 {@link #RADIUS} 格内的实体获得该星对应的负面效果（见 {@link #applyDebuff}）；</li>
- *   <li><b>传染</b>——同一范围内的实体若<b>尚未持有任何标记</b>，会被打上「同一颗星、星位等级 1」。</li>
+ *   <li><b>传染</b>——同一范围内的实体若<b>尚未持有任何标记</b>，会被打上「同一颗星、星位等级 1」。
+ *       域内走的是另一套放宽的规则，见文末「爱与幽会」一节。</li>
  * </ol>
  * <p>
  * <b>「伤害集中、效果扩散」</b>是这里的核心分工：伤害只落在爆心那一个目标身上，因为它引爆的是
@@ -45,6 +46,14 @@ import java.util.List;
  * <p>
  * 方块标记同样可以引爆，只是方块本身没有生命值——它的爆心取方块锚点，
  * 伤害为零而效果与传染照常落到周围实体身上；掉落物不是 {@link LivingEntity}，同样不受伤。
+ * <p>
+ * <b>「爱与幽会」域内的传播是另一套规则</b>（细节见 {@link #spreadMark}）：干净目标直接拿满级、
+ * 半径内已有的同星标记被一并拉满，于是被炸到的目标当场就成为下一个可燃点，链条才能连起来。
+ * 切换点在 {@link #detonate} 内部按「爆心是否落在域内」自行判断，所以叠满触发 / 撞击触发 /
+ * 飞行穿越触发这三条路径全部自动跟随，调用方不需要知情、也不需要各写一遍。
+ * <p>
+ * <b>爆心的原目标在两种模式下都不参与传染</b>：它的标记刚被消耗掉，若又被传染回来就成了
+ * 「回到满级」而不是「清零」，等于站着不动就能被反复引爆。
  */
 public final class StarMarkDetonation
 {
@@ -95,20 +104,24 @@ public final class StarMarkDetonation
     /**
      * 引爆的结算结果，供调用方拼动作栏提示。
      *
-     * @param damaged  是否真的对爆心目标造成了伤害。引爆在方块 / 掉落物上、爆心是施术者自己、
-     *                 或实体已消失时为 {@code false}——这三种情况都只走效果与传染
-     * @param affected 吃到负面效果的实体数（不含施术者）
-     * @param spread   被传染（新打上 1 级标记）的实体数
-     * @param evicted  因持有上限被顶掉的标记条数（见 {@code PlayerStarMarkData#MAX_MARKS}）——
-     *                 传染是免费扩散、不受打标入口的经济约束，所以满员时它会顶掉施术者最早的几颗星
+     * @param damaged   是否真的对爆心目标造成了伤害。引爆在方块 / 掉落物上、爆心是施术者自己、
+     *                  或实体已消失时为 {@code false}——这三种情况都只走效果与传染
+     * @param affected  吃到负面效果的实体数（不含施术者）
+     * @param spread    被传染（新打上标记）的实体数；域内给满级、域外给 1 级
+     * @param evicted   因持有上限被顶掉的标记条数（见 {@code PlayerStarMarkData#MAX_MARKS}）——
+     *                  传染是免费扩散、不受打标入口的经济约束，所以满员时它会顶掉施术者最早的几颗星
+     * @param empowered 域内被一并拉满的「同星已有标记」条数（见 {@link #spreadMark}）；域外恒为 0
      */
-    public record Result(boolean damaged, int affected, int spread, int evicted)
+    public record Result(boolean damaged, int affected, int spread, int evicted, int empowered)
     {
     }
 
     /**
      * 引爆一条满级标记：消耗标记、对爆心目标结算单体伤害、表现爆发、给范围内实体赋该星的负面效果、
-     * 并把标记传染给干净的目标。
+     * 并把标记传染给范围内的其他目标。
+     * <p>
+     * 传染的规则<b>按爆心是否落在「爱与幽会」领域内自动分两套</b>——域外只给干净目标打 1 级（默认规则），
+     * 域内给满级、并把已有的同星标记一并拉满（连锁规则）。调用方无需传任何标志。
      *
      * @param owner  施术者，标记的持有者；自身不会进入波及名单，也不会吃到伤害
      * @param mark   被引爆的标记（应当是 {@code stacks == MAX_STACKS} 的那条）
@@ -141,8 +154,16 @@ public final class StarMarkDetonation
         {
             applyDebuff(victim, mark.type());
         }
-        Spread spread = spreadMark(owner, mark, victims);
-        return new Result(damaged, victims.size(), spread.applied(), spread.evicted());
+
+        /*
+         * ⑤ 传染。域内规则的判据取爆心——也就是「这场爆炸实际发生在哪里」，与制导 / 撞击那条
+         * 域内判定同一口径。它同时自带术式校验（换术式即失效），见 StarMarkRules#isRendezvousDomainActive。
+         */
+        boolean domainBroadcast = StarMarkRules.isRendezvousDomainActive(owner)
+                && StarMarkRules.insideRendezvousDomain(owner, center);
+
+        Spread spread = spreadMark(owner, mark, victims, domainBroadcast);
+        return new Result(damaged, victims.size(), spread.applied(), spread.evicted(), spread.empowered());
     }
 
     /**
@@ -218,41 +239,76 @@ public final class StarMarkDetonation
     }
 
     /**
-     * 把引爆的那颗星传染给范围内尚未持有任何标记的实体，星位等级为 1（免费，不结算咒力）。
+     * 把引爆的那颗星传染给范围内的其他目标。
      * <p>
-     * 两类目标跳过：
-     * <ul>
-     *   <li><b>爆心的原目标</b>——它的标记刚刚被消耗掉，若又被传染回来就成了「回到 1 级」而不是
-     *       「清零」，与「想再炸一次必须重新叠满」的设计直接冲突。方块标记的爆心不是实体，
-     *       自然不在波及名单里，这条判断只对实体标记生效。</li>
-     *   <li><b>已有标记的目标</b>——不论它挂的是不是同一颗星：同星会当场再叠一层、异星会被换掉，
-     *       两者都会让「一次引爆」的结果不可预期。</li>
-     * </ul>
-     *
+     * <b>域外（默认规则）</b>：只落在「尚未持有任何标记」的干净目标上，星位等级 1（免费，不结算咒力）。
+     * 已有标记的目标一律跳过——同星会当场再叠一层、异星会被换掉，两者都会让「一次引爆」的结果不可预期，
+     * 而且会打乱施术者按星种划下的布阵。
+     * <p>
+     * <b>域内（{@code domainBroadcast}，「爱与幽会」）</b>：这是整套连锁的引擎，放宽两条：
+     * <ol>
+     *   <li>干净目标直接拿到<b>满级</b>。域外的「1 级」意味着被传染者离「可燃的满级」还差 4 次打标，
+     *       链条在每一环都断在这里；直接给满级，被炸到的目标当场就成为下一个可燃点。</li>
+     *   <li>已有的<b>同一颗星</b>的标记被一并<b>拉满</b>。否则「周围都标过一遍」之后传染再无落点，
+     *       链条会在群体内部枯竭。异星仍然跳过（理由同上）。</li>
+     * </ol>
+     * 域内这条「拉满」必须走 {@link StarMark#maxed(long)}——它会把打标时刻一起刷新，
+     * 否则衰减结算会在同一个 tick 里把满级按回原样。
+     * <p>
+     * <b>爆心的原目标在两种模式下都跳过</b>：它的标记刚刚被消耗掉，若又被传染回来就成了「回到满级」
+     * 而不是「清零」，等于让人站着不动就能被反复引爆。方块标记的爆心不是实体、自然不在波及名单里，
+     * 这条判断只对实体标记生效。
+     * <p>
      * 传染照常走 {@link PlayerStarMarkData#put}，因此同样受持有上限约束——满员时它会顶掉施术者
      * 最久没打的那几条，这一点由 {@link Result#evicted()} 报给调用方，不做静默丢弃。
      *
-     * @return 传染的结算：扩散了几条、以及因上限顶掉了几条
+     * @param domainBroadcast 是否走「爱与幽会」域内的连锁规则
+     * @return 传染的结算：新打标几条、拉满几条、因上限顶掉几条
      */
-    private static Spread spreadMark(ServerPlayer owner, StarMark source, List<LivingEntity> victims)
+    private static Spread spreadMark(ServerPlayer owner, StarMark source, List<LivingEntity> victims,
+                                     boolean domainBroadcast)
     {
+        long now = owner.level().getGameTime();
         int applied = 0;
+        int empowered = 0;
         int evicted = 0;
         for (LivingEntity victim : victims)
         {
-            StarMark mark = StarMarkSkillLogic.markOfEntity(owner, victim, source.type());
-            if (mark.sameTargetAs(source) || PlayerStarMarkData.findTarget(owner, mark) != null)
+            StarMark probe = StarMarkSkillLogic.markOfEntity(owner, victim, source.type());
+            /* 爆心的原目标：标记刚被消耗掉，不再传染回来 */
+            if (probe.sameTargetAs(source))
             {
                 continue;
             }
-            evicted += PlayerStarMarkData.put(owner, mark).evicted().size();
-            applied++;
+            StarMark existing = PlayerStarMarkData.findTarget(owner, probe);
+            if (existing == null)
+            {
+                /* 干净目标：域内直接满级，域外仍是 1 级 */
+                StarMark spread = domainBroadcast ? probe.maxed(now) : probe;
+                evicted += PlayerStarMarkData.put(owner, spread).evicted().size();
+                applied++;
+                continue;
+            }
+            /* 已有标记：只有「域内 + 同星 + 尚未满级」才拉满；异星与已满级都不动 */
+            if (!domainBroadcast || existing.type() != source.type()
+                    || existing.stacks() >= StarMark.MAX_STACKS)
+            {
+                continue;
+            }
+            evicted += PlayerStarMarkData.put(owner, existing.maxed(now)).evicted().size();
+            empowered++;
         }
-        return new Spread(applied, evicted);
+        return new Spread(applied, empowered, evicted);
     }
 
-    /** 传染的结算：{@code applied} 是扩散条数，{@code evicted} 是被持有上限顶掉的条数。 */
-    private record Spread(int applied, int evicted)
+    /**
+     * 传染的结算。
+     *
+     * @param applied   新打上标记的实体数（域内给满级、域外给 1 级）
+     * @param empowered 域内被一并拉满的同星已有标记数；域外恒为 0
+     * @param evicted   因持有上限被顶掉的标记条数
+     */
+    private record Spread(int applied, int empowered, int evicted)
     {
     }
 

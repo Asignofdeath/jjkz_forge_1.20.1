@@ -25,6 +25,9 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
+import java.util.WeakHashMap;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 星间飞行的三态标记规则，只在服务端结算。
@@ -56,10 +59,31 @@ import java.util.Map;
  * 解域也会丢弃，所以重新展开总是从初始位图起步。
  * 代价是「解锁」与「推开」在同一个实例内互斥：位图越满，能被推开的标记越少。
  * <p>
+ * <b>跨序斥力 = 芝诺墙</b>（见 {@link #zenoInwardCap}）。它约束的对象是<b>位移</b>而不是力：
+ * 每 tick 把「朝对方靠拢的那一段位移」压进一个上限，上限随距离线性趋零，于是距离的演化是
+ * {@code dd/dn = -k·(d - ZENO_CORE)}——指数逼近、<b>永远差最后 {@link #ZENO_CORE} 格</b>。
+ * 无论对方多快（僵尸寻路、玩家疾跑、鞘翅俯冲）都压得住，因为服务端放行的从来不是速度，
+ * 而是「这一 tick 允许靠近多少」。这与「把推力调大」是两回事：调大只是让力气大的一方赢，
+ * 且对位置由客户端权威的玩家根本不起作用。
+ * <p>
+ * <b>「爱与幽会」领域展开</b>（{@code LoveRendezvousDomainExpansion}）不改上面这三态本身，
+ * 而是在其之上加一条领域级重定义：
+ * <ul>
+ *   <li><b>引爆的传播升级成连锁</b>——规则与切换点都在 {@code StarMarkDetonation#spreadMark}
+ *       （按爆心是否落在域内自动分两套，域外行为完全不变），本类只提供
+ *       {@link #isRendezvousDomainActive} / {@link #insideRendezvousDomain} 这两个判据。</li>
+ *   <li><b>星星大碰撞改为完全制导</b>（见 {@link #homeBalls}：每 tick 改写速度方向 ⇒ 必中）。
+ *       它存在的意义是让连锁的每一环都不落空——链条靠一次成功的撞击推进，命中率若是随机的，
+ *       雪球会自己散掉。（球在飞行中豁免芝诺墙，所以必中不会被跨序斥力吃掉。）</li>
+ * </ul>
+ * 两者都由 {@link #activateRendezvousDomain} 登记的球体界定，域一关就整体失效——它们不是新的常态规则。
+ * <p>
  * 三条实现纪律：
  * <ul>
  *   <li>力度一律用**增量**速度（{@code setDeltaMovement(dm.add(impulse))}），不覆盖既有速度，
- *       否则会和 EpicFight 的移动 / 闪避互相吃掉。</li>
+ *       否则会和 EpicFight 的移动 / 闪避互相吃掉。<b>两处例外</b>：跨序斥力压的是位移
+ *       （见 {@link #zenoWall}），「爱与幽会」域内的完全制导直接改写速度方向
+ *       （见 {@link #homeBalls}）——两者都是领域级的重定义，不是常规施力。</li>
  *   <li>同标记用**质心**而不是两两成对，天然收敛、不会自激。</li>
  *   <li>方块是静态锚点，只对「会动的一侧」施力；方块之间不参与判定。</li>
  * </ul>
@@ -164,12 +188,68 @@ public final class StarMarkRules
      * 补偿也大 2 倍，容错占比不变，整个难度梯度当场被抵消。这是设计决策，不是遗漏。
      */
     private static final double GUIDANCE_IMPULSE = 0.045D;
+    /**
+     * 「爱与幽会」领域（领域展开）下，完全制导的<b>兜底水平航速</b>（格/tick）。
+     * <p>
+     * 域内飞行的球每 tick 被<b>直接改写水平速度的方向</b>去对准目标（见 {@link #homeBalls}），
+     * 速度取「当前水平速度」与本值的较大者。之所以必须有下限：地面摩擦每 tick 吃掉约 45%，
+     * 球在地上滑三四 tick 就会掉到 {@link #IMPACT_MIN_SPEED} 之下——那时连撞击都不再结算，
+     * 「必中」就成了空话。取 0.60：略高于撞击门槛，又不至于变成瞬移。
+     * <p>
+     * 域外不受影响：常态的制导依旧只是 {@link #GUIDANCE_IMPULSE} 那份固定横向加力，
+     * 「辅助而非必中」的手感在域外原样保留。
+     */
+    private static final double DOMAIN_HOMING_SPEED = 0.60D;
     /** 牵引的每 tick 增量速度。 */
     private static final double PULL_IMPULSE = 0.070D;
-    /** 跨序斥力的作用距离（格）。 */
+    /** 跨序斥力的作用距离（格）：同时是芝诺墙的外沿，见 {@link #ZENO_INWARD_CAP}。 */
     private static final double REPULSION_RANGE = 6.0D;
-    /** 跨序斥力的每 tick 增量速度。 */
-    private static final double REPULSION_IMPULSE = 0.075D;
+    /**
+     * 芝诺墙的硬底线（格）——可接近量的收敛目标：双方<b>永远差这一点</b>。
+     * <p>
+     * 距离的演化是 {@code d(n) - ZENO_CORE = (d(0) - ZENO_CORE)·(1-k)ⁿ}，指数逼近、永不归零，
+     * 所以它不是一堵会被撞开的墙，而是一道「越靠近越硬、硬到无穷」的墙。
+     * <p>
+     * ⚠️ <b>必须明显大于 {@link #CONTACT_RANGE}（2.5），并且留出「单 tick 位移」的余量。</b>
+     * 接触判定读的是<b>本 tick 修正之前</b>的位置（锚点在 {@code resolveAll} 里就算好了），
+     * 而位移是每 tick 只削一次的离散量：只要一步能跨过余量，那一 tick 就会先擦到接触线、
+     * 下一 tick 才被推回去——「磨蹭着贴上去」正是这样磨出来的。取 3.0 = 接触线 + 0.5：
+     * 疾跑跳跃的水平位移约 0.36 格/tick，跨不过这条余量；能跨过去的只有碰撞击飞 / 爆炸 /
+     * 鞘翅俯冲那个量级，而那些场合本来也不该由墙来管。
+     * <p>
+     * <b>调高不会锁死跨序链</b>：接触判定要求「对方那颗星本来就在自己的位图里」
+     * （见 {@link #effectiveMask}），也就是这一侧本来就不吃墙，所以「逐级经过」永远够得着目标，
+     * 「飞行，穿越」的依次穿越也不经过接触判定。墙真正封死的只有<b>被排斥的那一侧</b>——
+     * 那正是「禁行」的字面意思。
+     * <p>
+     * 这个旋钮就是「禁行有多严」：调高 = 挡得越远；调到 {@link #CONTACT_RANGE} 以下
+     * 等于默许接触（旧值 2.0 的毛病）。
+     */
+    private static final double ZENO_CORE = 3.0D;
+    /**
+     * 芝诺墙在外沿（{@link #REPULSION_RANGE}）处允许的最大朝内速度（格/tick）。
+     * <p>
+     * 取 0.20：略低于僵尸等地面生物的寻路速度，所以「一进斥力圈就被拖住」。
+     * 但它只是<b>外沿</b>的上限——越往里上限越低，到 {@link #ZENO_CORE} 处归零。
+     * 玩家步行（约 0.11 格/tick）在外沿几乎无感、越走越涩；疾跑（约 0.28）从外侧就被压住。
+     * <p>
+     * 圈厚 = {@code REPULSION_RANGE - ZENO_CORE}，当前 3.0 格；核心取大后这一段变短，
+     * 于是「被拖住」的手感出现得更早、也更陡——这是 {@link #ZENO_CORE} 那两个格的直接后果，
+     * 不是这里的系数变了。
+     */
+    private static final double ZENO_INWARD_CAP = 0.20D;
+    /**
+     * 芝诺墙的逼近阶：1.0 = 一阶线性衰减，即上面那条微分方程。
+     * <p>
+     * 调大会让「越靠近越涩」更陡（贴着边滑行也更难），调小则墙更软、卡点更靠外。
+     */
+    private static final double ZENO_EXP = 1.0D;
+    /**
+     * 单 tick 最多退回多少格，防止「被末影珍珠 / 瞬移塞进核心」时出现一次暴力弹射。
+     * <p>
+     * 正常推挤的越界量只有零点几格，这个上限根本碰不到；它只兜极端穿越。
+     */
+    private static final double ZENO_MAX_CORRECT = 1.0D;
     /**
      * 「接触」判定距离（格）：标记光点贴近到这一距离即视为「经过」，
      * 把对方那颗星及其顺序相邻并入自己的解锁位图。
@@ -280,7 +360,6 @@ public final class StarMarkRules
 
     /** 竖直方向的力度衰减，避免把目标顶上天。 */
     private static final double ATTRACT_VERTICAL_SCALE = 0.35D;
-    private static final double REPULSION_VERTICAL_SCALE = 0.5D;
 
     private static final String TAG_PULL_UNTIL = "jujutsukaisenzone_love_rendezvous_pull_until";
     /**
@@ -534,6 +613,29 @@ public final class StarMarkRules
     }
 
     /**
+     * 「飞行，穿越」<b>路径上</b>的一次撞击：把挡路的实体沿飞行方向撞开。
+     * <p>
+     * 与 {@link #flightKick} 的两点差别都是刻意的：
+     * <ul>
+     *   <li><b>力度由调用方给</b>——路径撞击是位移途中的顺带一下，用的是固定的小额度，
+     *       而不是「终结技最后一下」那种 {@code BURST_IMPULSE_NEAR × 满级倍率}；</li>
+     *   <li><b>不盖 {@link #TAG_BURST_UNTIL}</b>——「球」的身份只由 {@link #flightKick} 授予。
+     *       挡路的倒霉蛋只是被撞飞，不该因此获得撞击伤害的资格。</li>
+     * </ul>
+     * 方向与上抛沿用 {@link #burstKick}，所以观感与两套弹射同源：水平撞飞 + 一记固定上抛。
+     *
+     * @param from 这一撞的发力点（上一 tick 施术者所在的位置）
+     */
+    public static void flightRam(ServerPlayer owner, @Nullable Entity victim, Vec3 from, double impulse)
+    {
+        if (victim == null || victim.isRemoved() || !victim.isAlive())
+        {
+            return;
+        }
+        push(victim, burstKick(from, victim.position(), impulse), owner, true);
+    }
+
+    /**
      * 展开提示里的弹射计数后缀。
      * <p>
      * 必须与展开提示拼成同一条——动作栏只有一个槽位，单发一条会当场被紧随其后的
@@ -571,6 +673,11 @@ public final class StarMarkRules
      * 方块没有生命值也拿不到实体，所以「立一颗同星方块当球门」只负责吸引与瞄准，
      * 撞上去不结算伤害；掉落物同理（非 {@link LivingEntity}）。
      * <p>
+     * <b>「爱与幽会」域内还会多一步：引爆「被撞的那一个」身上的标记</b>（见方法内的 {@code detonating}），
+     * 连锁由这一下展开——引爆会把新的满级可燃点传染到周围，玩家再去踢下一个。
+     * 球自己<b>不炸</b>：它是这一脚踢出去的武器，不是挂在球上的炸药；撞完就摘掉球身份，
+     * 一颗球只换一击。
+     * <p>
      * 伤害走 {@link TechniqueDamageSources#deal}，因此术式击杀照常给咒术经验、掉术式情报、
      * 记罪恶者、判黑闪——与另外几处术式伤害同一个口径。
      */
@@ -594,6 +701,13 @@ public final class StarMarkRules
             {
                 continue;
             }
+
+            /*
+             * 「爱与幽会」领域：这一记撞击额外引爆「被撞的那一个」身上的标记，连锁由此展开。
+             * 判据与完全制导同一口径（域生效 + 球落在域内），所以「球是被域内那一脚踢出来的」这点是精确成立的。
+             */
+            boolean detonating = isRendezvousDomainActive(owner)
+                    && insideRendezvousDomain(owner, ball.position());
 
             double speed = horizontalSpeed(ball);
             if (speed < IMPACT_MIN_SPEED)
@@ -626,17 +740,45 @@ public final class StarMarkRules
                 dealt |= TechniqueDamageSources.deal(ballLiving, owner, damage);
 
                 ball.getPersistentData().putLong(TAG_IMPACT_AT, now);
+                if (detonating)
+                {
+                    /*
+                     * 只引爆「被撞的那一个」——球是这一脚踢出去的武器，不是挂在球上的炸药，
+                     * 所以球自己身上的标记留着（它下一 tick 就摘掉球身份，回到普通目标）。
+                     * 连锁靠「引爆把新的满级可燃点传染出去、玩家再踢下一个」推进，不靠一颗球连环炸。
+                     * 摘掉标签 = 结束这一颗球的使命（不再被制导、不再触发撞击）：一颗球只换一击。
+                     */
+                    detonateIfMarked(owner, other);
+                    ball.getPersistentData().remove(TAG_BURST_UNTIL);
+                }
                 if (dealt)
                 {
                     owner.displayClientMessage(Component.literal("★撞击 · "
                             + ballMark.mark().type().displayName() + " ⇄ "
                             + other.mark().type().displayName()
-                            + " 各受 " + Math.round(damage) + " 伤害"), true);
+                            + " 各受 " + Math.round(damage) + " 伤害"
+                            + (detonating ? "，「爱与幽会」引爆该标记并传染" : "")), true);
                 }
                 /* 一颗球一次只撞一个目标；贴近不散的情况交给 IMPACT_COOLDOWN_TICKS 去抖 */
                 break;
             }
         }
+    }
+
+    /**
+     * 引爆一条标记——先确认它还在施术者名下，再交给 {@link StarMarkDetonation}。
+     * <p>
+     * 这道确认是必要的：{@code marks} 是本 tick 开头的解析快照，而同一 tick 里另一颗球完全可能
+     * 已经把这条标记引爆掉了（它是那颗球的撞击目标）。{@link StarMarkDetonation#detonate} 并不校验
+     * 标记是否仍然存在——重复调用会把伤害、效果与传染再放一遍。
+     */
+    private static void detonateIfMarked(ServerPlayer owner, StarMarkSkillLogic.ResolvedMark mark)
+    {
+        if (PlayerStarMarkData.findTarget(owner, mark.mark()) == null)
+        {
+            return;
+        }
+        StarMarkDetonation.detonate(owner, mark.mark(), mark.position());
     }
 
     /** 水平速度（格/tick）：撞击只看「甩出去的那股劲」，竖直方向的坠落与上抛都不计入。 */
@@ -780,6 +922,107 @@ public final class StarMarkRules
         return active;
     }
 
+    /**
+     * 施术者此刻是否<b>站在自己的星域里</b>（跟随域或固定域任一覆盖到脚下）。
+     * <p>
+     * 「飞行，穿越」靠它决定要不要走「依次穿越已解锁星位」那条强化链路：域是那套进度的载体，
+     * 只判「域是否生效」并不够——固定域可以留在原地，人跑开了就不该再算「在自己星域中」。
+     * 半径口径与域内的禁行判定完全一致（{@link #gateRadius(ServerPlayer)}）。
+     * <p>
+     * 跟随域恒为真（它的圆心就是施术者脚下），所以这条判定真正过滤的只有「固定域留在别处」那一种。
+     */
+    public static boolean insideOwnGate(ServerPlayer player)
+    {
+        if (!isGateActive(player) && !isFixedGateActive(player))
+        {
+            return false;
+        }
+        Vec3 pos = player.position();
+        double radius = gateRadius(player);
+        return withinAnyGate(gateCenters(player, pos), pos, radius * radius);
+    }
+
+    // ======================== 「爱与幽会」领域展开 ========================
+
+    /**
+     * 「爱与幽会」领域（领域展开）的作用球体：施术者 UUID → 球心与半径。
+     * <p>
+     * 球心取<b>展开那一刻</b>的领域方块中心，半径取领域固定半径
+     * （{@code AbstractDomainExpansion.DOMAIN_RADIUS}）。领域本身不移动，登记一次就够。
+     * <p>
+     * <b>刻意放在内存里而不是玩家 NBT</b>：领域实例本身就是内存态（掉线、崩服都会消失），
+     * 强化跟着它同生共死才不会留下「没有领域、却仍在必中 / 仍在连锁」的幽灵状态——这一点与
+     * {@link #ZENO_PREV} / {@code StarFlightSkillLogic#FLIGHTS} 同一立场。
+     * <p>
+     * 读取它的有两处：本类的「星星大碰撞改走完全制导」（{@link #homeBalls} / {@link #resolveImpacts}），
+     * 以及 {@code StarMarkDetonation} 的引爆传染（判断这一场爆炸该走域内连锁规则还是域外默认规则）。
+     * 两处都只服务施术者自己那一份数据（{@link #apply} 与引爆本就按施术者跑），因此天然只有一项。
+     */
+    private static final Map<UUID, RendezvousDomain> RENDEZVOUS_DOMAINS = new ConcurrentHashMap<>();
+
+    /** 领域的球形作用域：球心 + 半径（格）。 */
+    private record RendezvousDomain(Vec3 center, double radius)
+    {
+    }
+
+    /**
+     * 「爱与幽会」领域展开完成：登记作用球体。
+     * <p>
+     * 登记之后域内两套规则随之生效，它们分别在各自的读取方落地：
+     * <ul>
+     *   <li><b>引爆传染升级成连锁</b>——{@code StarMarkDetonation#detonate} 每次引爆都会来查
+     *       {@link #isRendezvousDomainActive} + {@link #insideRendezvousDomain} 决定走哪套；</li>
+     *   <li><b>星星大碰撞完全制导</b>——{@link #homeBalls} 在 {@link #apply} 里每 tick 读一次。</li>
+     * </ul>
+     */
+    public static void activateRendezvousDomain(ServerPlayer owner, Vec3 center, double radius)
+    {
+        RENDEZVOUS_DOMAINS.put(owner.getUUID(), new RendezvousDomain(center, radius));
+    }
+
+    /** 领域关闭（或换术式）：撤销强化。 */
+    public static void deactivateRendezvousDomain(ServerPlayer owner)
+    {
+        RENDEZVOUS_DOMAINS.remove(owner.getUUID());
+    }
+
+    /**
+     * 施术者的「爱与幽会」领域是否生效。
+     * <p>
+     * 顺带做一次术式校验：换了生得术式就不再是星间飞行的领域，与 {@link #gateCenters} 同一个立场。
+     */
+    public static boolean isRendezvousDomainActive(ServerPlayer owner)
+    {
+        if (!RENDEZVOUS_DOMAINS.containsKey(owner.getUUID()))
+        {
+            return false;
+        }
+        if (!PlayerTechniqueData.isLoveRendezvous(owner))
+        {
+            deactivateRendezvousDomain(owner);
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * 某点是否落在施术者的「爱与幽会」领域球内；未展开时恒为 {@code false}。
+     * <p>
+     * <b>公开给引爆侧</b>：{@code StarMarkDetonation#detonate} 靠它决定这一场爆炸走域外的默认
+     * 传染规则、还是域内的连锁规则。刻意与 {@link #isRendezvousDomainActive} 分成两个方法——
+     * 前者管「有没有域」（并顺带做术式校验），后者管「这一点在不在域里」；凡是需要<b>按位置</b>判定的
+     * 调用点（制导、撞击、引爆）都两个一起调。
+     */
+    public static boolean insideRendezvousDomain(ServerPlayer owner, Vec3 pos)
+    {
+        RendezvousDomain domain = RENDEZVOUS_DOMAINS.get(owner.getUUID());
+        if (domain == null)
+        {
+            return false;
+        }
+        return pos.distanceToSqr(domain.center()) <= domain.radius() * domain.radius();
+    }
+
     // ======================== 星域实例通行证 ========================
 
     /**
@@ -798,8 +1041,11 @@ public final class StarMarkRules
      * <p>
      * 本轮还没解锁过、或解锁已全部过期时，结果就是初始值 = 自己的星 + 顺序相邻的星，
      * 所以展开时不需要给每条标记预先写一条记录。
+     * <p>
+     * 对外只被「飞行，穿越」用一次，而且必须在 {@link #deactivateGate} <b>之前</b>读——
+     * 通行证就存在那一轮星域里，关域会把整份记录删掉。读一次就取到快照，之后与星域无关。
      */
-    private static int unlockMaskOf(ServerPlayer player, StarMark mark)
+    public static int unlockMaskOf(ServerPlayer player, StarMark mark)
     {
         return effectiveMask(mark, expiryOf(player, mark), gameTime(player));
     }
@@ -987,6 +1233,15 @@ public final class StarMarkRules
         }
 
         /*
+         * 「爱与幽会」领域：域内飞行的球改为完全制导（必中），必须排在撞击结算之前——
+         * 这一 tick 掰过去的速度就是撞击扫掠判定读到的那一段位移。
+         */
+        if (isRendezvousDomainActive(owner))
+        {
+            homeBalls(owner, marks);
+        }
+
+        /*
          * 撞击结算：传完整的 marks 而不是上面那份 simulated。
          * 球是往远处飞的，而 simulated 按「离施术者最近」截断到 MAX_SIMULATED 条，
          * 恰恰最可能把飞远的球剔出去。开销不成问题——外层只对「正在飞的球」进入内层，
@@ -1099,25 +1354,18 @@ public final class StarMarkRules
                         dir = posA.subtract(posB).scale(1.0D / distance);
                     }
 
-                    double falloff = 1.0D - Math.min(1.0D, distance / REPULSION_RANGE);
-                    double strength = REPULSION_IMPULSE * (0.30D + falloff);
-                    if (distance < MIN_SEPARATION)
-                    {
-                        strength *= 2.0D;
-                    }
-
                     /*
-                     * 双向施力：施术者本人若也是这两颗星之一（自身标记），同样要吃推力——
-                     * 否则跨序只表现为「对方被推开、自己纹丝不动」，测不出排斥是否成立。
+                     * 双向约束：施术者本人若也是这两颗星之一（自身标记），同样要吃约束——
+                     * 否则跨序只表现为「对方被挡住、自己纹丝不动」，测不出排斥是否成立。
+                     * dir 由 A 减 B 得到，所以各自拿到的都是「远离对方」的外向向量。
                      */
-                    Vec3 impulse = dir.scale(strength).multiply(1.0D, REPULSION_VERTICAL_SCALE, 1.0D);
                     if (pushA)
                     {
-                        push(a.entity(), impulse, owner, true);
+                        zenoWall(a.entity(), dir, distance, now);
                     }
                     if (pushB)
                     {
-                        push(b.entity(), impulse.scale(-1.0D), owner, true);
+                        zenoWall(b.entity(), dir.scale(-1.0D), distance, now);
                     }
                 }
             }
@@ -1352,11 +1600,269 @@ public final class StarMarkRules
     }
 
     /**
+     * 「爱与幽会」领域的<b>完全制导</b>：域内正在飞的球，每 tick 把水平速度直接掰向最近的另一条标记。
+     * <p>
+     * 与常态 {@link #GUIDANCE_IMPULSE} 的差别是<b>性质</b>而非程度：常态是「加一份固定的横向力」，
+     * 于是速度越快偏角越小、本质是辅助；这里直接<b>改写速度的方向</b>，球飞出多远、多快，每 tick 都
+     * 重新对准一次——所以是必中，而不是「更容易打中」。这正是领域该有的量级差。
+     * <p>
+     * 三条边界：
+     * <ul>
+     *   <li><b>只制导「球」</b>——判据与撞击结算完全一致（{@link #TAG_BURST_UNTIL} 未过期）。
+     *       平时被同星吸引慢慢蹭的标记不会被抽走，域外的手感不受影响；</li>
+     *   <li><b>球必须在域内</b>——领域是那片场地。球飞出球面即失去制导，不会满世界追人；</li>
+     *   <li><b>只瞄「能挨撞击的目标」</b>——见 {@link #nearestStrikeable}。把球导向一块石头
+     *       等于让它提前失速（方块撞不出伤害），所以方块锚点与掉落物都不作数。</li>
+     * </ul>
+     * 竖直分量原样保留：上抛（{@link #BURST_LIFT}）与重力照旧，制导只负责「往哪儿去」。
+     * 水平速度取「当前值」与 {@link #DOMAIN_HOMING_SPEED} 的较大者——在地面上被摩擦拖慢时兜住速度，
+     * 否则球会滑到 {@link #IMPACT_MIN_SPEED} 之下、连撞击都不再结算。
+     * <p>
+     * <b>球是玩家时这条制导形同虚设</b>：服务端改不动玩家的 {@code deltaMovement}（位置由客户端权威），
+     * 与 {@link #push} 的立场一致。这不是缺口——被弹飞的是玩家时，他本来就该自己决定往哪儿走。
+     */
+    private static void homeBalls(ServerPlayer owner, List<StarMarkSkillLogic.ResolvedMark> marks)
+    {
+        long now = owner.level().getGameTime();
+        for (StarMarkSkillLogic.ResolvedMark ball : marks)
+        {
+            Entity entity = ball.entity();
+            /* 方块锚点没有实体、掉落物不是 LivingEntity——都当不了球 */
+            if (!(entity instanceof LivingEntity))
+            {
+                continue;
+            }
+            if (entity.getPersistentData().getLong(TAG_BURST_UNTIL) <= now)
+            {
+                continue;
+            }
+            if (!insideRendezvousDomain(owner, entity.position()))
+            {
+                continue;
+            }
+
+            StarMarkSkillLogic.ResolvedMark goal = nearestStrikeable(ball, marks);
+            if (goal == null)
+            {
+                continue;
+            }
+            Vec3 to = goal.position().subtract(entity.position());
+            Vec3 flat = new Vec3(to.x, 0.0D, to.z);
+            double length = flat.length();
+            if (length < 1.0E-6D)
+            {
+                /* 已经正对着（水平重合）：这一 tick 不需要拐，让它自己撞上去 */
+                continue;
+            }
+            Vec3 direction = flat.scale(1.0D / length);
+            Vec3 velocity = entity.getDeltaMovement();
+            double speed = Math.max(
+                    Math.sqrt(velocity.x * velocity.x + velocity.z * velocity.z),
+                    DOMAIN_HOMING_SPEED);
+            entity.setDeltaMovement(direction.x * speed, velocity.y, direction.z * speed);
+            entity.hurtMarked = true;
+            entity.hasImpulse = true;
+            entity.fallDistance = 0.0F;
+        }
+    }
+
+    /**
+     * 完全制导的目标：离球最近的、<b>撞得响</b>的另一条标记。
+     * <p>
+     * 只要 {@link LivingEntity}：撞击判定本身就跳过方块与掉落物（没有生命值、拿不到实体），
+     * 把球导向它们只会让它提前失速。与星种无关——撞击本来就不看双方是不是同一颗星，
+     * 「同星相吸」是另一套机制（制导只负责把这一脚送到最近的靶子上）。
+     */
+    @Nullable
+    private static StarMarkSkillLogic.ResolvedMark nearestStrikeable(
+            StarMarkSkillLogic.ResolvedMark ball, List<StarMarkSkillLogic.ResolvedMark> marks)
+    {
+        StarMarkSkillLogic.ResolvedMark nearest = null;
+        double best = Double.MAX_VALUE;
+        for (StarMarkSkillLogic.ResolvedMark other : marks)
+        {
+            if (other.entity() == ball.entity() || !(other.entity() instanceof LivingEntity))
+            {
+                continue;
+            }
+            double distance = other.position().distanceToSqr(ball.position());
+            if (distance < best)
+            {
+                best = distance;
+                nearest = other;
+            }
+        }
+        return nearest;
+    }
+
+    /**
+     * 芝诺墙的位移快照——约束的是位移，就得先知道这一 tick 走了多少。
+     * <p>
+     * 三张表分工（键都是 {@code Entity} 本身；{@code Entity} 不重写 equals，所以是身份比较；
+     * 弱引用保证实体卸载后不会留下永久条目）：
+     * <ul>
+     *   <li>{@link #ZENO_PREV} —— 上一 tick 的<b>最终</b>位置，本 tick 内只读、不变；</li>
+     *   <li>{@link #ZENO_CUR} —— 本 tick 的最新落点（含本 tick 已施加的修正），每 tick 覆盖；</li>
+     *   <li>{@link #ZENO_TICK} —— 上面那次「转正」发生在哪个 tick，用来判断是否已进入本 tick。</li>
+     * </ul>
+     * <b>为什么基准不能跟着修正一起更新</b>：同一个 tick 内，芝诺墙会被<b>多条跨序标记</b>各调用
+     * 一次（域里有几颗跨序之星，就有几个方向要削）。若每次修正后都把「当前位置」写回基准，
+     * 第二次调用算出的位移就是 0——第二条约束被静默吃掉，玩家只要斜着绕、或者让正走向的那颗星
+     * 排在列表后面，就能从一个没被削的方向磨进去。让基准焊死在上一 tick 的最终位置，
+     * 每次修正都只是「把已经走过的那一段再削一点」，多个方向于是自然累加。
+     * <p>
+     * 「转正」放在一切判定之前，所以被跳过的那些 tick（创造模式、正在飞的球、正在穿越的施术者）
+     * 同样会推进基准——否则快照僵在几十 tick 前，一恢复判定就会凭空算出一大段位移、
+     * 甩出一记 {@link #ZENO_MAX_CORRECT} 顶格的莫名推力。
+     * <p>
+     * 只有「跨序且落在斥力圈内」的实体才会进来，因此这几张表天然只有几项，不随标记总数增长。
+     */
+    private static final Map<Entity, Vec3> ZENO_PREV = new WeakHashMap<>();
+    private static final Map<Entity, Vec3> ZENO_CUR = new WeakHashMap<>();
+    private static final Map<Entity, Long> ZENO_TICK = new WeakHashMap<>();
+
+    /**
+     * 芝诺墙在距离 {@code distance} 处允许的单 tick 朝内位移（格）。
+     * <p>
+     * {@code u} 是「离底线的余量占整条斥力圈的比例」：外沿处为 1、底线处为 0。于是上限在外沿取
+     * {@link #ZENO_INWARD_CAP}，越往里越小，到 {@link #ZENO_CORE} 处归零。而「归零」那一点永远
+     * 到不了——距离每 tick 只减 {@code cap(d)}，得到的就是指数逼近、永不归零的那条轨迹。
+     */
+    private static double zenoInwardCap(double distance)
+    {
+        if (distance <= ZENO_CORE)
+        {
+            return 0.0D;
+        }
+        double u = Math.min(1.0D, (distance - ZENO_CORE) / (REPULSION_RANGE - ZENO_CORE));
+        return ZENO_INWARD_CAP * Math.pow(u, ZENO_EXP);
+    }
+
+    /**
+     * 芝诺墙：把「这一 tick 朝对方靠拢的那一段位移」削到允许上限以内
+     * （上限随距离线性趋零，见 {@link #zenoInwardCap}），于是距离永远收敛不到 {@link #ZENO_CORE}。
+     * <p>
+     * <b>为什么约束位移而不是速度</b>：速度域（往 {@code deltaMovement} 上加冲量）比拼的是
+     * 「谁的力气大」，对方只要持续输出就能净推进——僵尸寻路、玩家疾跑都是这样一点点挤进来的。
+     * 位移域没有这个口子：每 tick 只放行 {@code zenoInwardCap(d)} 格，而放行量本身随距离衰减，
+     * 于是无论对方多快都只能<b>指数逼近、永不抵达</b>。这就是芝诺的乌龟：阿基里斯每一步都追到
+     * 上一处，可剩下的那一点总还差一点。
+     * <p>
+     * <b>两种落点，因为两侧的权威不同</b>：
+     * <ul>
+     *   <li><b>生物 / 其他实体</b>：位置由服务端权威，{@code setPos} 直接生效；</li>
+     *   <li><b>玩家</b>：位置由<b>客户端</b>权威，改位置必须走位置包（{@code teleportTo}），
+     *       否则下一 tick 就被客户端的移动包盖回去——这与「飞行，穿越」必须用 {@code teleportTo}
+     *       平移、以及「推力对服务端玩家无效」是同一条根因。</li>
+     * </ul>
+     * <p>
+     * <b>只算水平</b>：竖直方向一概不碰。若沿三维修正，悬停的星（恶魂 / 幻翼）会把正下方的玩家
+     * 按进地面，修正与碰撞互相打架。竖直贴脸本来就无害，分离交给水平与寻路自己解决。
+     * <p>
+     * <b>不碰正在飞的球</b>：{@link #TAG_BURST_UNTIL} 未过期时它正在被弹射飞行，这时候削位移会把
+     * 抛物线压平——「星星大碰撞」的射程全靠那段自由飞行。
+     * <p>
+     * <b>不碰正在穿越的施术者</b>：那段位移由 {@code StarFlightSkillLogic} 每 tick 脚本化推进，
+     * 两者同时改位置会互相覆盖（穿越途中星域已收，本来也走不到这里，属于防御性判断）。
+     *
+     * @param outward 由「对方那颗星」指向本实体的单位向量（只有水平分量参与判定）
+     */
+    private static void zenoWall(@Nullable Entity entity, Vec3 outward, double distance, long now)
+    {
+        if (entity == null || entity.isRemoved() || !entity.isAlive())
+        {
+            return;
+        }
+
+        /* 进入本 tick：把上一 tick 的最终落点转正成基准。本 tick 内只做一次，之后基准不再变 */
+        Long recorded = ZENO_TICK.get(entity);
+        if (recorded == null || recorded.longValue() != now)
+        {
+            Vec3 lastFinal = ZENO_CUR.get(entity);
+            if (lastFinal != null)
+            {
+                ZENO_PREV.put(entity, lastFinal);
+            }
+            ZENO_TICK.put(entity, now);
+        }
+
+        Vec3 current = entity.position();
+        Vec3 settled = current;
+        try
+        {
+            if (entity instanceof Player player && (player.isSpectator() || player.isCreative()))
+            {
+                return;
+            }
+            if (entity.getPersistentData().getLong(TAG_BURST_UNTIL) > now)
+            {
+                return;
+            }
+            if (entity instanceof ServerPlayer flying && StarFlightSkillLogic.isFlying(flying))
+            {
+                return;
+            }
+
+            /* 上一 tick 的最终位置；本 tick 第一次进圈时还没有基准，只登记落点、不判定 */
+            Vec3 previous = ZENO_PREV.get(entity);
+            if (previous == null)
+            {
+                return;
+            }
+
+            /* 水平外向单位向量；两侧完全垂直重叠时没有「横向」可言，交给竖直与寻路自己处理 */
+            Vec3 flat = new Vec3(outward.x, 0.0D, outward.z);
+            double length = flat.length();
+            if (length < 1.0E-6D)
+            {
+                return;
+            }
+            flat = flat.scale(1.0D / length);
+
+            /*
+             * 本 tick「一共」朝内靠近了多少（只看水平；负值表示正在拉开，不管）。
+             * 基准固定在上 tick 的最终位置，而 current 已含本 tick 前面几条约束施加的修正，
+             * 所以同一 tick 内被多个方向调用时，这里读到的是累计量——第二次约束不会因为
+             * 「位置刚被第一条改过」而算出 0 位移、把自己静默吃掉。
+             */
+            double inward = -current.subtract(previous).dot(flat);
+            double allowed = zenoInwardCap(distance);
+            if (inward <= allowed)
+            {
+                return;
+            }
+
+            double step = Math.min(inward - allowed, ZENO_MAX_CORRECT);
+            Vec3 corrected = current.add(flat.scale(step));
+            if (entity instanceof ServerPlayer serverPlayer)
+            {
+                /* 位置包是唯一能压住客户端权威的手段；朝向沿用当前值，不拽视角 */
+                serverPlayer.teleportTo(corrected.x, corrected.y, corrected.z);
+            }
+            else
+            {
+                entity.setPos(corrected.x, corrected.y, corrected.z);
+                entity.hasImpulse = true;
+            }
+            settled = corrected;
+        }
+        finally
+        {
+            /* 落点无论走哪条分支都要记下（含被跳过的分支）：下次转正就是下一 tick 的基准 */
+            ZENO_CUR.put(entity, settled);
+        }
+    }
+
+    /**
      * 以增量速度推动目标；方块锚点（entity == null）与旁观 / 创造模式玩家跳过。
+     * <p>
+     * <b>跨序斥力不走这里</b>——它压的是位移，见 {@link #zenoWall}。这是唯一的例外，因为
+     * 「加一个更大的冲量」既比不过持续输出的 AI，对位置由客户端权威的玩家更是完全无效。
      *
      * @param allowOwner 是否允许推动施术者本人。
-     *                   自身标记同样是星域里的一颗星，跨序斥力必须双向成立，所以跨序传 {@code true}；
-     *                   同标记的质心吸引传 {@code false}——否则施术者会被自己挂的星拽着走。
+     *                   弹射 / 踢飞 / 路径撞击的受害者可能就是施术者自己（自身标记同样是域内的一颗星），
+     *                   所以这些场合传 {@code true}；同标记的质心吸引传 {@code false}——
+     *                   否则施术者会被自己挂的星拽着走。
      */
     private static void push(@Nullable Entity entity, Vec3 impulse, ServerPlayer owner, boolean allowOwner)
     {
