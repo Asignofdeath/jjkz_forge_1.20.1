@@ -7,6 +7,7 @@ import com.darkness.jujutsukaisenzone.player.BarrierRulesData;
 import com.darkness.jujutsukaisenzone.player.CursedGradeBonuses;
 import com.darkness.jujutsukaisenzone.player.PlayerBarrierTechniqueData;
 import com.darkness.jujutsukaisenzone.player.PlayerCursedEnergyData;
+import com.darkness.jujutsukaisenzone.player.PlayerCombatPowerData;
 import com.darkness.jujutsukaisenzone.player.PlayerCursedGradeData;
 import com.darkness.jujutsukaisenzone.player.PlayerDomainExpansionData;
 import com.darkness.jujutsukaisenzone.player.PlayerFactionData;
@@ -180,7 +181,7 @@ public final class CursedEnergyEvents
         ModNetwork.sendCursedGradeSync(serverPlayer, PlayerCursedGradeData.getExperience(serverPlayer));
         StrengthenTechniqueLearnLogic.tryUnlockForGrade(serverPlayer);
         ModNetwork.sendReverseTechniqueSync(serverPlayer, PlayerReverseTechniqueData.hasReverseTechnique(serverPlayer));
-        ModNetwork.sendBarrierTechniqueLearnedSync(serverPlayer, PlayerBarrierTechniqueData.hasLearned(serverPlayer));
+        PlayerBarrierTechniqueData.syncToClient(serverPlayer);
         ModNetwork.sendDomainExpansionLearnedSync(serverPlayer, PlayerDomainExpansionData.hasLearned(serverPlayer));
         ModNetwork.sendSeanceTechniqueLearnedSync(
                 serverPlayer,
@@ -193,6 +194,8 @@ public final class CursedEnergyEvents
                 PlayerStrengthenTechniqueData.isActive(serverPlayer));
         ModNetwork.sendTechniqueSync(serverPlayer, PlayerTechniqueData.getInnateTechnique(serverPlayer));
         PlayerTechniqueIntelData.syncToClient(serverPlayer);
+        // 术式情报会影响术式强度，必须在它同步之后下发面板
+        PlayerCombatPowerData.syncToClient(serverPlayer);
         SkillUnlockLogic.syncToClient(serverPlayer);
         ModNetwork.sendShrineBlackFlashMilestoneSync(
                 serverPlayer,

@@ -8,6 +8,7 @@ import com.darkness.jujutsukaisenzone.player.PlayerCursedEnergyData;
 import com.darkness.jujutsukaisenzone.player.PlayerCursedGradeData;
 import com.darkness.jujutsukaisenzone.player.PlayerShrineBlackFlashMilestoneData;
 import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
+import com.darkness.jujutsukaisenzone.technique.SkillDamageResolver;
 import com.darkness.jujutsukaisenzone.technique.TechniqueDamageBoosts;
 import com.darkness.jujutsukaisenzone.technique.development.SkillUnlockLogic;
 import com.darkness.jujutsukaisenzone.technique.skillset.ShrineTechniqueSkillSet;
@@ -84,6 +85,10 @@ public final class BlackFlashEvents
 
         // （Zone 伤害吸收已迁入 TechniqueDamageZoneEvents 统一乘区管线，判定与数值不变）
 
+        // 取走（并清空）本事件之前记下的「强度放大前的原始伤害」，供黑闪取幂使用。
+        // 必须在本方法最开头取：无论最终是否触发黑闪都要清空，避免残留值污染下一次结算。
+        float rawBeforePower = SkillDamageResolver.consumeRawBeforePower(event.getAmount());
+
         // 受击打断：被体术命中的玩家连击清零（只对 EpicFight 战斗模式中的有效体术攻击生效）
         if (target instanceof ServerPlayer victim
                 && EpicFightCompat.isBattleMode(victim)
@@ -135,7 +140,7 @@ public final class BlackFlashEvents
         if (PlayerBlackFlashData.hasGuaranteedBlackFlash(attacker))
         {
             RushIntoTheZoneClimaxEffect.consumeGuaranteedBlackFlash(attacker);
-            triggerBlackFlash(attacker, target, event);
+            triggerBlackFlash(attacker, target, event, rawBeforePower);
             return;
         }
 
@@ -170,7 +175,7 @@ public final class BlackFlashEvents
         // Step 3: 判定是否触发黑闪
         if (attacker.getRandom().nextDouble() < chance)
         {
-            triggerBlackFlash(attacker, target, event);
+            triggerBlackFlash(attacker, target, event, rawBeforePower);
         }
     }
 
@@ -304,10 +309,19 @@ public final class BlackFlashEvents
     /**
      * 执行黑闪触发效果：伤害倍率 + Photon fx + ZONE 状态。
      */
-    private static void triggerBlackFlash(ServerPlayer attacker, LivingEntity target, LivingHurtEvent event)
+    private static void triggerBlackFlash(ServerPlayer attacker, LivingEntity target, LivingHurtEvent event,
+                                          float rawBeforePower)
     {
-        // 伤害：2.5 次方（符合原著设定）
-        event.setAmount((float) Math.pow(event.getAmount(), Config.blackFlashDamageMultiplier));
+        // 伤害：2.5 次方（符合原著设定）。
+        // ⚠️ 必须拿「强度放大之前」的原始伤害取幂，再把面板倍率线性乘回去：
+        //    直接对已放大的伤害取幂，pow 会把面板倍率（特级最高 3 倍）一起指数放大成几十倍。
+        float scaledAmount = event.getAmount();
+        float powered = (float) Math.pow(rawBeforePower, Config.blackFlashDamageMultiplier);
+        if (rawBeforePower > 0.0001F)
+        {
+            powered *= scaledAmount / rawBeforePower;
+        }
+        event.setAmount(powered);
 
         // 黑闪音效
         attacker.level().playSound(null,

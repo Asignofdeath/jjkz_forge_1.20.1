@@ -9,6 +9,7 @@ import com.darkness.jujutsukaisenzone.entity.data.ShrineFugaConfig;
 import com.darkness.jujutsukaisenzone.entity.data.ShrineHachiConfig;
 import com.darkness.jujutsukaisenzone.entity.data.ShrineKaiConfig;
 import com.darkness.jujutsukaisenzone.technique.config.SkillCombatConfigRegistry;
+import com.darkness.jujutsukaisenzone.technique.SkillDamageResolver;
 import com.darkness.jujutsukaisenzone.technique.scaling.LimitlessBlueSkillGrowth;
 import com.darkness.jujutsukaisenzone.technique.scaling.LimitlessPurpleSkillGrowth;
 import com.darkness.jujutsukaisenzone.technique.scaling.LimitlessRedSkillGrowth;
@@ -28,6 +29,7 @@ import com.darkness.jujutsukaisenzone.technique.scaling.ShrineSkillGrowth;
 import com.darkness.jujutsukaisenzone.technique.skillset.ShrineTechniqueSkillSet;
 import com.darkness.jujutsukaisenzone.technique.skillset.TechniqueSkill;
 import com.darkness.jujutsukaisenzone.technique.commonskill.CommonTechniqueSkillRegistry;
+import com.darkness.jujutsukaisenzone.technique.development.SkillUnlockLogic;
 import com.darkness.jujutsukaisenzone.technique.aerial.AerialCombatSkills;
 import com.darkness.jujutsukaisenzone.technique.BarrierTechniqueServerLogic;
 import com.darkness.jujutsukaisenzone.technique.StrengthenTechniqueServerLogic;
@@ -38,11 +40,18 @@ import com.darkness.jujutsukaisenzone.player.StrengthenTechniqueLevel;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Player;
 
+import java.util.Arrays;
+
 /**
  * 术式技能描述入口：注册各技能数值解析，并组装完整描述视图。
  */
 public final class TechniqueSkillDescriptions
 {
+    /** 描述变体后缀：未解锁「量刑」——裁决里根本没有【死刑】这一档。 */
+    private static final String SUFFIX_NO_SENTENCING = "no_sentencing";
+    /** 描述变体后缀：已解锁「量刑」但未解锁「从重论处」——有【死刑】，但重罪与 debuff 加成一律不计。 */
+    private static final String SUFFIX_NO_AGGRAVATION = "no_aggravation";
+
     private TechniqueSkillDescriptions()
     {
     }
@@ -72,8 +81,7 @@ public final class TechniqueSkillDescriptions
         }
 
         String skillId = skill.skillId();
-        Object[] args = resolveDescriptionArgs(player, techniqueId, skill);
-        Component description = Component.translatable(TechniqueSkillDescriptionKeys.description(skillId), args);
+        Component description = buildDescription(player, techniqueId, skill);
         if (CommonTechniqueSkillRegistry.STRENGTHEN_TECHNIQUE_ID.equals(skillId))
         {
             return new TechniqueSkillDescriptionView(
@@ -105,6 +113,58 @@ public final class TechniqueSkillDescriptions
         return skill.cooldownTicks();
     }
 
+    /**
+     * 描述正文：优先用「按解锁状态切换的变体」（键与参数都由变体一次给全），没有变体时回退默认键
+     * + 已注册的参数解析器。
+     */
+    private static Component buildDescription(Player player, String techniqueId, TechniqueSkill skill)
+    {
+        TechniqueSkillDescriptionVariant variant = resolveVariant(player, techniqueId, skill);
+        if (variant != null)
+        {
+            return Component.translatable(variant.descriptionKey(), variant.descriptionArgs());
+        }
+        return Component.translatable(
+                TechniqueSkillDescriptionKeys.description(skill.skillId()),
+                resolveDescriptionArgs(player, techniqueId, skill));
+    }
+
+    private static TechniqueSkillDescriptionVariant resolveVariant(Player player, String techniqueId, TechniqueSkill skill)
+    {
+        TechniqueSkillDescriptionVariantResolver resolver =
+                TechniqueSkillDescriptionRegistry.getVariant(skill.skillId());
+        if (resolver == null)
+        {
+            return null;
+        }
+        TechniqueSkillDescriptionVariant variant = resolver.resolve(player, techniqueId, skill);
+        if (variant == null || variant.descriptionKey() == null || variant.descriptionKey().isBlank())
+        {
+            return null;
+        }
+        return variant;
+    }
+
+    /**
+     * 简洁页正文键：变体可以指定另一份文案，否则沿用默认的 {@code .brief}。
+     * <p>
+     * 简洁页同样要跟着解锁状态走——它是悬停框的默认视图，只改完整页的话，玩家看到的仍是
+     * 那句「再受【死刑】或【没收】」。
+     */
+    public static String resolveBriefKey(Player player, String techniqueId, TechniqueSkill skill)
+    {
+        if (skill == null)
+        {
+            return null;
+        }
+        TechniqueSkillDescriptionVariant variant = resolveVariant(player, techniqueId, skill);
+        if (variant != null && variant.briefKey() != null && !variant.briefKey().isBlank())
+        {
+            return variant.briefKey();
+        }
+        return TechniqueSkillDescriptionKeys.brief(skill.skillId());
+    }
+
     private static Object[] resolveDescriptionArgs(Player player, String techniqueId, TechniqueSkill skill)
     {
         TechniqueSkillDescriptionArgsResolver resolver = TechniqueSkillDescriptionRegistry.get(skill.skillId());
@@ -122,7 +182,7 @@ public final class TechniqueSkillDescriptions
                 (player, techniqueId, skill) -> new Object[] {
                         TechniqueSkillStatFormat.formatNumber(LimitlessBlueConfig.DAMAGE_RADIUS),
                         Integer.toString(LimitlessBlueConfig.DAMAGE_INTERVAL),
-                        TechniqueSkillStatFormat.formatNumber(LimitlessBlueSkillGrowth.damage(player)),
+                        SkillDamageResolver.ratioText(LimitlessBlueConfig.DAMAGE),
                         TechniqueSkillStatFormat.formatNumber(LimitlessBlueSkillGrowth.pullRadius(player))
                 });
 
@@ -130,14 +190,14 @@ public final class TechniqueSkillDescriptions
                 LimitlessTechniqueSkillSet.SKILL_RED,
                 (player, techniqueId, skill) -> new Object[] {
                         TechniqueSkillStatFormat.formatNumber(LimitlessRedSkillGrowth.explosionPower(player)),
-                        TechniqueSkillStatFormat.formatNumber(LimitlessRedConfig.BLOCK_LAUNCH_HURT_DAMAGE_PER_DISTANCE)
+                        SkillDamageResolver.ratioText(LimitlessRedConfig.BLOCK_LAUNCH_HURT_DAMAGE_PER_DISTANCE)
                 });
 
         TechniqueSkillDescriptionRegistry.register(
                 LimitlessTechniqueSkillSet.SKILL_PURPLE,
                 (player, techniqueId, skill) -> new Object[] {
                         TechniqueSkillStatFormat.formatNumber(LimitlessPurpleConfig.ARROW_BLOCK_ERASE_RADIUS),
-                        TechniqueSkillStatFormat.formatNumber(LimitlessPurpleConfig.ARROW_SPHERE_DAMAGE_PER_TICK)
+                        SkillDamageResolver.ratioText(LimitlessPurpleConfig.ARROW_SPHERE_DAMAGE_PER_TICK)
                 });
 
         TechniqueSkillDescriptionRegistry.register(
@@ -146,7 +206,7 @@ public final class TechniqueSkillDescriptions
                         TechniqueSkillStatFormat.formatSecondsFromTicks(
                                 LimitlessRemoteMurasakiConfig.HOLD_RELEASE_CHARGE_TICKS),
                         TechniqueSkillStatFormat.formatNumber(LimitlessRemoteMurasakiConfig.ARROW_BLOCK_ERASE_RADIUS),
-                        TechniqueSkillStatFormat.formatNumber(LimitlessRemoteMurasakiConfig.ARROW_SPHERE_DAMAGE_PER_TICK),
+                        SkillDamageResolver.ratioText(LimitlessRemoteMurasakiConfig.ARROW_SPHERE_DAMAGE_PER_TICK),
                         Integer.toString(SkillCombatConfigRegistry.resolveInt(
                                 SkillCombatConfigRegistry.SKILL_LIMITLESS_REMOTE_PURPLE,
                                 "max_flight_chunks",
@@ -160,7 +220,7 @@ public final class TechniqueSkillDescriptions
                 ShrineTechniqueSkillSet.SKILL_KAI,
                 (player, techniqueId, skill) -> new Object[] {
                         TechniqueSkillStatFormat.formatNumber(ShrineKaiConfig.COLUMN_RADIUS),
-                        TechniqueSkillStatFormat.formatNumber(ShrineSkillGrowth.kaiColumnDamage(player))
+                        SkillDamageResolver.ratioText(ShrineKaiConfig.COLUMN_DAMAGE)
                 });
 
         TechniqueSkillDescriptionRegistry.register(
@@ -168,7 +228,7 @@ public final class TechniqueSkillDescriptions
                 (player, techniqueId, skill) -> new Object[] {
                         TechniqueSkillStatFormat.formatNumber(ShrineKaiConfig.FLYOBJ_MAX_RANGE),
                         TechniqueSkillStatFormat.formatNumber(ShrineKaiConfig.COLUMN_RADIUS),
-                        TechniqueSkillStatFormat.formatNumber(ShrineSkillGrowth.kaiFlyobjColumnDamage(player))
+                        SkillDamageResolver.ratioText(ShrineKaiConfig.COLUMN_DAMAGE)
                 });
 
         TechniqueSkillDescriptionRegistry.register(
@@ -176,7 +236,7 @@ public final class TechniqueSkillDescriptions
                 (player, techniqueId, skill) -> new Object[] {
                         TechniqueSkillStatFormat.formatNumber(2.0D),
                         Integer.toString(ShrineHachiConfig.DAMAGE_INTERVAL),
-                        TechniqueSkillStatFormat.formatNumber(ShrineSkillGrowth.hachiDamage(player))
+                        SkillDamageResolver.ratioText(ShrineHachiConfig.DAMAGE)
                 });
 
         TechniqueSkillDescriptionRegistry.register(
@@ -185,50 +245,54 @@ public final class TechniqueSkillDescriptions
                         TechniqueSkillStatFormat.formatSecondsFromTicks(ShrineFugaConfig.CHARGE_TICKS),
                         TechniqueSkillStatFormat.formatNumber(ShrineFugaConfig.BOOM_RADIUS),
                         TechniqueSkillStatFormat.formatSecondsFromTicks(ShrineFugaConfig.BOOM_LIFETIME_TICKS),
-                        TechniqueSkillStatFormat.formatNumber(ShrineFugaConfig.BOOM_DAMAGE_PER_TICK)
+                        SkillDamageResolver.ratioText(ShrineFugaConfig.BOOM_DAMAGE_PER_TICK)
                 });
     }
 
     private static void registerJudgmentSkills()
     {
-        TechniqueSkillDescriptionRegistry.register(
-                JudgmentTechniqueSkillSet.SKILL_GAVEL,
-                (player, techniqueId, skill) -> new Object[] {
-                        TechniqueSkillStatFormat.formatNumber(GavelProjectileEntity.BASE_DAMAGE),
-                        TechniqueSkillStatFormat.formatNumber(GavelProjectileEntity.IMPACT_EXPLOSION_POWER),
-                        TechniqueSkillStatFormat.formatNumber(
-                                (JudgmentWeaponLogic.SINFUL_ONE_DAMAGE_MULTIPLIER - 1.0F) * 100.0F)
-                });
+        /*
+         * 三个主动技能的参数解析器先留成变量：下面的「按解锁状态换文案」解析器要复用它们
+         * （变体只是取前 N 个参数），不另写一份，免得两边数值走偏。
+         */
+        TechniqueSkillDescriptionArgsResolver gavelArgs = (player, techniqueId, skill) -> new Object[] {
+                SkillDamageResolver.ratioText(GavelProjectileEntity.BASE_DAMAGE),
+                TechniqueSkillStatFormat.formatNumber(GavelProjectileEntity.IMPACT_EXPLOSION_POWER),
+                TechniqueSkillStatFormat.formatNumber(
+                        (JudgmentWeaponLogic.SINFUL_ONE_DAMAGE_MULTIPLIER - 1.0F) * 100.0F)
+        };
 
-        TechniqueSkillDescriptionRegistry.register(
-                JudgmentTechniqueSkillSet.SKILL_TRIAL,
-                (player, techniqueId, skill) -> new Object[] {
-                        TechniqueSkillStatFormat.formatSecondsFromTicks(JudgmentTrialSkillLogic.LOCK_CHARGE_TICKS),
-                        TechniqueSkillStatFormat.formatNumber(JudgmentTrialSkillLogic.BASE_GUILTY_CHANCE_PERCENT),
-                        TechniqueSkillStatFormat.formatNumber(JudgmentTrialTargetData.GUILTY_BONUS_PER_TRIAL_PERCENT),
-                        TechniqueSkillStatFormat.formatNumber(JudgmentTrialTargetData.MAX_GUILTY_BONUS_PERCENT),
-                        TechniqueSkillStatFormat.formatNumber(JudgmentTrialSkillLogic.DEATH_SENTENCE_CHANCE_PERCENT),
-                        TechniqueSkillStatFormat.formatNumber(
-                                JudgmentTrialSkillLogic.DEATH_SENTENCE_WITH_CONFISCATION_CHANCE_PERCENT),
-                        TechniqueSkillStatFormat.formatNumber(
-                                JudgmentTrialSkillLogic.DEATH_SENTENCE_BONUS_PER_DEBUFF_PERCENT),
-                        TechniqueSkillStatFormat.formatNumber(
-                                JudgmentTrialSkillLogic.MAX_DEATH_SENTENCE_DEBUFF_BONUS_PERCENT)
-                });
+        TechniqueSkillDescriptionArgsResolver trialArgs = (player, techniqueId, skill) -> new Object[] {
+                TechniqueSkillStatFormat.formatSecondsFromTicks(JudgmentTrialSkillLogic.LOCK_CHARGE_TICKS),
+                TechniqueSkillStatFormat.formatNumber(JudgmentTrialSkillLogic.BASE_GUILTY_CHANCE_PERCENT),
+                TechniqueSkillStatFormat.formatNumber(JudgmentTrialTargetData.GUILTY_BONUS_PER_TRIAL_PERCENT),
+                TechniqueSkillStatFormat.formatNumber(JudgmentTrialTargetData.MAX_GUILTY_BONUS_PERCENT),
+                TechniqueSkillStatFormat.formatNumber(JudgmentTrialSkillLogic.DEATH_SENTENCE_CHANCE_PERCENT),
+                TechniqueSkillStatFormat.formatNumber(
+                        JudgmentTrialSkillLogic.DEATH_SENTENCE_WITH_CONFISCATION_CHANCE_PERCENT),
+                TechniqueSkillStatFormat.formatNumber(
+                        JudgmentTrialSkillLogic.DEATH_SENTENCE_BONUS_PER_DEBUFF_PERCENT),
+                TechniqueSkillStatFormat.formatNumber(
+                        JudgmentTrialSkillLogic.MAX_DEATH_SENTENCE_DEBUFF_BONUS_PERCENT)
+        };
 
-        TechniqueSkillDescriptionRegistry.register(
-                JudgmentTechniqueSkillSet.SKILL_ACCUSE,
-                (player, techniqueId, skill) -> new Object[] {
-                        TechniqueSkillStatFormat.formatSecondsFromTicks(JudgmentAccuseSkillLogic.CHOICE_WINDOW_TICKS),
-                        TechniqueSkillStatFormat.formatNumber(JudgmentAccuseSkillLogic.EVIDENCE_CONFIRMED_CHANCE_PERCENT),
-                        TechniqueSkillStatFormat.formatNumber(JudgmentTrialTargetData.GUILTY_BONUS_PER_TRIAL_PERCENT),
-                        TechniqueSkillStatFormat.formatNumber(JudgmentTrialTargetData.MAX_GUILTY_BONUS_PERCENT),
-                        TechniqueSkillStatFormat.formatNumber(JudgmentTrialSkillLogic.DEATH_SENTENCE_CHANCE_PERCENT),
-                        TechniqueSkillStatFormat.formatNumber(
-                                JudgmentTrialSkillLogic.DEATH_SENTENCE_BONUS_PER_DEBUFF_PERCENT),
-                        TechniqueSkillStatFormat.formatNumber(
-                                JudgmentTrialSkillLogic.MAX_DEATH_SENTENCE_DEBUFF_BONUS_PERCENT)
-                });
+        TechniqueSkillDescriptionArgsResolver accuseArgs = (player, techniqueId, skill) -> new Object[] {
+                TechniqueSkillStatFormat.formatSecondsFromTicks(JudgmentAccuseSkillLogic.CHOICE_WINDOW_TICKS),
+                TechniqueSkillStatFormat.formatNumber(JudgmentAccuseSkillLogic.EVIDENCE_CONFIRMED_CHANCE_PERCENT),
+                TechniqueSkillStatFormat.formatNumber(JudgmentTrialTargetData.GUILTY_BONUS_PER_TRIAL_PERCENT),
+                TechniqueSkillStatFormat.formatNumber(JudgmentTrialTargetData.MAX_GUILTY_BONUS_PERCENT),
+                TechniqueSkillStatFormat.formatNumber(JudgmentTrialSkillLogic.DEATH_SENTENCE_CHANCE_PERCENT),
+                TechniqueSkillStatFormat.formatNumber(
+                        JudgmentTrialSkillLogic.DEATH_SENTENCE_BONUS_PER_DEBUFF_PERCENT),
+                TechniqueSkillStatFormat.formatNumber(
+                        JudgmentTrialSkillLogic.MAX_DEATH_SENTENCE_DEBUFF_BONUS_PERCENT)
+        };
+
+        TechniqueSkillDescriptionRegistry.register(JudgmentTechniqueSkillSet.SKILL_GAVEL, gavelArgs);
+        TechniqueSkillDescriptionRegistry.register(JudgmentTechniqueSkillSet.SKILL_TRIAL, trialArgs);
+        TechniqueSkillDescriptionRegistry.register(JudgmentTechniqueSkillSet.SKILL_ACCUSE, accuseArgs);
+
+        registerJudgmentDescriptionVariants(gavelArgs, trialArgs, accuseArgs);
 
         /* 机制型技能：文案里没有数值，但同样注册——保持「每个技能都有注册项」这一条不出现例外。 */
         TechniqueSkillDescriptionRegistry.register(
@@ -253,6 +317,109 @@ public final class TechniqueSkillDescriptions
                 });
     }
 
+    /**
+     * 审判术式三个主动技能的描述随「量刑」/「从重论处」的解锁状态换文案。
+     * <p>
+     * 门控只有一处（{@code JudgmentTrialSkillLogic#rollGuiltyVerdictType}），但受它影响的是
+     * 三条路径（审判 / 指控 / 领域审理）外加【死刑】的下游产物（法槌的【处刑人之剑】）。
+     * 若描述一律照满配形态写，玩家在解锁前读到的就是一段「现在根本不会发生」的规则；
+     * 反过来若只在文末补一句「需解锁」，那一大段概率数字仍然摆在眼前，照样看不懂。
+     * 所以这里直接换键：未解锁的内容从正文里消失，只留一句「解锁 X 后会怎样」。
+     * <p>
+     * <b>每个后缀都必须在 zh_cn 与 en_us 两侧各写一条 .desc_<suffix></b>（简洁页要换的再写
+     * .brief_<suffix>），否则界面会直接把键名显示出来。
+     */
+    private static void registerJudgmentDescriptionVariants(
+            TechniqueSkillDescriptionArgsResolver gavelArgs,
+            TechniqueSkillDescriptionArgsResolver trialArgs,
+            TechniqueSkillDescriptionArgsResolver accuseArgs)
+    {
+        /* 法槌：只有「有没有死刑」这一件事会变——【处刑人之剑】是死刑的下游产物，与「从重论处」无关。 */
+        TechniqueSkillDescriptionRegistry.registerVariant(
+                JudgmentTechniqueSkillSet.SKILL_GAVEL,
+                (player, techniqueId, skill) ->
+                {
+                    if (isJudgmentMechanicUnlocked(player, JudgmentTechniqueSkillSet.SKILL_SENTENCING))
+                    {
+                        return null;
+                    }
+                    return TechniqueSkillDescriptionVariant.of(
+                            TechniqueSkillDescriptionKeys.description(
+                                    JudgmentTechniqueSkillSet.SKILL_GAVEL, SUFFIX_NO_SENTENCING),
+                            TechniqueSkillDescriptionKeys.brief(
+                                    JudgmentTechniqueSkillSet.SKILL_GAVEL, SUFFIX_NO_SENTENCING),
+                            gavelArgs.resolve(player, techniqueId, skill));
+                });
+
+        /*
+         * 审判：三档。lang 里 .desc_no_sentencing 只用到前 4 个 %s（到有罪叠层上限为止），
+         * .desc_no_aggravation 用到前 6 个（再到「附加了没收的死刑」为止），debuff 两项加成被整段删掉。
+         */
+        TechniqueSkillDescriptionRegistry.registerVariant(
+                JudgmentTechniqueSkillSet.SKILL_TRIAL,
+                (player, techniqueId, skill) ->
+                {
+                    String suffix = sentencingVariantSuffix(player);
+                    if (suffix.isEmpty())
+                    {
+                        return null;
+                    }
+                    /*
+                     * 简洁页不换：审判的 .brief 只讲「传唤与宣判」，不含【死刑】/【没收】
+                     * 这些会被门控的内容，未解锁时也照样成立，因此不注册 .brief_no_*。
+                     */
+                    return TechniqueSkillDescriptionVariant.of(
+                            TechniqueSkillDescriptionKeys.description(
+                                    JudgmentTechniqueSkillSet.SKILL_TRIAL, suffix),
+                            null,
+                            Arrays.copyOf(
+                                    trialArgs.resolve(player, techniqueId, skill),
+                                    SUFFIX_NO_SENTENCING.equals(suffix) ? 4 : 6));
+                });
+
+        /* 指控：同样三档；.desc_no_sentencing 用前 4 个 %s，.desc_no_aggravation 用前 5 个。 */
+        TechniqueSkillDescriptionRegistry.registerVariant(
+                JudgmentTechniqueSkillSet.SKILL_ACCUSE,
+                (player, techniqueId, skill) ->
+                {
+                    String suffix = sentencingVariantSuffix(player);
+                    if (suffix.isEmpty())
+                    {
+                        return null;
+                    }
+                    return TechniqueSkillDescriptionVariant.of(
+                            TechniqueSkillDescriptionKeys.description(
+                                    JudgmentTechniqueSkillSet.SKILL_ACCUSE, suffix),
+                            null,
+                            Arrays.copyOf(
+                                    accuseArgs.resolve(player, techniqueId, skill),
+                                    SUFFIX_NO_SENTENCING.equals(suffix) ? 4 : 5));
+                });
+    }
+
+    /**
+     * 「量刑」/「从重论处」的解锁状态后缀：""（都解锁）→ {@link #SUFFIX_NO_AGGRAVATION} →
+     * {@link #SUFFIX_NO_SENTENCING}。顺序即学习顺序，与开发树的前置链一致。
+     */
+    private static String sentencingVariantSuffix(Player player)
+    {
+        if (!isJudgmentMechanicUnlocked(player, JudgmentTechniqueSkillSet.SKILL_SENTENCING))
+        {
+            return SUFFIX_NO_SENTENCING;
+        }
+        if (!isJudgmentMechanicUnlocked(player, JudgmentTechniqueSkillSet.SKILL_AGGRAVATION))
+        {
+            return SUFFIX_NO_AGGRAVATION;
+        }
+        return "";
+    }
+
+    private static boolean isJudgmentMechanicUnlocked(Player player, String skillId)
+    {
+        return SkillUnlockLogic.isSkillUnlockedById(
+                player, PlayerTechniqueData.TECHNIQUE_JUDGMENT, skillId);
+    }
+
     private static void registerLoveRendezvousSkills()
     {
         TechniqueSkillDescriptionRegistry.register(
@@ -266,7 +433,7 @@ public final class TechniqueSkillDescriptions
                         Integer.toString(StarMark.MAX_STACKS),
                         Integer.toString(StarMarkRules.STACK_DECAY_TICKS / 20),
                         TechniqueSkillStatFormat.formatNumber(StarMarkDetonation.RADIUS),
-                        TechniqueSkillStatFormat.formatNumber(StarMarkDetonation.DETONATION_DAMAGE)
+                        SkillDamageResolver.ratioText(StarMarkDetonation.DETONATION_DAMAGE)
                 });
         TechniqueSkillDescriptionRegistry.register(
                 LoveRendezvousTechniqueSkillSet.SKILL_STAR_PULL,
@@ -292,9 +459,9 @@ public final class TechniqueSkillDescriptions
                         /* 顺序必须与 lang 里 %s 的出现次序一致：射程 → 冲撞伤害 → 引爆单体伤害 → 路径伤害
                            （「依次穿越」的加成数值已随折线一并搬到机制型技能「在星间穿梭」的描述里） */
                         TechniqueSkillStatFormat.formatNumber(StarFlightSkillLogic.CAST_RANGE),
-                        TechniqueSkillStatFormat.formatNumber(StarFlightSkillLogic.RAM_DAMAGE),
-                        TechniqueSkillStatFormat.formatNumber(StarMarkDetonation.DETONATION_DAMAGE),
-                        TechniqueSkillStatFormat.formatNumber(StarFlightSkillLogic.PATH_DAMAGE)
+                        SkillDamageResolver.martialRatioText(StarFlightSkillLogic.RAM_DAMAGE),
+                        SkillDamageResolver.ratioText(StarMarkDetonation.DETONATION_DAMAGE),
+                        SkillDamageResolver.martialRatioText(StarFlightSkillLogic.PATH_DAMAGE)
                 });
         /*
          * 机制型技能「在星间穿梭」：与「引力弹弓」同一形态——不占槽位、没有咒力与冷却，

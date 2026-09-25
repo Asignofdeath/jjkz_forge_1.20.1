@@ -91,10 +91,105 @@
 
 ## 伤害乘区管线（2026-09-24 起）
 - **汇合点 = `event/TechniqueDamageZoneEvents`**（`LivingHurtEvent` @HIGH）：术式（`deal`→`hurt`）与 EpicFight 体术都在此结算乘区。区序：①施术者增强（`TechniqueDamageBoosts` 分型匹配「下一击增伤」）→ ②目标减免（ZONE 减伤）。
-- 优先级链（勿乱动）：处刑人 HIGHEST（伤害量**改写**）→ 管线 HIGH → 罪恶者 ×1.5 / 黑闪 pow(2.5) / 蓄力打断 NORMAL。黑闪 pow 刻意最后 ⇒ 黑闪区放大一切前置乘区。乘法交换律 ⇒ 乘算类迁移位置不改数值。
+- 优先级链（勿乱动）：处刑人 HIGHEST（伤害量**改写**）→ 管线 HIGH → 罪恶者 ×1.5 / 黑闪 pow(2.5) / 蓄力打断 NORMAL。黑闪 `pow(raw, 2.5) × 当前值 / raw` ⇒ 幂只放大底数，各乘区（强度 / 防御 / ZONE）**线性**通过；前提是区 0 **无条件**记下 raw。乘法交换律 ⇒ 乘算类迁移位置不改数值。
 - **分型 = 叙事标签**（与通道解耦）：术式能力→TECHNIQUE；体术能力→MARTIAL；同一次叠加两者→COMPOSITE。挂法：`deal(..., type)` 或 `runWithType`/`callWithType`（thrown / explode / mobProjectile 等保留原通道时）。`currentDamageType()` 在 deal/runWithType 栈内有值。
 - **结算现场判定**（`TechniqueDamageZoneEvents#resolveDamageType`）：ThreadLocal 优先 → 处刑剑+死刑挥击→COMPOSITE → 必定黑闪的 EF 基础攻击→COMPOSITE → EF `isBasicAttack`→MARTIAL → 赫飞块 `TAG_RED_DEBRIS`→TECHNIQUE → 其余 null。随机黑闪在 NORMAL 才掷骰，管线 HIGH 时仍按体术消耗加成（已知边界）。
 - **技能描述**：正文写「N 点术式/体术伤害」等；**禁止**技能级 `damageTypes` 字段与悬停「伤害类型」标题行。分型只挂在出伤结算点。
 - `TechniqueDamageBoosts`：纯内存 Map（`push/consume/clear`），「下一击」瞬时增益**不落盘、不进 copyProgressionFrom**；登出在 `BlackFlashEvents#onPlayerLoggedOut` 清。消耗严格匹配：TECHNIQUE 击只耗 TECHNIQUE 登记，COMPOSITE 击一次耗三类。
 - 消耗语义：同分型多次 push 加算叠加（乘区内加算、乘区间乘算）。
 - ⚠️ 新乘区（易伤/克制/标签抗性）一律加进 `TechniqueDamageZoneEvents` 并写明顺序，别再开裸 `setAmount`。武器特有条件判定（如法槌对罪恶者）留在各自 Events，不进通用管线。
+## 目标防御层（2026-09-25 起）
+
+汇合点仍在 `TechniqueDamageZoneEvents`：区 0 / 1 / 3 在 `LivingHurtEvent` @HIGH；**区 2 目标防御层**单独挂 `LivingDamageEvent` @HIGH（原版护甲 / 附魔 / 抗性药水算完之后，才能对总减伤精确封顶）。
+
+- **`registry/ModAttributes`**：`jjkz:physical_resistance` / `jjkz:technique_resistance`，`RangedAttribute`，**单位是百分比点数**（25 = 25%），范围 −100~100，`setSyncable(true)`。默认 0 ⇒ **怪物不会凭空变软**。挂在实体类型上就用 `EntityAttributeModificationEvent`：`getTypes()` 是 `List<EntityType<? extends LivingEntity>>`，`add(type, attr)` 自动取 `getDefaultValue()`，**不做重复检查**。
+- **体抗语义（用户定死）**：只吃 EF 基础攻击 / 原版怪物近战 / 原版玩家近战 / 本模组 `MARTIAL`；**不碰**箭、三叉戟、火球、爆炸、闪电、火、岩浆。术抗只吃 `TECHNIQUE`。复合（黑闪 / 处刑必杀）**两层各半**（`combatDefense.compositeResistanceShare`），与 `SkillDamageResolver` 的「复合取均值」两端对称。
+- **`technique/SkillDefenseResolver`**：护甲层 + 抗性层换算，与 `SkillDamageResolver` 对称。护甲层**只该对 `JjkzDamageTypeTags.IS_TECHNIQUE` 调**——其余通道原版已经算过，再补一道就是双计。
+- **`jjkz:technique` 伤害类型**（`TechniqueDamageSources#TECHNIQUE_DAMAGE_TYPE`，数据包 `message_id = "jjkz.technique"` 带点）替代了原先借用的 `MAGIC`。标签取舍：**加** `bypasses_armor`（原版公式对高频小伤害太狠）、`bypasses_shield`；**不加** `bypasses_resistance` / `bypasses_enchantments` / `witch_resistant_to`（后者顺手修掉女巫对术式 ×0.15 的意外减伤）。
+- **近战判据 `TechniqueDamageSources#isMelee`**：`directEntity == getEntity() && instanceof LivingEntity && !IS_EXPLOSION`。比查标签准，不依赖 EF，`fallingBlock` 之类天然排除。
+- ⚠️ **分型解析不再要求 `ServerPlayer`**：怪物近战也要能分出 MARTIAL，否则体抗对怪物完全无效。需要玩家身份的两条判据（处刑必杀 / 必定黑闪）自己 `instanceof` 收敛。
+- ⚠️ **区 0 扩到 `MARTIAL || COMPOSITE`，但必须排除处刑必杀**（`!isExecutionersComposite(...)`）：处刑剑的伤害量已在 HIGHEST 被改写成固定致死值，再乘一道面板倍率会让低强度玩家杀不死。复合在近战里只有两条路，这条判据正好分开它们。
+- ⚠️ **区 2 挂 `LivingDamageEvent`，对总减伤精确封顶**：`LivingHurtEvent` 里只交接「进入原版减免前的量 + 分型」，真正的护甲/抗性乘算在原版全部算完后用交接基准封顶（`defenseReductionCap` 默认 85%）。ZONE（区 3）在交接之后施加，不进封顶基准。
+
+## LDLib 界面（术式开发 / 全屏 GUI）
+
+入口：`client/gui/technique/TechniqueDevelopmentUI#open()`（`ui.setFullScreen()` + `ModularUIGuiContainer`）。
+标签页 = 一排 `ButtonWidget`（`setButtonTexture` 切激活态）＋ 互斥切换的显示控件。
+
+写自定义控件（`client/gui/technique/PlayerDataPanelWidget` 是最简范例）：
+- `extends com.lowdragmc.lowdraglib.gui.widget.Widget`，构造 `super(new Position(0,0), new Size(1,1))` + `setClientSideWidget()`。
+- 重写 `drawInBackground(GuiGraphics, int mouseX, int mouseY, float partialTicks)`；里面直接用原版 `graphics.fill(...)` / `graphics.drawString(font, s, x, y, color, false)`，无需 LDLib 绘制器。
+- 尺寸：重写 `onScreenSizeUpdate(int w, int h)` 里 `setSelfPosition(0,0)` + `setSize(new Size(w,h))`（`Widget` 不会自动铺满）。
+- ⚠️ **最稳的坐标策略：控件固定 (0,0) 铺满全屏，内部按绝对坐标画**——这样无论 LDLib 是否按控件自身位置做位移，落到屏幕上的结果都一致。若是子控件，参照 `SkillTreeNodeWidget`（用 `getSelfPosition()`）。
+- `com.lowdragmc.lowdraglib.utils.Size` 的 `width` / `height` 是 **public final 字段**（另有 `getWidth()` / `getHeight()`）。
+- `setVisible(boolean)` 对 `FreeGraphView` 也生效，可用来做「画布 ↔ 面板」互斥。
+
+查 LDLib API：见 MEMORY.md 的 javap 路径。
+
+## 静态类型检查（不跑 gradlew，全工程 javac）
+
+**目的**：`./gradlew` 被明令禁止（游戏锁 `build/`、能卡 10min~1h）。但「改签名 / 改调用点」这类改动，编译器能报的错基本可穷尽 ⇒ 直接用 javac 编译整个 `src/main/java`，classpath 从 gradle 缓存现场拼。446 文件约 20 秒，**不写 `build/`**，输出到 `%TEMP%`。
+
+实测基线：2026-09-25 防御层改动后 **exit 0 / 0 错误**。
+
+```python
+# 用 python - <<'PY' ... PY 传给 python.exe 跑（脚本里用 C:/ 正斜杠路径）
+import os, subprocess, re, collections, zipfile
+
+# ⚠️ 唯一正确的 MC jar：official 映射，与源码一致
+KEEP = r'C:\Users\19316\.gradle\caches\forge_gradle\minecraft_user_repo\net\minecraftforge\forge\1.20.1-47.4.10_mapped_official_1.20.1\forge-1.20.1-47.4.10_mapped_official_1.20.1.jar'
+roots = [r'C:\Users\19316\.gradle\caches\forge_gradle',
+         r'C:\Users\19316\.gradle\caches\modules-2\files-2.1']
+jars = []
+for r in roots:
+    for dp, dn, fn in os.walk(r):
+        for f in fn:
+            if not f.endswith('.jar') or '-sources' in f or '-javadoc' in f:
+                continue
+            p = os.path.join(dp, f)
+            # 待删除的 mcp 空壳会让 javac 直接 "zip END header not found"
+            if 'mergeMappings' in p or os.path.getsize(p) < 2000:
+                continue
+            if os.path.normcase(p) == os.path.normcase(KEEP):
+                jars.append(p); continue
+            # 关键：缓存里有 11 个含 MC 类的 jar，映射风格各异。
+            # SRG 名 jar 抢先命中 ⇒ 6000+ 条假错误（Component 上没有 literal、满屏 m_xxxx_）
+            try:
+                if 'net/minecraft/network/chat/Component.class' in zipfile.ZipFile(p).namelist():
+                    continue
+            except Exception:
+                pass
+            jars.append(p)
+jars = [KEEP] + [j for j in jars if j != KEEP]        # KEEP 必须排第一
+
+srcs = [os.path.join(dp, f).replace('\\', '/')
+        for dp, dn, fn in os.walk(r'src\main\java') for f in fn if f.endswith('.java')]
+
+# classpath 有 300 个 jar ⇒ 超过 Windows 命令行长度限制（WinError 206），
+# 必须把 -cp 也一起塞进 @argfile；argfile 里用正斜杠 + 双引号（javac 把 \ 当转义）
+argf = 'C:/Users/19316/AppData/Local/Temp/jjkz_args.txt'
+with open(argf, 'w', encoding='utf-8') as fh:
+    fh.write('-encoding UTF-8\n-proc:none\n-nowarn\n-Xmaxerrs 10000\n')
+    fh.write('-d "C:/Users/19316/AppData/Local/Temp/jjkz_check_out"\n')
+    fh.write('-cp "%s"\n' % ';'.join(x.replace('\\', '/') for x in jars))
+    for s in srcs:
+        fh.write('"%s"\n' % s)
+
+p = subprocess.run(['javac', '@' + argf], capture_output=True)
+raw = p.stdout.decode('gbk', errors='replace') + p.stderr.decode('gbk', errors='replace')  # ⚠️ 输出是 GBK
+print('exit =', p.returncode)
+kinds = collections.Counter(); files = collections.Counter()
+for line in raw.splitlines():
+    m = re.search(r'错误[:：]\s*(.*)', line)
+    if m: kinds[m.group(1).strip()] += 1
+    m2 = re.match(r'(.*\.java):(\d+):', line)
+    if m2 and '错误' in line:
+        files[m2.group(1).replace('\\', '/').split('/')[-1]] += 1
+print('错误总行数:', sum(kinds.values()))
+for k, v in kinds.most_common(20): print(v, '|', k)
+for k, v in files.most_common(20): print(v, '|', k)
+```
+
+- `-proc:none` 跳过注解处理器（Mixin 处理器在这里不需要）。
+- 报错前**先看涉事文件的 mtime**：用户可能在 IDEA 里**同时编辑**该文件。2026-09-25 出现过「1 个错误」实为检查当时文件正被写入（差 25 秒），重跑即 0。
+- 查 Forge API 源码（比反编译靠谱）：解压上面那个官方 `-sources.jar`。例：`EntityAttributeModificationEvent` 的 `getTypes()` / `add()` 签名就是这么确认的。

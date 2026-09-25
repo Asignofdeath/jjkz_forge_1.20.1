@@ -1,0 +1,275 @@
+{
+  "_comment": "原版生物战斗属性表（百分比点数）。体抗/术抗=防御；穿甲=穿护甲%+体抗；术穿=穿术抗。缺省字段视为 0。可用 /reload 热更；已存在实体在再次入世（区块加载）时刷新。",
+  "entries": {
+    "minecraft:zombie": {
+      "physical_resistance": 5,
+      "technique_resistance": 0,
+      "physical_penetration": 0,
+      "technique_penetration": 0
+    },
+    "minecraft:husk": {
+      "physical_resistance": 8,
+      "technique_resistance": 0,
+      "physical_penetration": 2,
+      "technique_penetration": 0
+    },
+    "minecraft:drowned": {
+      "physical_resistance": 5,
+      "technique_resistance": 5,
+      "physical_penetration": 0,
+      "technique_penetration": 0
+    },
+    "minecraft:zombie_villager": {
+      "physical_resistance": 5,
+      "technique_resistance": 0,
+      "physical_penetration": 0,
+      "technique_penetration": 0
+    },
+    "minecraft:zombified_piglin": {
+      "physical_resistance": 10,
+      "technique_resistance": 5,
+      "physical_penetration": 5,
+      "technique_penetration": 0
+    },
+    "minecraft:skeleton": {
+      "physical_resistance": 0,
+      "technique_resistance": 0,
+      "physical_penetration": 5,
+      "technique_penetration": 0
+    },
+    "minecraft:stray": {
+      "physical_resistance": 0,
+      "technique_resistance": 5,
+      "physical_penetration": 5,
+      "technique_penetration": 5
+    },
+    "minecraft:wither_skeleton": {
+      "physical_resistance": 15,
+      "technique_resistance": 10,
+      "physical_penetration": 10,
+      "technique_penetration": 5
+    },
+    "minecraft:spider": {
+      "physical_resistance": 0,
+      "technique_resistance": 0,
+      "physical_penetration": 0,
+      "technique_penetration": 0
+    },
+    "minecraft:cave_spider": {
+      "physical_resistance": 0,
+      "technique_resistance": 5,
+      "physical_penetration": 5,
+      "technique_penetration": 0
+    },
+    "minecraft:creeper": {
+      "physical_resistance": 0,
+      "technique_resistance": 10,
+      "physical_penetration": 0,
+      "technique_penetration": 15
+    },
+    "minecraft:enderman": {
+      "physical_resistance": 10,
+      "technique_resistance": 20,
+      "physical_penetration": 5,
+      "technique_penetration": 10
+    },
+    "minecraft:endermite": {
+      "physical_resistance": 0,
+      "technique_resistance": 15,
+      "physical_penetration": 0,
+      "technique_penetration": 5
+    },
+    "minecraft:silverfish": {
+      "physical_resistance": 5,
+      "technique_resistance": 0,
+      "physical_penetration": 0,
+      "technique_penetration": 0
+    },
+    "minecraft:slime": {
+      "physical_resistance": 15,
+      "technique_resistance": 5,
+      "physical_penetration": 0,
+      "technique_penetration": 0
+    },
+    "minecraft:magma_cube": {
+      "physical_resistance": 20,
+      "technique_resistance": 15,
+      "physical_penetration": 5,
+      "technique_penetration": 5
+    },
+    "minecraft:phantom": {
+      "physical_resistance": 0,
+      "technique_resistance": 10,
+      "physical_penetration": 5,
+      "technique_penetration": 5
+    },
+    "minecraft:guardian": {
+      "physical_resistance": 15,
+      "technique_resistance": 15,
+      "physical_penetration": 0,
+      "technique_penetration": 15
+    },
+    "minecraft:elder_guardian": {
+      "physical_resistance": 25,
+      "technique_resistance": 25,
+      "physical_penetration": 5,
+      "technique_penetration": 20
+    },
+    "minecraft:shulker": {
+      "physical_resistance": 30,
+      "technique_resistance": 20,
+      "physical_penetration": 0,
+      "technique_penetration": 15
+    },
+    "minecraft:blaze": {
+      "physical_resistance": 5,
+      "technique_resistance": 25,
+      "physical_penetration": 0,
+      "technique_penetration": 20
+    },
+    "minecraft:ghast": {
+      "physical_resistance": 0,
+      "technique_resistance": 20,
+      "physical_penetration": 0,
+      "technique_penetration": 25
+    },
+    "minecraft:hoglin": {
+      "physical_resistance": 20,
+      "technique_resistance": 5,
+      "physical_penetration": 15,
+      "technique_penetration": 0
+    },
+    "minecraft:zoglin": {
+      "physical_resistance": 25,
+      "technique_resistance": 10,
+      "physical_penetration": 18,
+      "technique_penetration": 0
+    },
+    "minecraft:piglin": {
+      "physical_resistance": 10,
+      "technique_resistance": 5,
+      "physical_penetration": 8,
+      "technique_penetration": 0
+    },
+    "minecraft:piglin_brute": {
+      "physical_resistance": 25,
+      "technique_resistance": 10,
+      "physical_penetration": 20,
+      "technique_penetration": 0
+    },
+    "minecraft:witch": {
+      "physical_resistance": 0,
+      "technique_resistance": 30,
+      "physical_penetration": 0,
+      "technique_penetration": 20
+    },
+    "minecraft:vindicator": {
+      "physical_resistance": 15,
+      "technique_resistance": 5,
+      "physical_penetration": 15,
+      "technique_penetration": 0
+    },
+    "minecraft:evoker": {
+      "physical_resistance": 5,
+      "technique_resistance": 25,
+      "physical_penetration": 0,
+      "technique_penetration": 20
+    },
+    "minecraft:vex": {
+      "physical_resistance": 0,
+      "technique_resistance": 15,
+      "physical_penetration": 5,
+      "technique_penetration": 10
+    },
+    "minecraft:pillager": {
+      "physical_resistance": 5,
+      "technique_resistance": 0,
+      "physical_penetration": 8,
+      "technique_penetration": 0
+    },
+    "minecraft:ravager": {
+      "physical_resistance": 35,
+      "technique_resistance": 10,
+      "physical_penetration": 25,
+      "technique_penetration": 0
+    },
+    "minecraft:illusioner": {
+      "physical_resistance": 5,
+      "technique_resistance": 20,
+      "physical_penetration": 0,
+      "technique_penetration": 15
+    },
+    "minecraft:iron_golem": {
+      "physical_resistance": 40,
+      "technique_resistance": 15,
+      "physical_penetration": 20,
+      "technique_penetration": 0
+    },
+    "minecraft:snow_golem": {
+      "physical_resistance": 0,
+      "technique_resistance": 5,
+      "physical_penetration": 0,
+      "technique_penetration": 5
+    },
+    "minecraft:wolf": {
+      "physical_resistance": 5,
+      "technique_resistance": 0,
+      "physical_penetration": 5,
+      "technique_penetration": 0
+    },
+    "minecraft:polar_bear": {
+      "physical_resistance": 20,
+      "technique_resistance": 5,
+      "physical_penetration": 15,
+      "technique_penetration": 0
+    },
+    "minecraft:panda": {
+      "physical_resistance": 10,
+      "technique_resistance": 0,
+      "physical_penetration": 5,
+      "technique_penetration": 0
+    },
+    "minecraft:bee": {
+      "physical_resistance": 0,
+      "technique_resistance": 0,
+      "physical_penetration": 5,
+      "technique_penetration": 0
+    },
+    "minecraft:goat": {
+      "physical_resistance": 10,
+      "technique_resistance": 0,
+      "physical_penetration": 10,
+      "technique_penetration": 0
+    },
+    "minecraft:llama": {
+      "physical_resistance": 5,
+      "technique_resistance": 0,
+      "physical_penetration": 0,
+      "technique_penetration": 0
+    },
+    "minecraft:trader_llama": {
+      "physical_resistance": 5,
+      "technique_resistance": 0,
+      "physical_penetration": 0,
+      "technique_penetration": 0
+    },
+    "minecraft:warden": {
+      "physical_resistance": 45,
+      "technique_resistance": 35,
+      "physical_penetration": 30,
+      "technique_penetration": 15
+    },
+    "minecraft:wither": {
+      "physical_resistance": 30,
+      "technique_resistance": 40,
+      "physical_penetration": 15,
+      "technique_penetration": 30
+    },
+    "minecraft:ender_dragon": {
+      "physical_resistance": 35,
+      "technique_resistance": 40,
+      "physical_penetration": 20,
+      "technique_penetration": 25
+    }
+  }
+}

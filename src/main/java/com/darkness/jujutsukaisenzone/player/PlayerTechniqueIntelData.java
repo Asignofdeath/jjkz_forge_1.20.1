@@ -48,6 +48,8 @@ public final class PlayerTechniqueIntelData
         data.techniqueIntel.put(techniqueId, next);
         JjkzPlayerDataStorage.get(player).setDirty();
         syncToClient(player);
+        // 术式情报是术式强度的来源之一，面板必须跟着刷新
+        PlayerCombatPowerData.syncToClient(player);
     }
 
     public static boolean tryConsume(ServerPlayer player, String techniqueId, int amount)
@@ -65,6 +67,7 @@ public final class PlayerTechniqueIntelData
         data.techniqueIntel.put(techniqueId, current - amount);
         JjkzPlayerDataStorage.get(player).setDirty();
         syncToClient(player);
+        PlayerCombatPowerData.syncToClient(player);
         return true;
     }
 

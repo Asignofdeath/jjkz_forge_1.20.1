@@ -11,8 +11,10 @@ import com.darkness.jujutsukaisenzone.gameplay.CurseSpiritSpawnGrade;
 import com.darkness.jujutsukaisenzone.gameplay.TengenWedgeBarrierLogic;
 import com.darkness.jujutsukaisenzone.gameplay.TengenWedgeCurseSpiritSpawns;
 import com.darkness.jujutsukaisenzone.gameplay.TengenWedgeStartResult;
+import com.darkness.jujutsukaisenzone.player.CombatPowerStats;
 import com.darkness.jujutsukaisenzone.player.CursedGradeBonuses;
 import com.darkness.jujutsukaisenzone.player.JjkzPlayerDataDisplay;
+import com.darkness.jujutsukaisenzone.player.PlayerCombatPowerData;
 import com.darkness.jujutsukaisenzone.player.PlayerCursedEnergyData;
 import com.darkness.jujutsukaisenzone.player.PlayerCursedGradeData;
 import com.darkness.jujutsukaisenzone.player.PlayerFactionData;
@@ -139,6 +141,7 @@ public final class JjkzCommands
                         .then(buildReverseTechniqueCheatBranch())
                         .then(buildCursedEnergyCheatBranch())
                         .then(buildTechniqueIntelCheatBranch())
+                        .then(buildCombatPowerBranch())
                         .then(buildBarrierTechniqueCheatBranch())
                         .then(buildSeanceTechniqueCheatBranch())
                         .then(buildStrengthenTechniqueCheatBranch())
@@ -347,6 +350,62 @@ public final class JjkzCommands
         int total = PlayerTechniqueIntelData.getIntel(player, techniqueId);
         player.sendSystemMessage(Component.literal(
                 "术式【" + techniqueId + "】术式情报：" + total));
+        return 1;
+    }
+
+    /**
+     * 战斗强度面板：{@code /jjkz stats} 查看本人面板与构成明细；
+     * {@code /jjkz stats add <physical|technique|体术|术式> <数值>} 增减修炼加成
+     * （数值可为负，需要 GM 权限）。
+     */
+    private static LiteralArgumentBuilder<CommandSourceStack> buildCombatPowerBranch()
+    {
+        LiteralArgumentBuilder<CommandSourceStack> add = Commands.literal("add")
+                .requires(source -> source.hasPermission(Commands.LEVEL_GAMEMASTERS));
+        add.then(powerAddLiteral("physical", true));
+        add.then(powerAddLiteral("体术", true));
+        add.then(powerAddLiteral("technique", false));
+        add.then(powerAddLiteral("术式", false));
+
+        return Commands.literal("stats")
+                .executes(ctx -> executeCombatPowerShow(ctx.getSource().getPlayerOrException()))
+                .then(add);
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> powerAddLiteral(String literal, boolean physical)
+    {
+        return Commands.literal(literal)
+                .then(Commands.argument("amount", IntegerArgumentType.integer(-10000, 10000))
+                        .executes(ctx -> executeCombatPowerAdd(
+                                ctx.getSource().getPlayerOrException(),
+                                physical ? IntegerArgumentType.getInteger(ctx, "amount") : 0,
+                                physical ? 0 : IntegerArgumentType.getInteger(ctx, "amount"))));
+    }
+
+    private static int executeCombatPowerShow(ServerPlayer player)
+    {
+        CombatPowerStats stats = PlayerCombatPowerData.resolve(player);
+        player.sendSystemMessage(Component.literal("体术强度: " + stats.physicalPower()
+                + "　术式强度: " + stats.techniquePower()));
+        player.sendSystemMessage(Component.literal("[体术强度构成]"));
+        for (CombatPowerStats.Contribution contribution : stats.physicalBreakdown())
+        {
+            player.sendSystemMessage(Component.literal("  · " + contribution.label() + ": " + contribution.amount()));
+        }
+        player.sendSystemMessage(Component.literal("[术式强度构成]"));
+        for (CombatPowerStats.Contribution contribution : stats.techniqueBreakdown())
+        {
+            player.sendSystemMessage(Component.literal("  · " + contribution.label() + ": " + contribution.amount()));
+        }
+        return 1;
+    }
+
+    private static int executeCombatPowerAdd(ServerPlayer player, int physicalDelta, int techniqueDelta)
+    {
+        PlayerCombatPowerData.addBonus(player, physicalDelta, techniqueDelta);
+        CombatPowerStats stats = PlayerCombatPowerData.resolve(player);
+        player.sendSystemMessage(Component.literal("已调整强度 → 体术 " + stats.physicalPower()
+                + "　术式 " + stats.techniquePower()));
         return 1;
     }
 

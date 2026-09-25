@@ -39,10 +39,13 @@ public final class SkillCombatConfigRegistry
     public static void reloadFromForgeConfig()
     {
         int baselineGrade = Config.skillCombatBaselineGrade;
+        // ⚠️ 伤害类的 perRank 已交给强度面板（SkillDamageResolver）：等级成长统一由「术式强度」
+        // 承担，这里再叠加一次就会双计。只有关闭面板换算时才沿用旧的 perRank 曲线。
+        double perRankFactor = Config.combatPowerScalingEnabled ? 0.0D : 1.0D;
         Map<String, Map<String, SkillCombatStatDef>> loaded = new HashMap<>();
 
         put(loaded, SKILL_LIMITLESS_BLUE,
-                stat("damage", Config.limitlessBlueDamageBaseline, Config.limitlessBlueDamagePerRank, baselineGrade),
+                stat("damage", Config.limitlessBlueDamageBaseline, Config.limitlessBlueDamagePerRank * perRankFactor, baselineGrade),
                 stat("pull_radius", Config.limitlessBluePullRadiusBaseline, Config.limitlessBluePullRadiusPerRank, baselineGrade));
 
         put(loaded, SKILL_LIMITLESS_RED,
@@ -54,18 +57,19 @@ public final class SkillCombatConfigRegistry
                         Config.limitlessRemoteMurasakiMaxFlightChunksPerRank, baselineGrade));
 
         put(loaded, SKILL_SHRINE_KAI,
-                stat("damage", Config.shrineKaiDamageBaseline, Config.shrineKaiDamagePerRank, baselineGrade));
+                stat("damage", Config.shrineKaiDamageBaseline, Config.shrineKaiDamagePerRank * perRankFactor, baselineGrade));
 
         put(loaded, SKILL_SHRINE_KAI_FLYOBJ,
-                stat("damage", Config.shrineKaiFlyobjDamageBaseline, Config.shrineKaiFlyobjDamagePerRank, baselineGrade));
+                stat("damage", Config.shrineKaiFlyobjDamageBaseline, Config.shrineKaiFlyobjDamagePerRank * perRankFactor, baselineGrade));
 
         put(loaded, SKILL_SHRINE_HACHI,
-                stat("damage", Config.shrineHachiDamageBaseline, Config.shrineHachiDamagePerRank, baselineGrade));
+                stat("damage", Config.shrineHachiDamageBaseline, Config.shrineHachiDamagePerRank * perRankFactor, baselineGrade));
 
         put(loaded, SKILL_SHRINE_DOMAIN,
-                stat("slash_damage", Config.shrineDomainSlashDamageBaseline, Config.shrineDomainSlashDamagePerRank, baselineGrade),
+                stat("slash_damage", Config.shrineDomainSlashDamageBaseline,
+                        Config.shrineDomainSlashDamagePerRank * perRankFactor, baselineGrade),
                 stat("power_slash_damage", Config.shrineDomainPowerSlashDamageBaseline,
-                        Config.shrineDomainPowerSlashDamagePerRank, baselineGrade));
+                        Config.shrineDomainPowerSlashDamagePerRank * perRankFactor, baselineGrade));
 
         entries = Map.copyOf(loaded);
     }

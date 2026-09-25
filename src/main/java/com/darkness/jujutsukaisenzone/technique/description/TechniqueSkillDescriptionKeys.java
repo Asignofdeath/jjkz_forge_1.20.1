@@ -39,6 +39,16 @@ public final class TechniqueSkillDescriptionKeys
     }
 
     /**
+     * 带变体后缀的描述键（{@code skill.<modid>.<skillId>.desc_<suffix>}），供按解锁状态换文案的技能使用。
+     *
+     * @param variantSuffix 变体后缀；为 null / 空串时等同 {@link #description(String)}。
+     */
+    public static String description(String skillId, String variantSuffix)
+    {
+        return withSuffix(description(skillId), variantSuffix);
+    }
+
+    /**
      * 技能简介（简洁页）正文键，与完整描述 {@link #description(String)} 平行。
      * <p>
      * 简洁页不显示任何数值，所以按<b>无参</b>翻译解析。这个键是「有没有简洁页」的唯一依据：
@@ -47,5 +57,16 @@ public final class TechniqueSkillDescriptionKeys
     public static String brief(String skillId)
     {
         return SKILL_PREFIX + skillId + ".brief";
+    }
+
+    /** 带变体后缀的简洁页键，与 {@link #description(String, String)} 同一约定。 */
+    public static String brief(String skillId, String variantSuffix)
+    {
+        return withSuffix(brief(skillId), variantSuffix);
+    }
+
+    private static String withSuffix(String baseKey, String variantSuffix)
+    {
+        return variantSuffix == null || variantSuffix.isBlank() ? baseKey : baseKey + "_" + variantSuffix;
     }
 }

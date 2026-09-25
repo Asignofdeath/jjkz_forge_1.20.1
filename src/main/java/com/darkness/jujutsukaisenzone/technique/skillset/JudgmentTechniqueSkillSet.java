@@ -183,6 +183,21 @@ public final class JudgmentTechniqueSkillSet extends AbstractInnateTechniqueSkil
                     .visibleWhen(UnlockCondition.hasDomainExpansion())
                     .build())
             /*
+             * 说明节点「上诉」：原本写在「诛伏赐死」说明末尾。它讲的是<b>领域关闭之后</b>的另一套流程
+             * （上诉期 → 即时重开 → 单人重审），与「领域内怎么审理」不是同一件事，压在一起会把那份
+             * 说明再撑长一截，所以拆成自己的节点。
+             *
+             * 布局锚点仍取「审判」（与领域说明同一锚点、同一列），声明顺序紧随领域节点 ⇒ 落在它正下方，
+             * 读作「领域之上的另一条规则」。可见性条件与领域说明一致：没有领域就还谈不到上诉。
+             */
+            .node(SkillTreeNodeDef.info("judgment_appeal")
+                    .titleKey("skill_tree.jujutsukaisenzone.judgment_appeal.title")
+                    .iconPath("textures/item/trial_technique.png")
+                    .descriptionKey("skill_tree.jujutsukaisenzone.judgment_appeal.desc")
+                    .requires("judgment_trial")
+                    .visibleWhen(UnlockCondition.hasDomainExpansion())
+                    .build())
+            /*
              * 机制型技能「三式法槌」：<b>不占槽位、不能主动释放</b>，解锁即永久生效——它改的是
              * 「法槌再按一次会怎样」这条既有行为，而不是多给一个按键。
              *

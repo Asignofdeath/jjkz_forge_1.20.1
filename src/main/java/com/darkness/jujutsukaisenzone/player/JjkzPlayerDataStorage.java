@@ -123,6 +123,8 @@ public final class JjkzPlayerDataStorage extends SavedData
         private static final String TAG_STRENGTHEN_ACTIVE = "strengthenActive";
         private static final String TAG_LAST_PROCESSED_GAME_DAY = "lastProcessedGameDay";
         private static final String TAG_TECHNIQUE_INTEL = "techniqueIntel";
+        private static final String TAG_PHYSICAL_POWER_BONUS = "physicalPowerBonus";
+        private static final String TAG_TECHNIQUE_POWER_BONUS = "techniquePowerBonus";
 
         boolean cursedEnergyInitialized;
         int cursedEnergyBaseMax;
@@ -150,6 +152,8 @@ public final class JjkzPlayerDataStorage extends SavedData
         boolean strengthenActive;
         long lastProcessedGameDay = -1L;
         final Map<String, Integer> techniqueIntel = new LinkedHashMap<>();
+        int physicalPowerBonus;
+        int techniquePowerBonus;
 
         private static PlayerDataEntry load(CompoundTag tag)
         {
@@ -192,6 +196,8 @@ public final class JjkzPlayerDataStorage extends SavedData
             {
                 entry.techniqueIntel.put(techniqueId, Math.max(0, intelTag.getInt(techniqueId)));
             }
+            entry.physicalPowerBonus = Math.max(0, tag.getInt(TAG_PHYSICAL_POWER_BONUS));
+            entry.techniquePowerBonus = Math.max(0, tag.getInt(TAG_TECHNIQUE_POWER_BONUS));
             return entry;
         }
 
@@ -231,6 +237,8 @@ public final class JjkzPlayerDataStorage extends SavedData
                 intelTag.putInt(entry.getKey(), Math.max(0, entry.getValue()));
             }
             tag.put(TAG_TECHNIQUE_INTEL, intelTag);
+            tag.putInt(TAG_PHYSICAL_POWER_BONUS, Math.max(0, physicalPowerBonus));
+            tag.putInt(TAG_TECHNIQUE_POWER_BONUS, Math.max(0, techniquePowerBonus));
             return tag;
         }
 

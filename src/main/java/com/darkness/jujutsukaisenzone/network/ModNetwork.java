@@ -36,6 +36,7 @@ import com.darkness.jujutsukaisenzone.network.packet.SyncGhostFaceWobbleS2CPacke
 import com.darkness.jujutsukaisenzone.network.packet.SyncBlackFlashScreenShakeS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncFugaBoomScreenShakeS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncCursedEnergyS2CPacket;
+import com.darkness.jujutsukaisenzone.network.packet.SyncCombatPowerS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncCursedGradeS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncExecutionersSwordActivationS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncFactionS2CPacket;
@@ -466,6 +467,17 @@ public final class ModNetwork
                 .decoder(StarMarkClearC2SPacket::decode)
                 .consumerMainThread(StarMarkClearC2SPacket::handle)
                 .add();
+        CHANNEL.messageBuilder(SyncCombatPowerS2CPacket.class, packetId++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(SyncCombatPowerS2CPacket::encode)
+                .decoder(SyncCombatPowerS2CPacket::decode)
+                .consumerMainThread(SyncCombatPowerS2CPacket::handle)
+                .add();
+    }
+
+    public static void sendCombatPowerSync(ServerPlayer player, int physicalPower, int techniquePower)
+    {
+        CHANNEL.send(PacketDistributor.PLAYER.with(() -> player),
+                new SyncCombatPowerS2CPacket(physicalPower, techniquePower));
     }
 
     public static void sendCursedEnergySync(ServerPlayer player, int current, int max)
@@ -488,9 +500,10 @@ public final class ModNetwork
         CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new SyncReverseTechniqueS2CPacket(learned));
     }
 
-    public static void sendBarrierTechniqueLearnedSync(ServerPlayer player, boolean learned)
+    public static void sendBarrierTechniqueLearnedSync(ServerPlayer player, boolean learned, int tier)
     {
-        CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new SyncBarrierTechniqueLearnedS2CPacket(learned));
+        CHANNEL.send(PacketDistributor.PLAYER.with(() -> player),
+                new SyncBarrierTechniqueLearnedS2CPacket(learned, tier));
     }
 
     public static void sendDomainExpansionLearnedSync(ServerPlayer player, boolean learned)

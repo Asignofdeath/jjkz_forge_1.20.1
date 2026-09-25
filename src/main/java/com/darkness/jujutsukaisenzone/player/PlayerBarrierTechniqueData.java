@@ -12,6 +12,7 @@ import net.minecraft.world.entity.player.Player;
 public final class PlayerBarrierTechniqueData
 {
     private static final String CLIENT_TAG_LEARNED = "jujutsukaisenzone_barrier_technique_learned";
+    private static final String CLIENT_TAG_TIER = "jujutsukaisenzone_barrier_technique_tier";
 
     private PlayerBarrierTechniqueData()
     {
@@ -29,6 +30,21 @@ public final class PlayerBarrierTechniqueData
     }
 
     /**
+     * 客户端形态：等级来自 {@link #applyClientLearned} 写入的同步缓存。
+     * <p>
+     * 与 {@code PlayerSeanceTechniqueData} / {@code PlayerStrengthenTechniqueData} 同构——
+     * 面板与 tooltip 需要知道「掌握 / 完全掌握」，只同步一个 boolean 是不够的。
+     */
+    public static BarrierTechniqueLevel getLevel(Player player)
+    {
+        if (player instanceof ServerPlayer serverPlayer)
+        {
+            return getLevel(serverPlayer);
+        }
+        return BarrierTechniqueLevel.fromTier(player.getPersistentData().getInt(CLIENT_TAG_TIER));
+    }
+
+    /**
      * 设置玩家的结界术等级。
      * @param player 玩家
      * @param level 结界术等级
@@ -38,7 +54,13 @@ public final class PlayerBarrierTechniqueData
         JjkzPlayerDataStorage.PlayerDataEntry data = getData(player);
         data.barrierTechniqueLevel = level.name();
         markDirty(player);
-        ModNetwork.sendBarrierTechniqueLearnedSync(player, hasLearned(player));
+        syncToClient(player);
+    }
+
+    /** 把「是否习得 + 当前等级」一并下发给该玩家客户端。 */
+    public static void syncToClient(ServerPlayer player)
+    {
+        ModNetwork.sendBarrierTechniqueLearnedSync(player, hasLearned(player), getLevel(player).getTier());
     }
 
     /**
@@ -53,9 +75,10 @@ public final class PlayerBarrierTechniqueData
         return player.getPersistentData().getBoolean(CLIENT_TAG_LEARNED);
     }
 
-    public static void applyClientLearned(Player player, boolean learned)
+    public static void applyClientLearned(Player player, boolean learned, int tier)
     {
         player.getPersistentData().putBoolean(CLIENT_TAG_LEARNED, learned);
+        player.getPersistentData().putInt(CLIENT_TAG_TIER, Math.max(0, tier));
     }
 
     public static int getStudybookReadCount(ServerPlayer player)

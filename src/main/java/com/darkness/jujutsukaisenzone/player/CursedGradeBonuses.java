@@ -16,11 +16,15 @@ import java.util.UUID;
  */
 public final class CursedGradeBonuses
 {
-    private static final UUID ATTACK_UUID = UUID.fromString("6b2c9a01-0001-4000-8000-000000000001");
     private static final UUID SPEED_UUID = UUID.fromString("6b2c9a01-0002-4000-8000-000000000002");
     private static final UUID HEALTH_UUID = UUID.fromString("6b2c9a01-0003-4000-8000-000000000003");
     private static final UUID ARMOR_UUID = UUID.fromString("6b2c9a01-0004-4000-8000-000000000004");
-    private static final UUID HEAVENLY_ATTACK_UUID = UUID.fromString("6b2c9a01-1001-4000-8000-000000000001");
+    /**
+     * 体术通道的「锚」：等级攻击加成已迁走，但 EF / 原版近战的原始伤害里只剩武器与基础攻击（1.0），
+     * 直接乘「体术强度 / 基准」会让四级玩家近战只剩一半。这里补一个与等级无关的 +1.0，
+     * 使原始伤害锚在 2.0，再乘强度倍率（四级 = 1.0）正好回到改造前的 2.1。
+     */
+    private static final UUID ATTACK_BASE_UUID = UUID.fromString("6b2c9a01-0005-4000-8000-000000000005");
     private static final UUID HEAVENLY_SPEED_UUID = UUID.fromString("6b2c9a01-1002-4000-8000-000000000002");
     private static final UUID HEAVENLY_BURST_SPEED_UUID = UUID.fromString("6b2c9a01-1005-4000-8000-000000000005");
     private static final UUID HEAVENLY_HEALTH_UUID = UUID.fromString("6b2c9a01-1003-4000-8000-000000000003");
@@ -46,11 +50,10 @@ public final class CursedGradeBonuses
      */
     private static final double[] HEALTH_BONUS_BY_RANK = {0.0, 20.0, 50.0, 90.0, 170.0, 270.0};
 
-    /** 攻击：每级 +1.1（中幅，随 rank 累加） */
-    private static final double ATTACK_PER_RANK = 1.1;
     /** 仅疾跑时生效：每级移动速度 ADDITION（略高于旧常驻值） */
     private static final double SPRINT_SPEED_PER_RANK = 0.026;
-    private static final double HEAVENLY_ATTACK_BONUS = 14.0;
+    /** 与等级无关的体术锚点加成，见 {@link #ATTACK_BASE_UUID} */
+    private static final double ATTACK_BASE_BONUS = 1.0;
     private static final double HEAVENLY_SPRINT_SPEED_BONUS = 0.24;
     private static final double HEAVENLY_SPRINT_BURST_BONUS = 0.85;
     private static final int HEAVENLY_SPRINT_BURST_TICKS = 20;
@@ -109,8 +112,9 @@ public final class CursedGradeBonuses
         if (PlayerCursedEnergyData.isHeavenlyRestricted(player))
         {
             clearNormalModifiers(player);
-            applyAttribute(player, Attributes.ATTACK_DAMAGE, HEAVENLY_ATTACK_UUID, "jjkz_heavenly_attack", HEAVENLY_ATTACK_BONUS, AttributeModifier.Operation.ADDITION);
             clearSprintSpeedModifier(player);
+            applyAttribute(player, Attributes.ATTACK_DAMAGE, ATTACK_BASE_UUID, "jjkz_attack_base",
+                    ATTACK_BASE_BONUS, AttributeModifier.Operation.ADDITION);
             applyAttribute(player, Attributes.MAX_HEALTH, HEAVENLY_HEALTH_UUID, "jjkz_heavenly_health", resolveHealthBonus(player), AttributeModifier.Operation.ADDITION);
             applyAttribute(player, Attributes.ARMOR, HEAVENLY_ARMOR_UUID, "jjkz_heavenly_armor", HEAVENLY_ARMOR_BONUS, AttributeModifier.Operation.ADDITION);
             // 天与咒缚常驻满额击退抗性，保证在任何时刻都不会被击退。
@@ -121,7 +125,8 @@ public final class CursedGradeBonuses
             clearHeavenlyModifiers(player);
             int rank = PlayerCursedGradeData.getRank(player);
 
-            applyAttribute(player, Attributes.ATTACK_DAMAGE, ATTACK_UUID, "jjkz_grade_attack", ATTACK_PER_RANK * rank, AttributeModifier.Operation.ADDITION);
+            applyAttribute(player, Attributes.ATTACK_DAMAGE, ATTACK_BASE_UUID, "jjkz_attack_base",
+                    ATTACK_BASE_BONUS, AttributeModifier.Operation.ADDITION);
             clearSprintSpeedModifier(player);
             applyAttribute(player, Attributes.MAX_HEALTH, HEALTH_UUID, "jjkz_grade_health", resolveHealthBonus(player), AttributeModifier.Operation.ADDITION);
             applyAttribute(player, Attributes.ARMOR, ARMOR_UUID, "jjkz_grade_armor", 4.0 * rank, AttributeModifier.Operation.ADDITION);
@@ -129,6 +134,8 @@ public final class CursedGradeBonuses
 
         StrengthenTechniqueBonuses.applyActiveModifiers(player);
         PlayerHealthData.scaleHealthAfterMaxChange(player, oldMax, oldHealth);
+        // 等级 / 天与咒缚状态变化会改变强度面板，立刻下发给客户端（tooltip 与 /jjkz data 用）。
+        PlayerCombatPowerData.syncToClient(player);
     }
 
     /**
@@ -283,11 +290,6 @@ public final class CursedGradeBonuses
 
     private static void clearNormalModifiers(ServerPlayer player)
     {
-        var attack = player.getAttribute(Attributes.ATTACK_DAMAGE);
-        if (attack != null)
-        {
-            attack.removeModifier(ATTACK_UUID);
-        }
         var health = player.getAttribute(Attributes.MAX_HEALTH);
         if (health != null)
         {
@@ -302,11 +304,6 @@ public final class CursedGradeBonuses
 
     private static void clearHeavenlyModifiers(ServerPlayer player)
     {
-        var attack = player.getAttribute(Attributes.ATTACK_DAMAGE);
-        if (attack != null)
-        {
-            attack.removeModifier(HEAVENLY_ATTACK_UUID);
-        }
         var health = player.getAttribute(Attributes.MAX_HEALTH);
         if (health != null)
         {

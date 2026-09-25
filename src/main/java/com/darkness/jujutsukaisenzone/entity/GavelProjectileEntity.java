@@ -2,6 +2,7 @@ package com.darkness.jujutsukaisenzone.entity;
 
 import com.darkness.jujutsukaisenzone.registry.ModEntities;
 import com.darkness.jujutsukaisenzone.registry.ModItems;
+import com.darkness.jujutsukaisenzone.technique.SkillDamageResolver;
 import com.darkness.jujutsukaisenzone.technique.TechniqueDamageSources;
 import com.darkness.jujutsukaisenzone.technique.skill.GavelFormStats;
 import com.darkness.jujutsukaisenzone.technique.skillset.SkillDamageType;
@@ -63,7 +64,9 @@ public class GavelProjectileEntity extends ThrowableItemProjectile
                 if (hit instanceof LivingEntity living && hit != owner)
                 {
                     DamageSource source = this.damageSources().thrown(this, owner);
-                    living.hurt(source, GavelFormStats.getProjectileDamage(this.getItem()));
+                    living.hurt(source, SkillDamageResolver.technique(
+                            owner instanceof LivingEntity ownerLiving ? ownerLiving : null,
+                            GavelFormStats.getProjectileDamage(this.getItem())));
                 }
             });
         }

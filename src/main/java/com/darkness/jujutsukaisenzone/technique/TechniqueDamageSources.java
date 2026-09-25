@@ -2,8 +2,17 @@ package com.darkness.jujutsukaisenzone.technique;
 
 import com.darkness.jujutsukaisenzone.JuJutsuKaisenZone;
 import com.darkness.jujutsukaisenzone.technique.skillset.SkillDamageType;
+import net.minecraft.core.Holder;
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.tags.DamageTypeTags;
 import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.damagesource.DamageType;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.level.Level;
 import net.minecraftforge.event.entity.living.LivingKnockBackEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -26,8 +35,8 @@ import java.util.function.Supplier;
  *   <li>{@code TechniqueIntelligenceDropEvents} / {@code SinfulOneKillEvents} / {@code BlackFlashEvents}
  *       一律只看 {@code getSource().getEntity()} ⇒ 术式击杀也不掉术式情报、不记罪恶者、不判黑闪</li>
  * </ul>
- * 这里只补归因：伤害类型原样复用 {@code MAGIC} 的 {@link DamageSource#typeHolder()}，
- * 穿甲 / 抗性 / 免疫 / 药水 / 难度加成判定一律不变，变的只有「谁打的」。
+ * 这里只补归因：伤害类型用本模组自己的 {@link #TECHNIQUE_DAMAGE_TYPE}（见其文档说明为何不再借
+ * {@code MAGIC}），变的只有「谁打的」。
  * <p>
  * ⚠️ 原版 {@code LivingEntity#hurt} 里归因和击退写在同一段（都读 {@code getEntity()}），
  * 所以补上归因就会连带出 0.4 击退与「把施术者记成攻击者」。击退用
@@ -35,13 +44,14 @@ import java.util.function.Supplier;
  * 生物被术式打中后开始仇恨施术者，这是原版语义，同时
  * {@code CursedGradeKillEvents} 也依赖 {@code getLastHurtByMob()} 这条兜底。
  * <p>
- * ⚠️ 刻意<b>不</b>填 {@code directEntity}：{@code getSourcePosition()} 只在
- * {@code isDamageSourceBlocked}（举盾格挡）里被用到，填了就等于让盾牌能挡下术式，
- * 这是设定外的改动。保持 null ⇒ 术式依旧无视盾牌。
+ * ⚠️ 刻意<b>不</b>填 {@code directEntity}（见 {@link #techniqueSource}）：{@code getSourcePosition()}
+ * 只在 {@code isDamageSourceBlocked}（举盾格挡）里被用到，填了就等于让盾牌能挡下术式。
+ * 保持 null ⇒ 术式无视盾牌。
  * <p>
  * 分型（{@link SkillDamageType}）是<strong>叙事元数据</strong>，与通道解耦：不改穿甲 / 盾牌，
  * 仅在结算期间写入 {@link #ACTIVE_DAMAGE_TYPE}。走 {@code thrown} / {@code explode} /
- * EpicFight 等通道时，用 {@link #runWithType} / {@link #callWithType} 包住出伤即可挂上分型。
+ * EpicFight 等通道时，用 {@link #runWithType} / {@link #callWithType} 包住出伤即可挂上分型；
+ * 防御管线（{@code TechniqueDamageZoneEvents} 区 2）按它决定吃体抗还是术抗。
  */
 @Mod.EventBusSubscriber(modid = JuJutsuKaisenZone.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public final class TechniqueDamageSources
@@ -59,12 +69,91 @@ public final class TechniqueDamageSources
      */
     private static final ThreadLocal<SkillDamageType> ACTIVE_DAMAGE_TYPE = new ThreadLocal<>();
 
+    /**
+     * 本次伤害是否已由 {@link #deal} 做过强度换算。
+     * <p>
+     * {@code TechniqueDamageZoneEvents} 的「区 0」负责给 EF / 原版近战这类<b>不走 deal</b> 的体术伤害
+     * 补强度倍率；而走 deal 的伤害已经在进 {@code hurt} 之前乘过了，这里必须让区 0 能识别出来，
+     * 否则同一个倍率会被乘两遍。
+     */
+    private static final ThreadLocal<Boolean> POWER_ALREADY_SCALED = ThreadLocal.withInitial(() -> Boolean.FALSE);
+
     /** 赫击飞方块的 persistentData 标记：落地砸人仍算术式伤害。 */
     public static final String TAG_RED_DEBRIS = "jujutsukaisenzone_red_debris";
+
+    /**
+     * 术式专属伤害类型（数据包 {@code data/jujutsukaisenzone/damage_type/technique.json}）。
+     * <p>
+     * 为什么不再复用 {@code MAGIC}：
+     * <ul>
+     *   <li>{@code MAGIC} 在 {@code WITCH_RESISTANT_TO} 里 ⇒ 女巫会对<span>所有</span>术式白嫖 ×0.15 减伤，
+     *       这只是「瞬伤药水也是 MAGIC」的连带副作用，不是设计意图</li>
+     *   <li>需要一个干净的通道标识，让防御管线能精确区分「这是本模组的术式」</li>
+     * </ul>
+     * 标签安排（见 {@code data/minecraft/tags/damage_type/}）：
+     * <b>加进</b> {@code BYPASSES_ARMOR} / {@code BYPASSES_SHIELD}，
+     * <b>不加</b> {@code BYPASSES_RESISTANCE} / {@code BYPASSES_ENCHANTMENTS}（继续吃抗性药水与附魔保护），
+     * 也<b>不加</b> {@code WITCH_RESISTANT_TO}。
+     * <p>
+     * ⚠️ 之所以仍然绕过原版护甲、改由 {@code TechniqueDamageZoneEvents} 区 2 自己算，是因为原版
+     * {@code CombatRules.getDamageAfterAbsorb} 对小伤害的减免比例极高（8 点伤害对钻石甲会被砍掉约 72%），
+     * 而术式大多是「每 1~5 tick」的高频小伤害，直接继承会把高频流派整个打死。
+     */
+    public static final ResourceKey<DamageType> TECHNIQUE_DAMAGE_TYPE =
+            ResourceKey.create(Registries.DAMAGE_TYPE, new ResourceLocation(JuJutsuKaisenZone.MODID, "technique"));
+
+    /** 术式伤害类型的 holder 缓存：{@link Level#registryAccess()} 变了就重取（换存档 / 跨维度）。服务端单线程，无并发问题。 */
+    private static Holder<DamageType> cachedTechniqueType;
+    private static RegistryAccess cachedTechniqueAccess;
 
     private TechniqueDamageSources()
     {
     }
+
+    /**
+     * 取出术式伤害类型。数据包注册表在运行时才可用，所以只能按需从 level 的 registryAccess 里查。
+     */
+    private static Holder<DamageType> techniqueType(Level level)
+    {
+        RegistryAccess access = level.registryAccess();
+        if (cachedTechniqueType == null || cachedTechniqueAccess != access)
+        {
+            cachedTechniqueType = access.registryOrThrow(Registries.DAMAGE_TYPE).getHolderOrThrow(TECHNIQUE_DAMAGE_TYPE);
+            cachedTechniqueAccess = access;
+        }
+        return cachedTechniqueType;
+    }
+
+    /**
+     * 构造一次术式伤害的 {@link DamageSource}。
+     * <p>
+     * {@code directEntity} 刻意留 null：{@code getSourcePosition()} 只在举盾格挡判定里用到，
+     * 填了就等于让盾牌能挡下术式（同时 {@code jjkz:technique} 也已加进 {@code BYPASSES_SHIELD}，
+     * 这里是第二道保险，两道都留着以防标签被别的数据包改掉）。
+     */
+    public static DamageSource techniqueSource(Level level, @Nullable LivingEntity owner)
+    {
+        return new DamageSource(techniqueType(level), null, owner);
+    }
+
+    /**
+     * 判定这一击是不是「贴身格斗」——EpicFight 基础攻击、原版怪物近战、原版玩家近战都走这条。
+     * <p>
+     * 判据用原版语义本身：近战伤害的 {@code directEntity} 就是攻击者本人
+     * （{@code mobAttack} / {@code playerAttack} 都是 {@code DamageSource(entity, entity)}），
+     * 而投掷物 / 弹射物的 {@code directEntity} 是那个投射物，爆炸则两者常常都是 null。
+     * 比查标签更准，也不依赖 EpicFight。
+     */
+    public static boolean isMelee(DamageSource source)
+    {
+        Entity direct = source.getDirectEntity();
+        return direct != null
+                && direct == source.getEntity()
+                && direct instanceof LivingEntity
+                && !source.is(DamageTypeTags.IS_EXPLOSION)
+                && !source.is(DamageTypeTags.IS_PROJECTILE);
+    }
+
 
     /**
      * 对目标造成一次术式伤害（带施术者归因，且不产生击退）。
@@ -86,30 +175,77 @@ public final class TechniqueDamageSources
      * 分型只是「随伤害带出去的元数据」：不改伤害类型（依旧复用 {@code MAGIC} 的
      * {@link DamageSource#typeHolder()}）、不改穿甲 / 抗性 / 盾牌语义，仅在结算期间写入
      * {@link #ACTIVE_DAMAGE_TYPE}，供乘区管线（{@code TechniqueDamageZoneEvents}）按分型挑加成。
+     * <p>
+     * ⚠️ <b>强度面板换算在这里统一完成</b>：调用方一律传「四级基准点数」（就是原来写死的那个数，
+     * 例如 {@code LimitlessBlueConfig.DAMAGE} = 8.0F），本方法按施术者当前的体术 / 术式强度
+     * 换算成实际伤害（见 {@link SkillDamageResolver}）。
+     * 因此调用方<b>不要</b>自己再乘强度，否则重复放大。
      *
      * @param damageType 这一击的叙事分型；传 {@link SkillDamageType#TECHNIQUE} 与旧三参重载等价
      */
     public static boolean deal(LivingEntity target, @Nullable LivingEntity owner, float amount, SkillDamageType damageType)
     {
-        return callWithType(damageType, () -> {
-            if (owner == null)
-            {
-                return target.hurt(target.damageSources().magic(), amount);
-            }
+        float resolvedAmount = resolvePowerScaled(owner, amount, damageType);
+        boolean previousScaledFlag = POWER_ALREADY_SCALED.get();
+        POWER_ALREADY_SCALED.set(true);
+        // 把「强度放大前」的原始点数交给黑闪：黑闪要对原始值取幂，否则 pow 会把面板倍率一起指数放大。
+        // 标记只在本次 hurt 调用栈内存活（LivingHurtEvent 是同步派发的），finally 里必定清掉。
+        if (Math.abs(resolvedAmount - amount) > 0.0001F)
+        {
+            SkillDamageResolver.markRawBeforePower(amount);
+        }
+        try
+        {
+            return callWithType(damageType, () -> {
+                DamageSource source = techniqueSource(target.level(), owner);
+                if (owner == null)
+                {
+                    return target.hurt(source, resolvedAmount);
+                }
 
-            DamageSource source = new DamageSource(owner.damageSources().magic().typeHolder(), null, owner);
+                IdentityHashMap<LivingEntity, Boolean> guard = KNOCKBACK_GUARD.get();
+                guard.put(target, Boolean.TRUE);
+                try
+                {
+                    return target.hurt(source, resolvedAmount);
+                }
+                finally
+                {
+                    guard.remove(target);
+                }
+            });
+        }
+        finally
+        {
+            SkillDamageResolver.clearRawBeforePower();
+            POWER_ALREADY_SCALED.set(previousScaledFlag);
+        }
+    }
 
-            IdentityHashMap<LivingEntity, Boolean> guard = KNOCKBACK_GUARD.get();
-            guard.put(target, Boolean.TRUE);
-            try
-            {
-                return target.hurt(source, amount);
-            }
-            finally
-            {
-                guard.remove(target);
-            }
-        });
+    /** 当前是否处于 {@link #deal} 的结算栈内（区 0 用它避免重复乘强度）。 */
+    public static boolean isPowerAlreadyScaled()
+    {
+        return POWER_ALREADY_SCALED.get();
+    }
+
+    /**
+     * 强度面板换算：把「四级基准点数」变成施术者当前强度下的实际伤害。
+     * <ul>
+     *   <li>术式 → 术式强度</li>
+     *   <li>体术 → 体术强度</li>
+     *   <li>复合 → 两者各算一次取平均（避免黑闪这类同时动用两种能力的技能吃双倍面板）</li>
+     * </ul>
+     * 非玩家（没有面板）一律原样返回。
+     */
+    private static float resolvePowerScaled(@Nullable LivingEntity owner, float baselinePoints, SkillDamageType damageType)
+    {
+        return switch (damageType)
+        {
+            case TECHNIQUE -> SkillDamageResolver.technique(owner, baselinePoints);
+            case MARTIAL -> SkillDamageResolver.physical(owner, baselinePoints);
+            case COMPOSITE -> (SkillDamageResolver.technique(owner, baselinePoints)
+                    + SkillDamageResolver.physical(owner, baselinePoints)) * 0.5F;
+        };
     }
 
     /**

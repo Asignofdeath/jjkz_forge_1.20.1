@@ -6,6 +6,7 @@ import com.darkness.jujutsukaisenzone.entity.util.GeometryUtils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.util.Mth;
+import com.darkness.jujutsukaisenzone.technique.SkillDamageResolver;
 import com.darkness.jujutsukaisenzone.technique.TechniqueDamageSources;
 import com.darkness.jujutsukaisenzone.technique.skillset.SkillDamageType;
 import net.minecraft.world.damagesource.DamageSource;
@@ -103,7 +104,7 @@ public class LimitlessPurpleArrowBehavior extends EffectBehavior
         AABB query = new AABB(cx, cy, cz, cx, cy, cz).inflate(r);
 
         LivingEntity owner = resolveOwner(entity, this.ownerUuid);
-        float dmg = LimitlessPurpleConfig.ARROW_SPHERE_DAMAGE_PER_TICK;
+        float dmg = SkillDamageResolver.technique(owner, LimitlessPurpleConfig.ARROW_SPHERE_DAMAGE_PER_TICK);
 
         for (LivingEntity target : level.getEntitiesOfClass(LivingEntity.class, query))
         {
@@ -111,9 +112,7 @@ public class LimitlessPurpleArrowBehavior extends EffectBehavior
             if (!GeometryUtils.aabbIntersectsSphere(cx, cy, cz, rSqr, target.getBoundingBox())) continue;
             if (owner != null && target.getUUID().equals(owner.getUUID())) continue;
 
-            DamageSource source = owner != null
-                    ? entity.damageSources().mobProjectile(entity, owner)
-                    : entity.damageSources().magic();
+            DamageSource source = TechniqueDamageSources.techniqueSource(level, owner);
             TechniqueDamageSources.runWithType(SkillDamageType.TECHNIQUE, () -> {
                 if (target instanceof Player)
                 {

@@ -51,6 +51,7 @@ public final class TechniqueSkillTooltipHelper
         }
         TechniqueSkillDescriptionView view = TechniqueSkillDescriptions.resolve(player, techniqueId, skill);
         boolean mechanic = SkillUnlockLogic.isMechanicSkill(techniqueId, skill.skillId());
+        String briefKey = TechniqueSkillDescriptions.resolveBriefKey(player, techniqueId, skill);
         /*
          * 悬停框有两页：简洁页是默认视图，完整页靠按住 Shift 唤出。
          *
@@ -58,9 +59,9 @@ public final class TechniqueSkillTooltipHelper
          * 此时直接给完整页，免得悬停框里冒出一串键名。这样「哪些技能有简洁页」由 lang 决定，
          * 不必在这里维护一份名单：新技能写好 .brief 就自动生效。
          */
-        if (!Screen.hasShiftDown() && hasBrief(skill.skillId()))
+        if (!Screen.hasShiftDown() && hasBrief(briefKey))
         {
-            return buildBrief(view, skill.skillId(), mechanic);
+            return buildBrief(view, briefKey, mechanic);
         }
         return mechanic ? buildMechanic(view) : build(view);
     }
@@ -69,12 +70,18 @@ public final class TechniqueSkillTooltipHelper
      * 该技能有没有简洁页文案。
      * <p>
      * {@code .brief} 键缺失时 {@code translatable} 会把键名原样返回，以此判断。
+     *
+     * @param briefKey 已解析过的简洁页键（可能按解锁状态换过，见
+     *                 {@link TechniqueSkillDescriptions#resolveBriefKey}）
      */
-    private static boolean hasBrief(String skillId)
+    private static boolean hasBrief(String briefKey)
     {
-        String key = TechniqueSkillDescriptionKeys.brief(skillId);
-        String text = Component.translatable(key).getString();
-        return !key.equals(text) && !text.isBlank();
+        if (briefKey == null || briefKey.isBlank())
+        {
+            return false;
+        }
+        String text = Component.translatable(briefKey).getString();
+        return !briefKey.equals(text) && !text.isBlank();
     }
 
     /**
@@ -83,7 +90,7 @@ public final class TechniqueSkillTooltipHelper
      * 它是悬停框的默认视图；按住 Shift 换到完整页（见 {@link #build(Player, String, TechniqueSkill)}）。
      * 机制型技能的浅紫类型标注在这里照旧保留，与完整页一致。
      */
-    private static List<Component> buildBrief(TechniqueSkillDescriptionView view, String skillId, boolean mechanic)
+    private static List<Component> buildBrief(TechniqueSkillDescriptionView view, String briefKey, boolean mechanic)
     {
         if (view == null || view.displayName().getString().isEmpty())
         {
@@ -99,8 +106,7 @@ public final class TechniqueSkillTooltipHelper
         lines.add(Component.translatable(TechniqueSkillDescriptionKeys.SHIFT_FOR_DETAILS)
                 .withStyle(ChatFormatting.DARK_GRAY));
         lines.add(Component.empty());
-        lines.add(Component.translatable(TechniqueSkillDescriptionKeys.brief(skillId))
-                .withStyle(ChatFormatting.GRAY));
+        lines.add(Component.translatable(briefKey).withStyle(ChatFormatting.GRAY));
         return Collections.unmodifiableList(lines);
     }
 

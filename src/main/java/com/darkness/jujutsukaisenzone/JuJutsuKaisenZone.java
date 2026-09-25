@@ -7,6 +7,7 @@ import com.darkness.jujutsukaisenzone.client.gui.SkillBarConfigScreen;
 import com.darkness.jujutsukaisenzone.compat.EpicFightCompat;
 import com.darkness.jujutsukaisenzone.event.TechniqueSkillKeyEvents;
 import com.darkness.jujutsukaisenzone.network.ModNetwork;
+import com.darkness.jujutsukaisenzone.registry.ModAttributes;
 import com.darkness.jujutsukaisenzone.registry.ModBlockEntities;
 import com.darkness.jujutsukaisenzone.registry.ModBlocks;
 import com.darkness.jujutsukaisenzone.registry.ModCreativeTabs;
@@ -84,6 +85,7 @@ public class JuJutsuKaisenZone
         ModCreativeTabs.register(modEventBus);
         ModEntities.register(modEventBus);
         ModEffects.register(modEventBus);
+        ModAttributes.register(modEventBus);
         ModSounds.register(modEventBus);
         ModNetwork.register();
 

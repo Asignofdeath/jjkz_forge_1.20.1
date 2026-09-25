@@ -141,6 +141,79 @@ public class Config
             .comment("击杀原版生物获得的经验上限")
             .defineInRange("killExpMaxFromMob", 20, 1, 100);
 
+    // ======== 战斗强度面板（体术强度 / 术式强度） ========
+
+    private static final ForgeConfigSpec.BooleanValue COMBAT_POWER_SCALING_ENABLED = BUILDER
+            .comment("是否启用「体术强度 / 术式强度」面板换算伤害（关闭则回到旧的固定点数结算）")
+            .define("combatPower.scalingEnabled", true);
+
+    private static final ForgeConfigSpec.DoubleValue COMBAT_POWER_BASE = BUILDER
+            .comment("战斗强度：无咒术等级时的基础值")
+            .defineInRange("combatPower.base", 10.0D, 0.0D, 100000.0D);
+
+    private static final ForgeConfigSpec.DoubleValue COMBAT_POWER_PER_RANK = BUILDER
+            .comment("战斗强度：每升一级咒术等级的增量（四级 = base + perRank）")
+            .defineInRange("combatPower.perRank", 10.0D, 0.0D, 100000.0D);
+
+    private static final ForgeConfigSpec.DoubleValue COMBAT_POWER_TECHNIQUE_BASELINE = BUILDER
+            .comment("术式强度换算基准：描述中的百分比 = 四级基准点数 / 本值 × 100")
+            .defineInRange("combatPower.techniqueBaseline", 20.0D, 0.001D, 100000.0D);
+
+    private static final ForgeConfigSpec.DoubleValue COMBAT_POWER_PHYSICAL_BASELINE = BUILDER
+            .comment("体术强度换算基准：体术伤害 = 原始伤害 × 体术强度 / 本值。"
+                    + "与 techniqueBaseline 取同一个值，才有「四级时伤害 = 现状数值」这个不变量")
+            .defineInRange("combatPower.physicalBaseline", 20.0D, 0.001D, 100000.0D);
+
+    private static final ForgeConfigSpec.DoubleValue COMBAT_POWER_HEAVENLY_MULTIPLIER = BUILDER
+            .comment("天与咒缚：体术强度放大倍数（术式强度恒为 0）")
+            .defineInRange("combatPower.heavenlyPhysicalMultiplier", 3.5D, 1.0D, 1000.0D);
+
+    private static final ForgeConfigSpec.DoubleValue COMBAT_POWER_REVERSE_TECHNIQUE_BONUS = BUILDER
+            .comment("习得反转术式后的术式强度加成")
+            .defineInRange("combatPower.reverseTechniqueBonus", 10.0D, 0.0D, 100000.0D);
+
+    private static final ForgeConfigSpec.DoubleValue COMBAT_POWER_INTEL_PER_LEVEL = BUILDER
+            .comment("每点术式情报提供的术式强度")
+            .defineInRange("combatPower.intelPerLevel", 2.0D, 0.0D, 100000.0D);
+
+    // ======== 防御面板（护甲 / 体术抗性 / 术式抗性） ========
+
+    private static final ForgeConfigSpec.BooleanValue COMBAT_DEFENSE_ENABLED = BUILDER
+            .comment("是否启用防御面板（护甲补算 + 体术 / 术式抗性）。关闭则回到「术式无视护甲、无抗性」的旧行为")
+            .define("combatDefense.enabled", true);
+
+    private static final ForgeConfigSpec.DoubleValue COMBAT_DEFENSE_ARMOR_FACTOR = BUILDER
+            .comment("每点护甲提供的术式减伤（百分比点数）。")
+            .defineInRange("combatDefense.armorFactorPerPoint", 2.0D, 0.0D, 100.0D);
+
+    private static final ForgeConfigSpec.DoubleValue COMBAT_DEFENSE_ARMOR_CAP = BUILDER
+            .comment("护甲层对术式减伤的封顶（百分比）。")
+            .defineInRange("combatDefense.armorMaxReduction", 60.0D, 0.0D, 100.0D);
+
+    private static final ForgeConfigSpec.DoubleValue COMBAT_DEFENSE_PHYSICAL_RESIST_CAP = BUILDER
+            .comment("体术抗性的生效封顶（百分比）。")
+            .defineInRange("combatDefense.physicalResistanceCap", 70.0D, 0.0D, 100.0D);
+
+    private static final ForgeConfigSpec.DoubleValue COMBAT_DEFENSE_TECHNIQUE_RESIST_CAP = BUILDER
+            .comment("术式抗性的生效封顶（百分比）。")
+            .defineInRange("combatDefense.techniqueResistanceCap", 70.0D, 0.0D, 100.0D);
+
+    private static final ForgeConfigSpec.DoubleValue COMBAT_DEFENSE_TOTAL_CAP = BUILDER
+            .comment("护甲 + 抗性合起来的减伤封顶（百分比）。")
+            .defineInRange("combatDefense.defenseReductionCap", 85.0D, 0.0D, 100.0D);
+
+    private static final ForgeConfigSpec.DoubleValue COMBAT_DEFENSE_COMPOSITE_SHARE = BUILDER
+            .comment("复合伤害（黑闪 / 处刑必杀）里体抗与术抗各自的计算比例，0.5 表示各按一半计。")
+            .defineInRange("combatDefense.compositeResistanceShare", 0.5D, 0.0D, 1.0D);
+
+    private static final ForgeConfigSpec.BooleanValue COMBAT_DEFENSE_PENETRATION_ENABLED = BUILDER
+            .comment("Enable physical/technique penetration. Off => pen attributes read as 0.")
+            .define("combatDefense.penetrationEnabled", true);
+
+    private static final ForgeConfigSpec.BooleanValue COMBAT_DEFENSE_PENETRATION_CAN_OVERPEN = BUILDER
+            .comment("If false, penetration floors positive mitigation at 0 (no overpen into vulnerability).")
+            .define("combatDefense.penetrationCanOverpen", false);
+
     // ======== 技能战斗数值（玩家可在 config/jujutsukaisenzone-common.toml 修改） ========
 
     private static final ForgeConfigSpec.IntValue SKILL_COMBAT_BASELINE_GRADE = BUILDER
@@ -276,6 +349,29 @@ public class Config
     public static double shrineDomainPowerSlashDamageBaseline;
     public static double shrineDomainPowerSlashDamagePerRank;
 
+    // ======== 战斗强度面板 ========
+
+    public static boolean combatPowerScalingEnabled;
+    public static double combatPowerBase;
+    public static double combatPowerPerRank;
+    public static double combatPowerTechniqueBaseline;
+    public static double combatPowerPhysicalBaseline;
+    public static double combatPowerHeavenlyPhysicalMultiplier;
+    public static double combatPowerReverseTechniqueBonus;
+    public static double combatPowerIntelPerLevel;
+
+    // ======== 防御面板 ========
+
+    public static boolean combatDefenseEnabled;
+    public static double combatDefenseArmorFactorPerPoint;
+    public static double combatDefenseArmorMaxReduction;
+    public static double combatDefensePhysicalResistanceCap;
+    public static double combatDefenseTechniqueResistanceCap;
+    public static double combatDefenseDefenseReductionCap;
+    public static double combatDefenseCompositeResistanceShare;
+    public static boolean combatDefensePenetrationEnabled;
+    public static boolean combatDefensePenetrationCanOverpen;
+
     private static boolean validateItemName(final Object obj)
     {
         return obj instanceof final String itemName && ForgeRegistries.ITEMS.containsKey(ResourceLocation.tryParse(itemName));
@@ -351,6 +447,27 @@ public class Config
         shrineDomainSlashDamagePerRank = SHRINE_DOMAIN_SLASH_DAMAGE_PER_RANK.get();
         shrineDomainPowerSlashDamageBaseline = SHRINE_DOMAIN_POWER_SLASH_DAMAGE_BASELINE.get();
         shrineDomainPowerSlashDamagePerRank = SHRINE_DOMAIN_POWER_SLASH_DAMAGE_PER_RANK.get();
+
+        // 战斗强度面板配置加载
+        combatPowerScalingEnabled = COMBAT_POWER_SCALING_ENABLED.get();
+        combatPowerBase = COMBAT_POWER_BASE.get();
+        combatPowerPerRank = COMBAT_POWER_PER_RANK.get();
+        combatPowerTechniqueBaseline = COMBAT_POWER_TECHNIQUE_BASELINE.get();
+        combatPowerPhysicalBaseline = COMBAT_POWER_PHYSICAL_BASELINE.get();
+        combatPowerHeavenlyPhysicalMultiplier = COMBAT_POWER_HEAVENLY_MULTIPLIER.get();
+        combatPowerReverseTechniqueBonus = COMBAT_POWER_REVERSE_TECHNIQUE_BONUS.get();
+        combatPowerIntelPerLevel = COMBAT_POWER_INTEL_PER_LEVEL.get();
+
+        // 防御面板配置加载
+        combatDefenseEnabled = COMBAT_DEFENSE_ENABLED.get();
+        combatDefenseArmorFactorPerPoint = COMBAT_DEFENSE_ARMOR_FACTOR.get();
+        combatDefenseArmorMaxReduction = COMBAT_DEFENSE_ARMOR_CAP.get();
+        combatDefensePhysicalResistanceCap = COMBAT_DEFENSE_PHYSICAL_RESIST_CAP.get();
+        combatDefenseTechniqueResistanceCap = COMBAT_DEFENSE_TECHNIQUE_RESIST_CAP.get();
+        combatDefenseDefenseReductionCap = COMBAT_DEFENSE_TOTAL_CAP.get();
+        combatDefenseCompositeResistanceShare = COMBAT_DEFENSE_COMPOSITE_SHARE.get();
+        combatDefensePenetrationEnabled = COMBAT_DEFENSE_PENETRATION_ENABLED.get();
+        combatDefensePenetrationCanOverpen = COMBAT_DEFENSE_PENETRATION_CAN_OVERPEN.get();
 
         SkillCombatConfigRegistry.reloadFromForgeConfig();
     }

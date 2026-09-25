@@ -40,6 +40,8 @@ public final class PlayerReverseTechniqueData
         data.reverseTechniqueLearned = learned;
         JjkzPlayerDataStorage.get(player).setDirty();
         ModNetwork.sendReverseTechniqueSync(player, learned);
+        // 反转术式是术式强度的来源之一，面板必须跟着刷新
+        PlayerCombatPowerData.syncToClient(player);
     }
 
     public static void applyClientLearned(Player player, boolean learned)

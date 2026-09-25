@@ -1,5 +1,6 @@
 package com.darkness.jujutsukaisenzone.player;
 
+import com.darkness.jujutsukaisenzone.registry.ModAttributes;
 import com.darkness.jujutsukaisenzone.technique.DomainExpansionServerLogic;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
@@ -58,6 +59,31 @@ public final class JjkzPlayerDataDisplay
                 CursedGradeBonuses.BASE_MAX_HEALTH,
                 healthBonus)));
         viewer.sendSystemMessage(Component.literal("天与咒缚: " + (heavenlyRestricted ? "是" : "否")));
+        CombatPowerStats power = PlayerCombatPowerData.resolve(subject);
+        viewer.sendSystemMessage(Component.literal("体术强度: " + power.physicalPower()
+                + "　术式强度: " + power.techniquePower()));
+        for (CombatPowerStats.Contribution contribution : power.physicalBreakdown())
+        {
+            viewer.sendSystemMessage(Component.literal("  · 体术 " + contribution.label() + ": " + contribution.amount()));
+        }
+        for (CombatPowerStats.Contribution contribution : power.techniqueBreakdown())
+        {
+            viewer.sendSystemMessage(Component.literal("  · 术式 " + contribution.label() + ": " + contribution.amount()));
+        }
+        // 防御侧平行三层 + 攻击侧穿透（穿甲穿护甲%与体抗，术穿只穿术抗）。
+        var physicalResistance = subject.getAttribute(ModAttributes.PHYSICAL_RESISTANCE.get());
+        var techniqueResistance = subject.getAttribute(ModAttributes.TECHNIQUE_RESISTANCE.get());
+        var physicalPenetration = subject.getAttribute(ModAttributes.PHYSICAL_PENETRATION.get());
+        var techniquePenetration = subject.getAttribute(ModAttributes.TECHNIQUE_PENETRATION.get());
+        viewer.sendSystemMessage(Component.literal(String.format(
+                "护甲（防御力）: %s　体术抗性: %.1f%%　术式抗性: %.1f%%",
+                subject.getArmorValue(),
+                physicalResistance == null ? 0.0D : physicalResistance.getValue(),
+                techniqueResistance == null ? 0.0D : techniqueResistance.getValue())));
+        viewer.sendSystemMessage(Component.literal(String.format(
+                "穿甲: %.1f%%　术穿: %.1f%%",
+                physicalPenetration == null ? 0.0D : physicalPenetration.getValue(),
+                techniquePenetration == null ? 0.0D : techniquePenetration.getValue())));
         DomainExpansionServerLogic domainLogic = DomainExpansionServerLogic.getInstance();
         boolean hasDomain = domainLogic.hasLearnedDomainExpansion(subject);
         String domainName = domainLogic.getDomainName();

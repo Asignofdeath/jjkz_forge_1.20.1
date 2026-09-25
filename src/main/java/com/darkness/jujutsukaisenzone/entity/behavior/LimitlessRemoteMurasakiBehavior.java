@@ -17,6 +17,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
+import com.darkness.jujutsukaisenzone.technique.SkillDamageResolver;
 import com.darkness.jujutsukaisenzone.technique.TechniqueDamageSources;
 import com.darkness.jujutsukaisenzone.technique.skillset.SkillDamageType;
 import net.minecraft.world.damagesource.DamageSource;
@@ -556,7 +557,7 @@ public class LimitlessRemoteMurasakiBehavior extends EffectBehavior
         AABB query = new AABB(cx, cy, cz, cx, cy, cz).inflate(r);
 
         LivingEntity owner = resolveOwner(entity, this.ownerUuid);
-        float dmg = LimitlessRemoteMurasakiConfig.ARROW_SPHERE_DAMAGE_PER_TICK;
+        float dmg = SkillDamageResolver.technique(owner, LimitlessRemoteMurasakiConfig.ARROW_SPHERE_DAMAGE_PER_TICK);
 
         for (LivingEntity target : level.getEntitiesOfClass(LivingEntity.class, query))
         {
@@ -573,9 +574,7 @@ public class LimitlessRemoteMurasakiBehavior extends EffectBehavior
                 continue;
             }
 
-            DamageSource source = owner != null
-                    ? entity.damageSources().mobProjectile(entity, owner)
-                    : entity.damageSources().magic();
+            DamageSource source = TechniqueDamageSources.techniqueSource(level, owner);
             TechniqueDamageSources.runWithType(SkillDamageType.TECHNIQUE, () -> {
                 target.hurt(source, dmg);
                 if (!(target instanceof Player) && !target.isAlive())
