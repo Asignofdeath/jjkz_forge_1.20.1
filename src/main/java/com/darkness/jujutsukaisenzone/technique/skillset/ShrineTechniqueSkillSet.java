@@ -91,6 +91,13 @@ public final class ShrineTechniqueSkillSet extends AbstractInnateTechniqueSkillS
     public static final String SKILL_FUGA = "shrine_fuga";
     public static final String REF_BLACK_FLASH_3 = "ref_shrine_black_flash_3";
     public static final String REF_SEANCE_COMPLETE = "ref_seance_technique_complete";
+    /**
+     * 领域「伏魔神龛」<b>说明节点</b>的 nodeId。
+     * <p>
+     * 领域没有 skillId（它不是可释放技能，只是个说明节点），所以「本领域斩击不参与暴击」这条
+     * 描述标注只能按 nodeId 定位，见 {@code CritSkillPolicy#isNoCritInfoNode}。
+     */
+    public static final String INFO_DOMAIN_FUMOSHINKAN = "shrine_domain_fumoshinkan";
 
     private static final List<TechniqueSkill> SKILLS = Arrays.asList(
             new TechniqueSkill(SKILL_KAI, 1, Component.literal("「解」挥砍"),
@@ -135,7 +142,7 @@ public final class ShrineTechniqueSkillSet extends AbstractInnateTechniqueSkillS
                     .requires(REF_SEANCE_COMPLETE)
                     .intelCost(600)
                     .build())
-            .node(SkillTreeNodeDef.info("shrine_domain_fumoshinkan")
+            .node(SkillTreeNodeDef.info(INFO_DOMAIN_FUMOSHINKAN)
                     .titleKey("skill_tree.jujutsukaisenzone.shrine_domain_fumoshinkan.title")
                     .iconPath("textures/item/slash_technique_sukuna.png")
                     .descriptionKey("skill_tree.jujutsukaisenzone.shrine_domain_fumoshinkan.desc")

@@ -49,6 +49,12 @@ public class TechniqueMeltdownEffect extends MobEffect
         );
     }
 
+    /** 清除术式熔断（反转修复等）。 */
+    public static void clear(ServerPlayer player)
+    {
+        player.removeEffect(ModEffects.TECHNIQUE_MELTDOWN.get());
+    }
+
     public static boolean blockTechniqueSkillUse(ServerPlayer player)
     {
         if (!isActive(player))

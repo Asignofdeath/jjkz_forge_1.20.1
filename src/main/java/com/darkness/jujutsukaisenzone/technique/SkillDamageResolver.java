@@ -1,6 +1,7 @@
 package com.darkness.jujutsukaisenzone.technique;
 
 import com.darkness.jujutsukaisenzone.Config;
+import com.darkness.jujutsukaisenzone.entity.combat.LivingCombatStats;
 import com.darkness.jujutsukaisenzone.player.PlayerCombatPowerData;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
@@ -16,8 +17,8 @@ import org.jetbrains.annotations.Nullable;
  * 这样现有 {@code *Config} 里的常量（8.0 / 10.0 / 5.0 / 3.0 / 400.0 …）语义保持不变，
  * 只是从「四级时的固定伤害」变成「四级基准点数」，之后随强度线性放大。
  * <p>
- * ⚠️ 非玩家攻击者（原版生物等）一律原样返回：它们没有面板，且默认推导会把平衡打乱。
- * 未来给生物登记面板时在此扩展 {@code LivingCombatStats}。
+ * 攻击者优先级：玩家 {@link PlayerCombatPowerData} → 实体 {@link LivingCombatStats}
+ * （十影式神等）→ 无面板则原样返回。
  */
 public final class SkillDamageResolver
 {
@@ -36,11 +37,11 @@ public final class SkillDamageResolver
     /** 术式：把「四级基准点数」换算成施术者当前强度下的实际伤害。 */
     public static float technique(@Nullable LivingEntity owner, float baselinePoints)
     {
-        if (!enabled() || !(owner instanceof Player player))
+        if (!enabled())
         {
             return baselinePoints;
         }
-        int power = PlayerCombatPowerData.techniquePower(player);
+        int power = resolveTechniquePower(owner);
         if (power < 0)
         {
             return baselinePoints;
@@ -51,16 +52,34 @@ public final class SkillDamageResolver
     /** 体术：对 EpicFight / 原版近战的原始伤害施加体术强度倍率。 */
     public static float physical(@Nullable LivingEntity attacker, float rawAmount)
     {
-        if (!enabled() || !(attacker instanceof Player player))
+        if (!enabled())
         {
             return rawAmount;
         }
-        int power = PlayerCombatPowerData.physicalPower(player);
+        int power = resolvePhysicalPower(attacker);
         if (power < 0)
         {
             return rawAmount;
         }
         return rawAmount * power / (float) Config.combatPowerPhysicalBaseline;
+    }
+
+    private static int resolvePhysicalPower(@Nullable LivingEntity attacker)
+    {
+        if (attacker instanceof Player player)
+        {
+            return PlayerCombatPowerData.physicalPower(player);
+        }
+        return LivingCombatStats.physicalPower(attacker);
+    }
+
+    private static int resolveTechniquePower(@Nullable LivingEntity owner)
+    {
+        if (owner instanceof Player player)
+        {
+            return PlayerCombatPowerData.techniquePower(player);
+        }
+        return LivingCombatStats.techniquePower(owner);
     }
 
     /** 技能描述用的百分比：四级基准点数 → 倍率百分数（8 点 = 40%）。 */

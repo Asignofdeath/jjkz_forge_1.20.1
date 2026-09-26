@@ -5,6 +5,7 @@ import com.darkness.jujutsukaisenzone.entity.combat.MobCombatStats;
 import com.darkness.jujutsukaisenzone.entity.combat.MobCombatStatsRegistry;
 import com.darkness.jujutsukaisenzone.entity.combat.MobCombatStatsReloadListener;
 import com.darkness.jujutsukaisenzone.registry.ModAttributes;
+import com.darkness.jujutsukaisenzone.technique.skill.tenshadows.TenShadowsShikigamiStatsApplier;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
@@ -64,6 +65,11 @@ public final class MobCombatStatsEvents
     /** 按当前注册表刷新该生物的四项修饰符（表里没有则清掉旧修饰符）。 */
     public static void applyFromTable(LivingEntity living)
     {
+        /* 十影式神用专用面板，勿被原版生物表盖掉 */
+        if (TenShadowsShikigamiStatsApplier.isTenShadowsStatEntity(living))
+        {
+            return;
+        }
         MobCombatStats stats = MobCombatStatsRegistry.get(living.getType());
         if (stats == null)
         {

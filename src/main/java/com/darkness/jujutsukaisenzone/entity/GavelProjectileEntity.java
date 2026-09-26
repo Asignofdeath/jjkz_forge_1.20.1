@@ -57,16 +57,18 @@ public class GavelProjectileEntity extends ThrowableItemProjectile
     {
         if (!this.level().isClientSide)
         {
-            TechniqueDamageSources.runWithType(SkillDamageType.TECHNIQUE, () -> {
+            // 法槌命中是一次结算（撞击 + 爆炸各一次）⇒ 放行暴击
+            TechniqueDamageSources.runWithTypeCrit(SkillDamageType.TECHNIQUE, () -> {
                 detonateAt(result.getLocation());
                 Entity hit = result.getEntity();
                 Entity owner = this.getOwner();
                 if (hit instanceof LivingEntity living && hit != owner)
                 {
+                    LivingEntity ownerLiving = owner instanceof LivingEntity livingOwner ? livingOwner : null;
                     DamageSource source = this.damageSources().thrown(this, owner);
                     living.hurt(source, SkillDamageResolver.technique(
-                            owner instanceof LivingEntity ownerLiving ? ownerLiving : null,
-                            GavelFormStats.getProjectileDamage(this.getItem())));
+                            ownerLiving,
+                            GavelFormStats.getProjectileDamage(this.getItem(), ownerLiving)));
                 }
             });
         }
@@ -78,7 +80,7 @@ public class GavelProjectileEntity extends ThrowableItemProjectile
     {
         if (!this.level().isClientSide)
         {
-            TechniqueDamageSources.runWithType(SkillDamageType.TECHNIQUE,
+            TechniqueDamageSources.runWithTypeCrit(SkillDamageType.TECHNIQUE,
                     () -> detonateAt(result.getLocation()));
         }
         this.discard();
@@ -92,7 +94,9 @@ public class GavelProjectileEntity extends ThrowableItemProjectile
                 impact.x,
                 impact.y,
                 impact.z,
-                GavelFormStats.getExplosionPower(stack),
+                GavelFormStats.getExplosionPower(
+                        stack,
+                        this.getOwner() instanceof LivingEntity ownerLiving ? ownerLiving : null),
                 false,
                 GavelFormStats.getExplosionInteraction(stack));
     }

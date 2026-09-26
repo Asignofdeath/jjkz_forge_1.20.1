@@ -214,6 +214,117 @@ public class Config
             .comment("If false, penetration floors positive mitigation at 0 (no overpen into vulnerability).")
             .define("combatDefense.penetrationCanOverpen", false);
 
+    // ======== 领域脑损（第1期） ========
+    private static final ForgeConfigSpec.BooleanValue DOMAIN_BRAIN_ENABLED = BUILDER
+            .comment("Enable domain brain-damage soft limit (free daily expansions, then escalating damage).")
+            .define("domainBrain.enabled", true);
+
+    private static final ForgeConfigSpec.IntValue DOMAIN_BRAIN_MAX = BUILDER
+            .comment("Max brain damage points.")
+            .defineInRange("domainBrain.max", 100, 1, 1000);
+
+    private static final ForgeConfigSpec.IntValue DOMAIN_BRAIN_FREE_DAILY = BUILDER
+            .comment("Daily free domain expansions that do not add brain damage.")
+            .defineInRange("domainBrain.freeDailyExpansions", 3, 0, 100);
+
+    private static final ForgeConfigSpec.IntValue DOMAIN_BRAIN_RECOVER_PER_DAY = BUILDER
+            .comment("Brain damage recovered per Minecraft day passed.")
+            .defineInRange("domainBrain.recoverPerDay", 20, 0, 1000);
+
+    private static final ForgeConfigSpec.DoubleValue DOMAIN_BRAIN_FULL_ATTEMPT_DAMAGE = BUILDER
+            .comment("Magic damage dealt when forcing domain at full brain damage.")
+            .defineInRange("domainBrain.fullAttemptDamage", 6.0D, 0.0D, 1000.0D);
+
+    private static final ForgeConfigSpec.IntValue DOMAIN_BRAIN_OVERAGE_1 = BUILDER
+            .comment("Brain damage added on first expansion beyond free quota.")
+            .defineInRange("domainBrain.overageGain1", 15, 0, 1000);
+
+    private static final ForgeConfigSpec.IntValue DOMAIN_BRAIN_OVERAGE_2 = BUILDER
+            .comment("Brain damage added on second expansion beyond free quota.")
+            .defineInRange("domainBrain.overageGain2", 25, 0, 1000);
+
+    private static final ForgeConfigSpec.IntValue DOMAIN_BRAIN_OVERAGE_3 = BUILDER
+            .comment("Brain damage added on third expansion beyond free quota.")
+            .defineInRange("domainBrain.overageGain3", 40, 0, 1000);
+
+    private static final ForgeConfigSpec.IntValue DOMAIN_BRAIN_OVERAGE_REST = BUILDER
+            .comment("Brain damage added on further expansions beyond free quota.")
+            .defineInRange("domainBrain.overageGainRest", 50, 0, 1000);
+
+    private static final ForgeConfigSpec.IntValue DOMAIN_BRAIN_FOOD_HEAL_MINOR = BUILDER
+            .comment("Brain damage healed by soothing candy.")
+            .defineInRange("domainBrain.foodHealMinor", 15, 1, 1000);
+
+    private static final ForgeConfigSpec.IntValue DOMAIN_BRAIN_FOOD_HEAL_MAJOR = BUILDER
+            .comment("Brain damage healed by calming pill.")
+            .defineInRange("domainBrain.foodHealMajor", 35, 1, 1000);
+
+    // ======== 领域量表（第2期） ========
+    private static final ForgeConfigSpec.BooleanValue DOMAIN_GAUGE_ENABLED = BUILDER
+            .comment("Require a full domain gauge to expand. Charge via combat; brain damage reduces efficiency.")
+            .define("domainGauge.enabled", true);
+
+    private static final ForgeConfigSpec.IntValue DOMAIN_GAUGE_MAX = BUILDER
+            .comment("Domain gauge maximum.")
+            .defineInRange("domainGauge.max", 100, 1, 1000);
+
+    private static final ForgeConfigSpec.DoubleValue DOMAIN_GAUGE_TECH_HIT_GAIN = BUILDER
+            .comment("Base gauge gained per technique hit (before efficiency).")
+            .defineInRange("domainGauge.techniqueHitGain", 3.0D, 0.0D, 1000.0D);
+
+    private static final ForgeConfigSpec.IntValue DOMAIN_GAUGE_TECH_HIT_CD = BUILDER
+            .comment("Cooldown ticks between technique-hit gauge charges.")
+            .defineInRange("domainGauge.techniqueHitCooldownTicks", 10, 0, 200);
+
+    private static final ForgeConfigSpec.DoubleValue DOMAIN_GAUGE_BLACK_FLASH_GAIN = BUILDER
+            .comment("Base gauge gained on Black Flash.")
+            .defineInRange("domainGauge.blackFlashGain", 20.0D, 0.0D, 1000.0D);
+
+    private static final ForgeConfigSpec.DoubleValue DOMAIN_GAUGE_EFF_25 = BUILDER
+            .comment("Charge efficiency when brain damage >= 25.")
+            .defineInRange("domainGauge.efficiencyAt25", 0.85D, 0.0D, 1.0D);
+
+    private static final ForgeConfigSpec.DoubleValue DOMAIN_GAUGE_EFF_50 = BUILDER
+            .comment("Charge efficiency when brain damage >= 50.")
+            .defineInRange("domainGauge.efficiencyAt50", 0.65D, 0.0D, 1.0D);
+
+    private static final ForgeConfigSpec.DoubleValue DOMAIN_GAUGE_EFF_75 = BUILDER
+            .comment("Charge efficiency when brain damage >= 75.")
+            .defineInRange("domainGauge.efficiencyAt75", 0.40D, 0.0D, 1.0D);
+
+    // ======== 修复术式熔断（第3期） ========
+    private static final ForgeConfigSpec.BooleanValue DOMAIN_MELTDOWN_REPAIR_ENABLED = BUILDER
+            .comment("Allow Shift+G reverse technique to clear Technique Meltdown at the cost of cursed energy + brain damage.")
+            .define("domainMeltdownRepair.enabled", true);
+
+    private static final ForgeConfigSpec.IntValue DOMAIN_MELTDOWN_REPAIR_COST = BUILDER
+            .comment("Cursed energy cost to repair meltdown.")
+            .defineInRange("domainMeltdownRepair.cost", 300, 0, 100000);
+
+    private static final ForgeConfigSpec.IntValue DOMAIN_MELTDOWN_REPAIR_GAIN_1 = BUILDER
+            .comment("Brain damage from the 1st meltdown repair today.")
+            .defineInRange("domainMeltdownRepair.gain1", 20, 0, 1000);
+
+    private static final ForgeConfigSpec.IntValue DOMAIN_MELTDOWN_REPAIR_GAIN_2 = BUILDER
+            .comment("Brain damage from the 2nd meltdown repair today.")
+            .defineInRange("domainMeltdownRepair.gain2", 30, 0, 1000);
+
+    private static final ForgeConfigSpec.IntValue DOMAIN_MELTDOWN_REPAIR_GAIN_3 = BUILDER
+            .comment("Brain damage from the 3rd meltdown repair today.")
+            .defineInRange("domainMeltdownRepair.gain3", 45, 0, 1000);
+
+    private static final ForgeConfigSpec.IntValue DOMAIN_MELTDOWN_REPAIR_GAIN_REST = BUILDER
+            .comment("Brain damage from the 4th+ meltdown repair today.")
+            .defineInRange("domainMeltdownRepair.gainRest", 55, 0, 1000);
+
+    private static final ForgeConfigSpec.IntValue DOMAIN_MELTDOWN_REPAIR_HIGH_BRAIN_THRESHOLD = BUILDER
+            .comment("When current brain damage is at least this, add extra repair brain cost.")
+            .defineInRange("domainMeltdownRepair.highBrainThreshold", 75, 0, 1000);
+
+    private static final ForgeConfigSpec.IntValue DOMAIN_MELTDOWN_REPAIR_HIGH_BRAIN_EXTRA = BUILDER
+            .comment("Extra brain damage when repairing while already at/above highBrainThreshold.")
+            .defineInRange("domainMeltdownRepair.highBrainExtra", 10, 0, 1000);
+
     // ======== 技能战斗数值（玩家可在 config/jujutsukaisenzone-common.toml 修改） ========
 
     private static final ForgeConfigSpec.IntValue SKILL_COMBAT_BASELINE_GRADE = BUILDER
@@ -372,6 +483,37 @@ public class Config
     public static boolean combatDefensePenetrationEnabled;
     public static boolean combatDefensePenetrationCanOverpen;
 
+    // domain brain
+    public static boolean domainBrainEnabled;
+    public static int domainBrainMax;
+    public static int domainBrainFreeDailyExpansions;
+    public static int domainBrainRecoverPerDay;
+    public static double domainBrainFullAttemptDamage;
+    public static int domainBrainOverageGain1;
+    public static int domainBrainOverageGain2;
+    public static int domainBrainOverageGain3;
+    public static int domainBrainOverageGainRest;
+    public static int domainBrainFoodHealMinor;
+    public static int domainBrainFoodHealMajor;
+
+    public static boolean domainGaugeEnabled;
+    public static int domainGaugeMax;
+    public static double domainGaugeTechniqueHitGain;
+    public static int domainGaugeTechniqueHitCooldownTicks;
+    public static double domainGaugeBlackFlashGain;
+    public static double domainGaugeEfficiency25;
+    public static double domainGaugeEfficiency50;
+    public static double domainGaugeEfficiency75;
+
+    public static boolean domainMeltdownRepairEnabled;
+    public static int domainMeltdownRepairCost;
+    public static int domainMeltdownRepairGain1;
+    public static int domainMeltdownRepairGain2;
+    public static int domainMeltdownRepairGain3;
+    public static int domainMeltdownRepairGainRest;
+    public static int domainMeltdownRepairHighBrainThreshold;
+    public static int domainMeltdownRepairHighBrainExtra;
+
     private static boolean validateItemName(final Object obj)
     {
         return obj instanceof final String itemName && ForgeRegistries.ITEMS.containsKey(ResourceLocation.tryParse(itemName));
@@ -468,6 +610,33 @@ public class Config
         combatDefenseCompositeResistanceShare = COMBAT_DEFENSE_COMPOSITE_SHARE.get();
         combatDefensePenetrationEnabled = COMBAT_DEFENSE_PENETRATION_ENABLED.get();
         combatDefensePenetrationCanOverpen = COMBAT_DEFENSE_PENETRATION_CAN_OVERPEN.get();
+        domainBrainEnabled = DOMAIN_BRAIN_ENABLED.get();
+        domainBrainMax = DOMAIN_BRAIN_MAX.get();
+        domainBrainFreeDailyExpansions = DOMAIN_BRAIN_FREE_DAILY.get();
+        domainBrainRecoverPerDay = DOMAIN_BRAIN_RECOVER_PER_DAY.get();
+        domainBrainFullAttemptDamage = DOMAIN_BRAIN_FULL_ATTEMPT_DAMAGE.get();
+        domainBrainOverageGain1 = DOMAIN_BRAIN_OVERAGE_1.get();
+        domainBrainOverageGain2 = DOMAIN_BRAIN_OVERAGE_2.get();
+        domainBrainOverageGain3 = DOMAIN_BRAIN_OVERAGE_3.get();
+        domainBrainOverageGainRest = DOMAIN_BRAIN_OVERAGE_REST.get();
+        domainBrainFoodHealMinor = DOMAIN_BRAIN_FOOD_HEAL_MINOR.get();
+        domainBrainFoodHealMajor = DOMAIN_BRAIN_FOOD_HEAL_MAJOR.get();
+        domainGaugeEnabled = DOMAIN_GAUGE_ENABLED.get();
+        domainGaugeMax = DOMAIN_GAUGE_MAX.get();
+        domainGaugeTechniqueHitGain = DOMAIN_GAUGE_TECH_HIT_GAIN.get();
+        domainGaugeTechniqueHitCooldownTicks = DOMAIN_GAUGE_TECH_HIT_CD.get();
+        domainGaugeBlackFlashGain = DOMAIN_GAUGE_BLACK_FLASH_GAIN.get();
+        domainGaugeEfficiency25 = DOMAIN_GAUGE_EFF_25.get();
+        domainGaugeEfficiency50 = DOMAIN_GAUGE_EFF_50.get();
+        domainGaugeEfficiency75 = DOMAIN_GAUGE_EFF_75.get();
+        domainMeltdownRepairEnabled = DOMAIN_MELTDOWN_REPAIR_ENABLED.get();
+        domainMeltdownRepairCost = DOMAIN_MELTDOWN_REPAIR_COST.get();
+        domainMeltdownRepairGain1 = DOMAIN_MELTDOWN_REPAIR_GAIN_1.get();
+        domainMeltdownRepairGain2 = DOMAIN_MELTDOWN_REPAIR_GAIN_2.get();
+        domainMeltdownRepairGain3 = DOMAIN_MELTDOWN_REPAIR_GAIN_3.get();
+        domainMeltdownRepairGainRest = DOMAIN_MELTDOWN_REPAIR_GAIN_REST.get();
+        domainMeltdownRepairHighBrainThreshold = DOMAIN_MELTDOWN_REPAIR_HIGH_BRAIN_THRESHOLD.get();
+        domainMeltdownRepairHighBrainExtra = DOMAIN_MELTDOWN_REPAIR_HIGH_BRAIN_EXTRA.get();
 
         SkillCombatConfigRegistry.reloadFromForgeConfig();
     }

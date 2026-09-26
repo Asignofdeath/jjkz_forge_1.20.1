@@ -4,6 +4,7 @@ import com.darkness.jujutsukaisenzone.network.ModNetwork;
 import com.darkness.jujutsukaisenzone.player.PlayerCursedGradeData;
 import com.darkness.jujutsukaisenzone.player.PlayerSeanceTechniqueData;
 import com.darkness.jujutsukaisenzone.player.PlayerShrineBlackFlashMilestoneData;
+import com.darkness.jujutsukaisenzone.player.PlayerSpData;
 import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
 import com.darkness.jujutsukaisenzone.player.PlayerTechniqueIntelData;
 import com.darkness.jujutsukaisenzone.player.SeanceTechniqueLevel;
@@ -184,6 +185,10 @@ public final class SkillUnlockLogic
         {
             return false;
         }
+        if (MechanicLiberationRegistry.isLiberationMechanic(node.skillId()))
+        {
+            return canLiberateMechanic(player, techniqueId, node.skillId());
+        }
         if (node.vanillaXpLevelCost() > 0)
         {
             return player.experienceLevel >= node.vanillaXpLevelCost();
@@ -226,6 +231,10 @@ public final class SkillUnlockLogic
         {
             return SkillUnlockResult.CONDITIONS_NOT_MET;
         }
+        if (MechanicLiberationRegistry.isLiberationMechanic(node.skillId()))
+        {
+            return tryLiberateMechanic(player, techniqueId, node);
+        }
         if (node.vanillaXpLevelCost() > 0)
         {
             if (player.experienceLevel < node.vanillaXpLevelCost())
@@ -243,6 +252,46 @@ public final class SkillUnlockLogic
             player.giveExperienceLevels(-node.vanillaXpLevelCost());
         }
 
+        setSkillUnlocked(player, techniqueId, node, true);
+        return SkillUnlockResult.SUCCESS;
+    }
+
+    /**
+     * 机制型技能是否满足「关联主动满级 + SP」解放条件（不含前置节点；由 {@link #canUnlockSkill} 先查）。
+     */
+    public static boolean canLiberateMechanic(Player player, String techniqueId, String mechanicSkillId)
+    {
+        Optional<MechanicLiberationDef> defOpt = MechanicLiberationRegistry.find(mechanicSkillId);
+        if (defOpt.isEmpty())
+        {
+            return false;
+        }
+        MechanicLiberationDef def = defOpt.get();
+        int activeLevel = SkillUpgradeLogic.getSkillLevel(player, techniqueId, def.requiredActiveSkillId());
+        if (!SkillLevelRules.isMaxLevel(activeLevel))
+        {
+            return false;
+        }
+        return PlayerSpData.getAvailable(player) >= def.spCost();
+    }
+
+    private static SkillUnlockResult tryLiberateMechanic(ServerPlayer player, String techniqueId, SkillTreeNodeDef node)
+    {
+        Optional<MechanicLiberationDef> defOpt = MechanicLiberationRegistry.find(node.skillId());
+        if (defOpt.isEmpty())
+        {
+            return SkillUnlockResult.UNKNOWN_NODE;
+        }
+        MechanicLiberationDef def = defOpt.get();
+        int activeLevel = SkillUpgradeLogic.getSkillLevel(player, techniqueId, def.requiredActiveSkillId());
+        if (!SkillLevelRules.isMaxLevel(activeLevel))
+        {
+            return SkillUnlockResult.ACTIVE_NOT_MAX_LEVEL;
+        }
+        if (!PlayerSpData.tryConsumeLiberation(player, def.spCost()))
+        {
+            return SkillUnlockResult.INSUFFICIENT_SP;
+        }
         setSkillUnlocked(player, techniqueId, node, true);
         return SkillUnlockResult.SUCCESS;
     }
@@ -415,6 +464,38 @@ public final class SkillUnlockLogic
     public static void syncToClient(ServerPlayer player)
     {
         ModNetwork.sendSkillUnlocksSync(player, snapshotUnlockTags(player));
+        syncLevelsToClient(player);
+    }
+
+    public static Map<String, Integer> snapshotLevelTags(ServerPlayer player)
+    {
+        Map<String, Integer> result = new LinkedHashMap<>();
+        CompoundTag data = player.getPersistentData();
+        for (String key : data.getAllKeys())
+        {
+            if (isLevelTagKey(key, data))
+            {
+                result.put(key, SkillLevelRules.clampLevel(data.getInt(key)));
+            }
+        }
+        return result;
+    }
+
+    public static void applyClientLevelTags(Player player, Map<String, Integer> levelTags)
+    {
+        for (Map.Entry<String, Integer> entry : levelTags.entrySet())
+        {
+            if (entry.getKey() == null || entry.getKey().isBlank())
+            {
+                continue;
+            }
+            player.getPersistentData().putInt(entry.getKey(), SkillLevelRules.clampLevel(entry.getValue()));
+        }
+    }
+
+    public static void syncLevelsToClient(ServerPlayer player)
+    {
+        ModNetwork.sendSkillLevelsSync(player, snapshotLevelTags(player));
     }
 
     /** 快捷栏槽位仅允许已解锁技能；否则返回空串。 */

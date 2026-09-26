@@ -1,0 +1,12 @@
+{
+
+  "parent": "minecraft:item/generated",
+
+  "textures": {
+
+    "layer0": "jujutsukaisenzone:item/placeholder_technique_item"
+
+  }
+
+}
+

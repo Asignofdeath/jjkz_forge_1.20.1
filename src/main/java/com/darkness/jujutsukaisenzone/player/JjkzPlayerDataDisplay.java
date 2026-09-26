@@ -1,5 +1,6 @@
 package com.darkness.jujutsukaisenzone.player;
 
+import com.darkness.jujutsukaisenzone.Config;
 import com.darkness.jujutsukaisenzone.registry.ModAttributes;
 import com.darkness.jujutsukaisenzone.technique.DomainExpansionServerLogic;
 import net.minecraft.network.chat.Component;
@@ -38,7 +39,11 @@ public final class JjkzPlayerDataDisplay
                 "========== JJKZ 玩家数据（" + subject.getGameProfile().getName() + "）=========="));
         viewer.sendSystemMessage(Component.literal("阵营: " + factionDisplay));
         viewer.sendSystemMessage(Component.literal("生得术式: " + innateTechnique));
-        viewer.sendSystemMessage(Component.literal("反转术式: " + (reverseTechniqueLearned ? "已习得" : "未习得")));
+        viewer.sendSystemMessage(Component.literal("反转术式: " + (reverseTechniqueLearned ? "已习得" : "未习得")
+                + String.format("（效率 %.0f%%）",
+                subject.getAttribute(ModAttributes.REVERSE_TECHNIQUE_EFFICIENCY.get()) == null
+                        ? 100.0D
+                        : subject.getAttribute(ModAttributes.REVERSE_TECHNIQUE_EFFICIENCY.get()).getValue())));
         viewer.sendSystemMessage(Component.literal("结界术等级: " + getBarrierLevelDisplayName(barrierLevel)
                 + "（维持减免：" + (int) (barrierLevel.getMaintainCostReduction() * 100) + "%）"));
         viewer.sendSystemMessage(Component.literal("降灵术等级: " + getSeanceLevelDisplayName(seanceLevel)
@@ -81,7 +86,7 @@ public final class JjkzPlayerDataDisplay
                 physicalResistance == null ? 0.0D : physicalResistance.getValue(),
                 techniqueResistance == null ? 0.0D : techniqueResistance.getValue())));
         viewer.sendSystemMessage(Component.literal(String.format(
-                "穿甲: %.1f%%　术穿: %.1f%%",
+                "穿甲: %.1f%%　术式穿透: %.1f%%",
                 physicalPenetration == null ? 0.0D : physicalPenetration.getValue(),
                 techniquePenetration == null ? 0.0D : techniquePenetration.getValue())));
         DomainExpansionServerLogic domainLogic = DomainExpansionServerLogic.getInstance();
@@ -89,6 +94,20 @@ public final class JjkzPlayerDataDisplay
         String domainName = domainLogic.getDomainName();
         viewer.sendSystemMessage(Component.literal("领域展开: " + (hasDomain ? "已习得" : "未习得")
                 + (domainName.isEmpty() ? "" : "（" + domainName + "）")));
+        int brain = PlayerBrainDamageData.getBrainDamage(subject);
+        int expands = PlayerBrainDamageData.getExpandsToday(subject);
+        int free = PlayerBrainDamageData.getFreeDailyQuota();
+        int maxBrain = Config.domainBrainMax > 0 ? Config.domainBrainMax : 100;
+        viewer.sendSystemMessage(Component.literal("脑损: " + brain + "/" + maxBrain
+                + "　今日领域: " + expands + "（免费额度 " + free + "）"));
+        viewer.sendSystemMessage(Component.literal("领域量表: " + PlayerDomainGaugeData.getGauge(subject)
+                + "/" + PlayerDomainGaugeData.getMax()
+                + String.format("（充能效率 %.0f%%）",
+                subject.getAttribute(ModAttributes.DOMAIN_GAUGE_CHARGE_EFFICIENCY.get()) == null
+                        ? 100.0D
+                        : subject.getAttribute(ModAttributes.DOMAIN_GAUGE_CHARGE_EFFICIENCY.get()).getValue())));
+        viewer.sendSystemMessage(Component.literal("今日熔断修复: "
+                + PlayerBrainDamageData.getMeltdownRepairsToday(subject)));
 
         List<Component> crimeRecordLines = new ArrayList<>();
         PlayerCrimeRecordData.appendDisplayLines(subject, crimeRecordLines);

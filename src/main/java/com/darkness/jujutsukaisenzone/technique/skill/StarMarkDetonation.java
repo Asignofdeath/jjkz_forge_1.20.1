@@ -197,7 +197,8 @@ public final class StarMarkDetonation
          * 它内部会吃掉原版击退，所以引爆只掉血、不推人——这正是「单体伤害」该有的样子。
          * 返回值沿用 hurt 的语义（伤害是否真正生效），因此无敌帧、创造模式目标等情况会被如实报成「没打到」。
          */
-        return TechniqueDamageSources.deal(living, owner, DETONATION_DAMAGE);
+        // 引爆是一次结算（不是逐 tick 灼烧）⇒ 放行暴击
+        return TechniqueDamageSources.dealCrit(living, owner, DETONATION_DAMAGE);
     }
 
     /**

@@ -9,7 +9,13 @@ import com.darkness.jujutsukaisenzone.player.SeanceTechniqueLevel;
 import com.darkness.jujutsukaisenzone.technique.commonskill.ReverseTechniqueCommonKeySkill;
 import com.darkness.jujutsukaisenzone.technique.development.SkillTreeNodeDef;
 import com.darkness.jujutsukaisenzone.technique.development.SkillTreeReferenceKind;
+import com.darkness.jujutsukaisenzone.player.PlayerSpData;
+import com.darkness.jujutsukaisenzone.technique.development.MechanicLiberationDef;
+import com.darkness.jujutsukaisenzone.technique.development.MechanicLiberationRegistry;
+import com.darkness.jujutsukaisenzone.technique.development.SkillLevelRules;
 import com.darkness.jujutsukaisenzone.technique.development.SkillUnlockLogic;
+import com.darkness.jujutsukaisenzone.technique.development.SkillUpgradeCostRegistry;
+import com.darkness.jujutsukaisenzone.technique.development.SkillUpgradeLogic;
 import com.darkness.jujutsukaisenzone.technique.skillset.TechniqueSkill;
 import com.darkness.jujutsukaisenzone.technique.skillset.TechniqueSpecialMove;
 import net.minecraft.client.Minecraft;
@@ -293,15 +299,38 @@ public final class TechniqueSkillTreeViewHelper
 
         return switch (state)
         {
-            case SKILL_UNLOCKED -> "已解锁";
-            case SKILL_CAN_UNLOCK -> getCanUnlockSubtitle(node);
+            case SKILL_UNLOCKED -> getUnlockedSubtitle(player, techniqueId, node);
+            case SKILL_CAN_UNLOCK -> getCanUnlockSubtitle(player, techniqueId, node);
             case SKILL_LOCKED -> getLockedSubtitle(player, techniqueId, node);
             default -> "";
         };
     }
 
-    private static String getCanUnlockSubtitle(SkillTreeNodeDef node)
+    private static String getUnlockedSubtitle(Player player, String techniqueId, SkillTreeNodeDef node)
     {
+        if (SkillUnlockLogic.isMechanicSkill(techniqueId, node.skillId()))
+        {
+            return "已解放";
+        }
+        if (!SkillUpgradeCostRegistry.isUpgradeable(node.skillId()))
+        {
+            return "已解锁";
+        }
+        int level = SkillUpgradeLogic.getSkillLevel(player, techniqueId, node.skillId());
+        if (SkillLevelRules.isMaxLevel(level))
+        {
+            return "Lv." + level + " 满级";
+        }
+        return "Lv." + level + " · 右键升级";
+    }
+
+    private static String getCanUnlockSubtitle(Player player, String techniqueId, SkillTreeNodeDef node)
+    {
+        var liberation = MechanicLiberationRegistry.find(node.skillId());
+        if (liberation.isPresent())
+        {
+            return "可解放 · " + liberation.get().spCost() + " SP";
+        }
         if (node.vanillaXpLevelCost() > 0)
         {
             return Component.translatable(
@@ -313,6 +342,18 @@ public final class TechniqueSkillTreeViewHelper
 
     private static String getLockedSubtitle(Player player, String techniqueId, SkillTreeNodeDef node)
     {
+        var liberation = MechanicLiberationRegistry.find(node.skillId());
+        if (liberation.isPresent())
+        {
+            MechanicLiberationDef def = liberation.get();
+            int activeLevel = SkillUpgradeLogic.getSkillLevel(player, techniqueId, def.requiredActiveSkillId());
+            int sp = PlayerSpData.getAvailable(player);
+            if (!SkillLevelRules.isMaxLevel(activeLevel))
+            {
+                return "需关联主动满级（" + activeLevel + "/" + SkillLevelRules.MAX_LEVEL + "）";
+            }
+            return "需 " + def.spCost() + " SP（" + sp + "）";
+        }
         if (node.vanillaXpLevelCost() > 0)
         {
             return Component.translatable(

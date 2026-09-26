@@ -23,7 +23,13 @@ public enum SkillDamageType
     MARTIAL,
     /** 术式：本次伤害由术式能力造成。 */
     TECHNIQUE,
-    /** 复合：本次伤害同时叠加体术能力与术式能力。 */
+    /**
+     * 复合：本次伤害同时叠加体术能力与术式能力。
+     * <p>
+     * ⚠️ 复合<b>不参与暴击</b>（见 {@code CritRules#canCrit}）。目前它只出现在黑闪与处刑必杀两处：
+     * 前者本就以暴击为门槛、后者是致死量改写，都不该再叠一道暴击浮动。
+     * 将来新增复合分型的技能时它会<b>静默吃不到暴击</b>——先决定要不要动 {@code canCrit}，别以为会自动生效。
+     */
     COMPOSITE;
 
     private static final String LANG_PREFIX = "gui." + JuJutsuKaisenZone.MODID + ".damage_type.";

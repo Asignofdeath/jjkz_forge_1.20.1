@@ -1,0 +1,105 @@
+{
+  "_comment": "已调伏基础面板 + 主人缩放。最终 = 基础 + owner_* × 主人强度。魔虚罗不进此表。",
+  "owner_scaling": {
+    "physical_power_per_owner_physical": 0.35,
+    "technique_power_per_owner_technique": 0.35,
+    "max_health_per_owner_physical": 0.12,
+    "armor_per_owner_physical": 0.02,
+    "physical_resistance_per_owner_physical": 0.02,
+    "technique_resistance_per_owner_technique": 0.03,
+    "physical_penetration_per_owner_physical": 0.02,
+    "technique_penetration_per_owner_technique": 0.02
+  },
+  "entries": {
+    "divine_dogs": {
+      "max_health": 28,
+      "armor": 1,
+      "physical_resistance": 5,
+      "technique_resistance": 0,
+      "physical_penetration": 5,
+      "technique_penetration": 0,
+      "physical_power": 18,
+      "technique_power": 8
+    },
+    "nue": {
+      "max_health": 36,
+      "armor": 1,
+      "physical_resistance": 3,
+      "technique_resistance": 8,
+      "physical_penetration": 3,
+      "technique_penetration": 8,
+      "physical_power": 14,
+      "technique_power": 24
+    },
+    "toad": {
+      "max_health": 32,
+      "armor": 1,
+      "physical_resistance": 6,
+      "technique_resistance": 4,
+      "physical_penetration": 2,
+      "technique_penetration": 4,
+      "physical_power": 16,
+      "technique_power": 14
+    },
+    "great_serpent": {
+      "max_health": 42,
+      "armor": 2,
+      "physical_resistance": 8,
+      "technique_resistance": 5,
+      "physical_penetration": 8,
+      "technique_penetration": 4,
+      "physical_power": 22,
+      "technique_power": 16
+    },
+    "max_elephant": {
+      "max_health": 70,
+      "armor": 6,
+      "physical_resistance": 15,
+      "technique_resistance": 3,
+      "physical_penetration": 5,
+      "technique_penetration": 0,
+      "physical_power": 28,
+      "technique_power": 10
+    },
+    "rabbit_escape": {
+      "max_health": 10,
+      "armor": 0,
+      "physical_resistance": 0,
+      "technique_resistance": 0,
+      "physical_penetration": 4,
+      "technique_penetration": 0,
+      "physical_power": 10,
+      "technique_power": 6
+    },
+    "round_deer": {
+      "max_health": 44,
+      "armor": 3,
+      "physical_resistance": 6,
+      "technique_resistance": 18,
+      "physical_penetration": 0,
+      "technique_penetration": 12,
+      "physical_power": 12,
+      "technique_power": 30
+    },
+    "piercing_ox": {
+      "max_health": 58,
+      "armor": 4,
+      "physical_resistance": 10,
+      "technique_resistance": 3,
+      "physical_penetration": 12,
+      "technique_penetration": 0,
+      "physical_power": 32,
+      "technique_power": 8
+    },
+    "tiger_funeral": {
+      "max_health": 48,
+      "armor": 3,
+      "physical_resistance": 9,
+      "technique_resistance": 9,
+      "physical_penetration": 8,
+      "technique_penetration": 8,
+      "physical_power": 24,
+      "technique_power": 24
+    }
+  }
+}

@@ -1,0 +1,95 @@
+{
+  "_comment": "未调伏：调伏仪式敌对体固定面板（不含魔虚罗）。单位：生命/护甲为原版；双抗双穿为百分比点数；physical_power/technique_power 为强度点。",
+  "entries": {
+    "divine_dogs": {
+      "max_health": 36,
+      "armor": 2,
+      "physical_resistance": 8,
+      "technique_resistance": 0,
+      "physical_penetration": 8,
+      "technique_penetration": 0,
+      "physical_power": 28,
+      "technique_power": 12
+    },
+    "nue": {
+      "max_health": 48,
+      "armor": 1,
+      "physical_resistance": 5,
+      "technique_resistance": 12,
+      "physical_penetration": 5,
+      "technique_penetration": 12,
+      "physical_power": 22,
+      "technique_power": 36
+    },
+    "toad": {
+      "max_health": 42,
+      "armor": 2,
+      "physical_resistance": 10,
+      "technique_resistance": 6,
+      "physical_penetration": 4,
+      "technique_penetration": 6,
+      "physical_power": 24,
+      "technique_power": 22
+    },
+    "great_serpent": {
+      "max_health": 55,
+      "armor": 3,
+      "physical_resistance": 12,
+      "technique_resistance": 8,
+      "physical_penetration": 12,
+      "technique_penetration": 6,
+      "physical_power": 34,
+      "technique_power": 26
+    },
+    "max_elephant": {
+      "max_health": 90,
+      "armor": 8,
+      "physical_resistance": 22,
+      "technique_resistance": 5,
+      "physical_penetration": 8,
+      "technique_penetration": 0,
+      "physical_power": 42,
+      "technique_power": 16
+    },
+    "rabbit_escape": {
+      "max_health": 12,
+      "armor": 0,
+      "physical_resistance": 0,
+      "technique_resistance": 0,
+      "physical_penetration": 6,
+      "technique_penetration": 0,
+      "physical_power": 16,
+      "technique_power": 10
+    },
+    "round_deer": {
+      "max_health": 58,
+      "armor": 4,
+      "physical_resistance": 10,
+      "technique_resistance": 28,
+      "physical_penetration": 0,
+      "technique_penetration": 18,
+      "physical_power": 18,
+      "technique_power": 44
+    },
+    "piercing_ox": {
+      "max_health": 75,
+      "armor": 6,
+      "physical_resistance": 16,
+      "technique_resistance": 5,
+      "physical_penetration": 18,
+      "technique_penetration": 0,
+      "physical_power": 48,
+      "technique_power": 12
+    },
+    "tiger_funeral": {
+      "max_health": 64,
+      "armor": 4,
+      "physical_resistance": 14,
+      "technique_resistance": 14,
+      "physical_penetration": 12,
+      "technique_penetration": 12,
+      "physical_power": 38,
+      "technique_power": 38
+    }
+  }
+}

@@ -9,6 +9,7 @@ import com.darkness.jujutsukaisenzone.network.packet.AdjustBarrierRadiusTierC2SP
 import com.darkness.jujutsukaisenzone.network.packet.BarrierTechniqueCastC2SPacket;
 import com.darkness.jujutsukaisenzone.network.packet.DomainExpansionCastC2SPacket;
 import com.darkness.jujutsukaisenzone.network.packet.RepairBarrierC2SPacket;
+import com.darkness.jujutsukaisenzone.network.packet.RepairMeltdownC2SPacket;
 import com.darkness.jujutsukaisenzone.network.packet.ReverseTechniqueTickC2SPacket;
 import com.darkness.jujutsukaisenzone.network.packet.ShrineDomainTeleportC2SPacket;
 import com.darkness.jujutsukaisenzone.network.packet.JudgmentTrialOpeningPerformanceS2CPacket;
@@ -55,6 +56,12 @@ import com.darkness.jujutsukaisenzone.network.packet.SyncShrineCastFilterS2CPack
 import com.darkness.jujutsukaisenzone.network.packet.SyncWhiteOverlayS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncMaxOutputChargeInterruptS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncTechniqueIntelS2CPacket;
+import com.darkness.jujutsukaisenzone.network.packet.SyncSpS2CPacket;
+import com.darkness.jujutsukaisenzone.network.packet.SyncSpNodesS2CPacket;
+import com.darkness.jujutsukaisenzone.network.packet.SyncSeLoadoutS2CPacket;
+import com.darkness.jujutsukaisenzone.network.packet.SyncSkillLevelsS2CPacket;
+import com.darkness.jujutsukaisenzone.network.packet.UpgradeSkillC2SPacket;
+import com.darkness.jujutsukaisenzone.network.packet.UpgradeSkillS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncTechniqueS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.TechniqueHoldReleaseC2SPacket;
 import com.darkness.jujutsukaisenzone.network.packet.TechniqueMaxOutputC2SPacket;
@@ -62,6 +69,12 @@ import com.darkness.jujutsukaisenzone.network.packet.SyncBarrierRulesC2SPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncBarrierRulesS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncBarrierTechniqueLearnedS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncDomainExpansionLearnedS2CPacket;
+import com.darkness.jujutsukaisenzone.network.packet.SyncBrainDamageS2CPacket;
+import com.darkness.jujutsukaisenzone.network.packet.SyncTenShadowsModeS2CPacket;
+import com.darkness.jujutsukaisenzone.network.packet.SyncTenShadowsContractS2CPacket;
+import com.darkness.jujutsukaisenzone.network.packet.SyncTenShadowsFalseDeathS2CPacket;
+import com.darkness.jujutsukaisenzone.network.packet.TenShadowsShikigamiC2SPacket;
+import com.darkness.jujutsukaisenzone.network.packet.ShikigamiAbilityC2SPacket;
 import com.darkness.jujutsukaisenzone.network.packet.TechniqueSpecialMoveC2SPacket;
 import com.darkness.jujutsukaisenzone.network.packet.TechniqueSkillUseC2SPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncSkillBarConfigC2SPacket;
@@ -71,6 +84,10 @@ import com.darkness.jujutsukaisenzone.network.packet.SyncSkillUnlocksS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncShrineBlackFlashMilestoneS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.UnlockSkillC2SPacket;
 import com.darkness.jujutsukaisenzone.network.packet.UnlockSkillS2CPacket;
+import com.darkness.jujutsukaisenzone.network.packet.UnlockSpNodeC2SPacket;
+import com.darkness.jujutsukaisenzone.network.packet.ResetSpNodesC2SPacket;
+import com.darkness.jujutsukaisenzone.network.packet.EquipSeC2SPacket;
+import com.darkness.jujutsukaisenzone.network.packet.UnequipSeC2SPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncMimicryS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncSeanceTechniqueLearnedS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncStrengthenTechniqueLearnedS2CPacket;
@@ -197,10 +214,45 @@ public final class ModNetwork
                 .decoder(SyncDomainExpansionLearnedS2CPacket::decode)
                 .consumerMainThread(SyncDomainExpansionLearnedS2CPacket::handle)
                 .add();
+        CHANNEL.messageBuilder(SyncBrainDamageS2CPacket.class, packetId++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(SyncBrainDamageS2CPacket::encode)
+                .decoder(SyncBrainDamageS2CPacket::decode)
+                .consumerMainThread(SyncBrainDamageS2CPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(SyncTenShadowsModeS2CPacket.class, packetId++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(SyncTenShadowsModeS2CPacket::encode)
+                .decoder(SyncTenShadowsModeS2CPacket::decode)
+                .consumerMainThread(SyncTenShadowsModeS2CPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(TenShadowsShikigamiC2SPacket.class, packetId++, NetworkDirection.PLAY_TO_SERVER)
+                .encoder(TenShadowsShikigamiC2SPacket::encode)
+                .decoder(TenShadowsShikigamiC2SPacket::decode)
+                .consumerMainThread(TenShadowsShikigamiC2SPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(ShikigamiAbilityC2SPacket.class, packetId++, NetworkDirection.PLAY_TO_SERVER)
+                .encoder(ShikigamiAbilityC2SPacket::encode)
+                .decoder(ShikigamiAbilityC2SPacket::decode)
+                .consumerMainThread(ShikigamiAbilityC2SPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(SyncTenShadowsContractS2CPacket.class, packetId++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(SyncTenShadowsContractS2CPacket::encode)
+                .decoder(SyncTenShadowsContractS2CPacket::decode)
+                .consumerMainThread(SyncTenShadowsContractS2CPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(SyncTenShadowsFalseDeathS2CPacket.class, packetId++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(SyncTenShadowsFalseDeathS2CPacket::encode)
+                .decoder(SyncTenShadowsFalseDeathS2CPacket::decode)
+                .consumerMainThread(SyncTenShadowsFalseDeathS2CPacket::handle)
+                .add();
         CHANNEL.messageBuilder(RepairBarrierC2SPacket.class, packetId++, NetworkDirection.PLAY_TO_SERVER)
                 .encoder(RepairBarrierC2SPacket::encode)
                 .decoder(RepairBarrierC2SPacket::decode)
                 .consumerMainThread(RepairBarrierC2SPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(RepairMeltdownC2SPacket.class, packetId++, NetworkDirection.PLAY_TO_SERVER)
+                .encoder(RepairMeltdownC2SPacket::encode)
+                .decoder(RepairMeltdownC2SPacket::decode)
+                .consumerMainThread(RepairMeltdownC2SPacket::handle)
                 .add();
         CHANNEL.messageBuilder(DomainExpansionCastC2SPacket.class, packetId++, NetworkDirection.PLAY_TO_SERVER)
                 .encoder(DomainExpansionCastC2SPacket::encode)
@@ -382,6 +434,36 @@ public final class ModNetwork
                 .decoder(SyncTechniqueIntelS2CPacket::decode)
                 .consumerMainThread(SyncTechniqueIntelS2CPacket::handle)
                 .add();
+        CHANNEL.messageBuilder(SyncSpS2CPacket.class, packetId++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(SyncSpS2CPacket::encode)
+                .decoder(SyncSpS2CPacket::decode)
+                .consumerMainThread(SyncSpS2CPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(SyncSpNodesS2CPacket.class, packetId++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(SyncSpNodesS2CPacket::encode)
+                .decoder(SyncSpNodesS2CPacket::decode)
+                .consumerMainThread(SyncSpNodesS2CPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(SyncSeLoadoutS2CPacket.class, packetId++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(SyncSeLoadoutS2CPacket::encode)
+                .decoder(SyncSeLoadoutS2CPacket::decode)
+                .consumerMainThread(SyncSeLoadoutS2CPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(SyncSkillLevelsS2CPacket.class, packetId++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(SyncSkillLevelsS2CPacket::encode)
+                .decoder(SyncSkillLevelsS2CPacket::decode)
+                .consumerMainThread(SyncSkillLevelsS2CPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(UpgradeSkillC2SPacket.class, packetId++, NetworkDirection.PLAY_TO_SERVER)
+                .encoder(UpgradeSkillC2SPacket::encode)
+                .decoder(UpgradeSkillC2SPacket::decode)
+                .consumerMainThread(UpgradeSkillC2SPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(UpgradeSkillS2CPacket.class, packetId++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(UpgradeSkillS2CPacket::encode)
+                .decoder(UpgradeSkillS2CPacket::decode)
+                .consumerMainThread(UpgradeSkillS2CPacket::handle)
+                .add();
         CHANNEL.messageBuilder(UnlockSkillC2SPacket.class, packetId++, NetworkDirection.PLAY_TO_SERVER)
                 .encoder(UnlockSkillC2SPacket::encode)
                 .decoder(UnlockSkillC2SPacket::decode)
@@ -391,6 +473,26 @@ public final class ModNetwork
                 .encoder(UnlockSkillS2CPacket::encode)
                 .decoder(UnlockSkillS2CPacket::decode)
                 .consumerMainThread(UnlockSkillS2CPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(UnlockSpNodeC2SPacket.class, packetId++, NetworkDirection.PLAY_TO_SERVER)
+                .encoder(UnlockSpNodeC2SPacket::encode)
+                .decoder(UnlockSpNodeC2SPacket::decode)
+                .consumerMainThread(UnlockSpNodeC2SPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(ResetSpNodesC2SPacket.class, packetId++, NetworkDirection.PLAY_TO_SERVER)
+                .encoder(ResetSpNodesC2SPacket::encode)
+                .decoder(ResetSpNodesC2SPacket::decode)
+                .consumerMainThread(ResetSpNodesC2SPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(EquipSeC2SPacket.class, packetId++, NetworkDirection.PLAY_TO_SERVER)
+                .encoder(EquipSeC2SPacket::encode)
+                .decoder(EquipSeC2SPacket::decode)
+                .consumerMainThread(EquipSeC2SPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(UnequipSeC2SPacket.class, packetId++, NetworkDirection.PLAY_TO_SERVER)
+                .encoder(UnequipSeC2SPacket::encode)
+                .decoder(UnequipSeC2SPacket::decode)
+                .consumerMainThread(UnequipSeC2SPacket::handle)
                 .add();
         CHANNEL.messageBuilder(SyncSkillUnlocksS2CPacket.class, packetId++, NetworkDirection.PLAY_TO_CLIENT)
                 .encoder(SyncSkillUnlocksS2CPacket::encode)
@@ -511,6 +613,16 @@ public final class ModNetwork
         CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new SyncDomainExpansionLearnedS2CPacket(learned));
     }
 
+    public static void sendBrainDamageSync(ServerPlayer player, int brainDamage, int expandsToday)
+    {
+        sendDomainResourcesSync(player, brainDamage, expandsToday, com.darkness.jujutsukaisenzone.player.PlayerDomainGaugeData.getGauge(player), com.darkness.jujutsukaisenzone.player.PlayerBrainDamageData.getMeltdownRepairsToday(player));
+    }
+
+    public static void sendDomainResourcesSync(ServerPlayer player, int brainDamage, int expandsToday, int domainGauge, int meltdownRepairsToday)
+    {
+        CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new SyncBrainDamageS2CPacket(brainDamage, expandsToday, domainGauge, meltdownRepairsToday));
+    }
+
     public static void sendSeanceTechniqueLearnedSync(ServerPlayer player, boolean learned, int tier)
     {
         CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new SyncSeanceTechniqueLearnedS2CPacket(learned, tier));
@@ -532,6 +644,44 @@ public final class ModNetwork
         CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new SyncTechniqueIntelS2CPacket(values));
     }
 
+    public static void sendSpSync(ServerPlayer player, int available, int total, int liberation, int allocated)
+    {
+        CHANNEL.send(PacketDistributor.PLAYER.with(() -> player),
+                new SyncSpS2CPacket(available, total, liberation, allocated));
+    }
+
+    public static void sendSpNodesSync(ServerPlayer player, java.util.Set<String> nodeIds, int quality)
+    {
+        CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new SyncSpNodesS2CPacket(nodeIds, quality));
+    }
+
+    public static void sendSeLoadoutSync(ServerPlayer player, java.util.List<String> slots)
+    {
+        CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new SyncSeLoadoutS2CPacket(slots));
+    }
+
+    public static void sendSkillLevelsSync(ServerPlayer player, java.util.Map<String, Integer> levelTags)
+    {
+        CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new SyncSkillLevelsS2CPacket(levelTags));
+    }
+
+    public static void sendUpgradeSkillRequest(String techniqueId, String skillId)
+    {
+        CHANNEL.send(PacketDistributor.SERVER.noArg(), new UpgradeSkillC2SPacket(techniqueId, skillId));
+    }
+
+    public static void sendUpgradeSkillResult(
+            ServerPlayer player,
+            com.darkness.jujutsukaisenzone.technique.development.SkillUpgradeResult result,
+            String techniqueId,
+            String skillId,
+            String levelTag,
+            int level)
+    {
+        CHANNEL.send(PacketDistributor.PLAYER.with(() -> player),
+                new UpgradeSkillS2CPacket(result, techniqueId, skillId, levelTag, level));
+    }
+
     public static void sendSkillUnlocksSync(ServerPlayer player, java.util.Map<String, Boolean> unlockTags)
     {
         CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new SyncSkillUnlocksS2CPacket(unlockTags));
@@ -540,6 +690,26 @@ public final class ModNetwork
     public static void sendUnlockSkillRequest(String techniqueId, String nodeId)
     {
         CHANNEL.send(PacketDistributor.SERVER.noArg(), new UnlockSkillC2SPacket(techniqueId, nodeId));
+    }
+
+    public static void sendUnlockSpNodeRequest(String nodeId)
+    {
+        CHANNEL.send(PacketDistributor.SERVER.noArg(), new UnlockSpNodeC2SPacket(nodeId));
+    }
+
+    public static void sendResetSpNodesRequest()
+    {
+        CHANNEL.send(PacketDistributor.SERVER.noArg(), new ResetSpNodesC2SPacket());
+    }
+
+    public static void sendEquipSeRequest(int slot, String seId)
+    {
+        CHANNEL.send(PacketDistributor.SERVER.noArg(), new EquipSeC2SPacket(slot, seId));
+    }
+
+    public static void sendUnequipSeRequest(int slot)
+    {
+        CHANNEL.send(PacketDistributor.SERVER.noArg(), new UnequipSeC2SPacket(slot));
     }
 
     public static void sendAerialMultiJumpRequest()
@@ -699,6 +869,11 @@ public final class ModNetwork
     public static void sendRepairBarrierToServer()
     {
         CHANNEL.send(PacketDistributor.SERVER.noArg(), new RepairBarrierC2SPacket());
+    }
+
+    public static void sendRepairMeltdownToServer()
+    {
+        CHANNEL.send(PacketDistributor.SERVER.noArg(), new RepairMeltdownC2SPacket());
     }
 
     public static void sendDomainExpansionCastToServer()
@@ -951,6 +1126,33 @@ public final class ModNetwork
     public static void sendSkillBarConfigSync(ServerPlayer player, String techniqueId, String[] skillIds)
     {
         CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new SyncSkillBarConfigS2CPacket(techniqueId, skillIds));
+    }
+
+    public static void sendTenShadowsModeSync(ServerPlayer player, boolean active)
+    {
+        CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new SyncTenShadowsModeS2CPacket(active));
+    }
+
+    public static void sendTenShadowsShikigamiToServer(int shikigamiIndex)
+    {
+        CHANNEL.send(PacketDistributor.SERVER.noArg(), new TenShadowsShikigamiC2SPacket(shikigamiIndex));
+    }
+
+    public static void sendShikigamiAbilityToServer(int shikigamiIndex, int modifierMask)
+    {
+        CHANNEL.send(PacketDistributor.SERVER.noArg(), new ShikigamiAbilityC2SPacket(shikigamiIndex, modifierMask));
+    }
+
+    public static void sendTenShadowsContractSync(ServerPlayer player, int tamedMask)
+    {
+        CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new SyncTenShadowsContractS2CPacket(tamedMask));
+    }
+
+    public static void sendTenShadowsFalseDeathSync(net.minecraft.world.entity.LivingEntity entity, boolean active)
+    {
+        CHANNEL.send(
+                PacketDistributor.TRACKING_ENTITY_AND_SELF.with(() -> entity),
+                new SyncTenShadowsFalseDeathS2CPacket(entity.getUUID(), active));
     }
 
     /** 客户端 → 服务端：切换拟态开关。 */

@@ -205,7 +205,6 @@ public final class JudgmentTechniqueSkillSet extends AbstractInnateTechniqueSkil
              */
             .node(SkillTreeNodeDef.skill("judgment_gavel_forms", SKILL_GAVEL_FORMS)
                     .requires("judgment_gavel")
-                    .intelCost(150)
                     .build())
             /*
              * 机制型技能「量刑」：把「有罪之后会怎样」拆成两步的第一半——先只会【没收】。
@@ -215,7 +214,6 @@ public final class JudgmentTechniqueSkillSet extends AbstractInnateTechniqueSkil
              */
             .node(SkillTreeNodeDef.skill("judgment_sentencing", SKILL_SENTENCING)
                     .requires("judgment_trial")
-                    .intelCost(150)
                     .build())
             /*
              * 机制型技能「从重论处」：第二半——【死刑】的概率怎么被推高。
@@ -225,7 +223,6 @@ public final class JudgmentTechniqueSkillSet extends AbstractInnateTechniqueSkil
              */
             .node(SkillTreeNodeDef.skill("judgment_aggravation", SKILL_AGGRAVATION)
                     .requires("judgment_sentencing")
-                    .intelCost(200)
                     .build())
             .build();
 

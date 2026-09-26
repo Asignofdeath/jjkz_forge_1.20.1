@@ -4,14 +4,22 @@ import com.darkness.jujutsukaisenzone.Config;
 import com.darkness.jujutsukaisenzone.JuJutsuKaisenZone;
 import com.darkness.jujutsukaisenzone.compat.EpicFightCompat;
 import com.darkness.jujutsukaisenzone.effect.DeathSentenceEffect;
+import com.darkness.jujutsukaisenzone.entity.combat.LivingCombatStats;
 import com.darkness.jujutsukaisenzone.player.PlayerBlackFlashData;
+import com.darkness.jujutsukaisenzone.player.PlayerCombatPowerData;
+import com.darkness.jujutsukaisenzone.player.PlayerDomainGaugeData;
 import com.darkness.jujutsukaisenzone.technique.JjkzDamageTypeTags;
 import com.darkness.jujutsukaisenzone.technique.SkillDamageResolver;
 import com.darkness.jujutsukaisenzone.technique.SkillDefenseResolver;
 import com.darkness.jujutsukaisenzone.technique.TechniqueDamageBoosts;
 import com.darkness.jujutsukaisenzone.technique.TechniqueDamageSources;
+import com.darkness.jujutsukaisenzone.technique.crit.CritRules;
+import com.darkness.jujutsukaisenzone.technique.crit.HitCritState;
 import com.darkness.jujutsukaisenzone.technique.skill.JudgmentWeaponLogic;
+import com.darkness.jujutsukaisenzone.technique.skill.RatioSpotLogic;
+import com.darkness.jujutsukaisenzone.technique.skill.tenshadows.TenShadowsPresenceBonuses;
 import com.darkness.jujutsukaisenzone.technique.skillset.SkillDamageType;
+import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
@@ -38,6 +46,8 @@ import java.util.Map;
  *   <li><b>区 0 · 施术者面板换算</b> —— 只给不走 {@code deal} 的体术通道（EF / 原版近战）补强度倍率，
  *       并顺手记下幂运算要用的原始伤害</li>
  *   <li><b>区 1 · 施术者增强</b> —— {@link TechniqueDamageBoosts} 的分型匹配「下一击增伤」</li>
+ *   <li><b>区 C · 暴击</b> —— 暴击几率属性判定 + 随机浮动乘区；体术默认参与，术式需出伤点显式放行
+ *       （见 {@code TechniqueDamageSources#critAllowed}），复合不参与；黑闪须先暴击且须为体术系</li>
  *   <li><b>区 3 · 目标减免</b> —— ZONE 状态减伤（自 {@code BlackFlashEvents} 迁入，判定与数值不变）</li>
  * </ol>
  * 以上三区在 {@link LivingHurtEvent}（{@link EventPriority#HIGH}）内完成；<b>区 2 · 目标防御层</b>
@@ -83,9 +93,21 @@ public final class TechniqueDamageZoneEvents
         LivingEntity target = event.getEntity();
         DamageSource source = event.getSource();
 
+        // 本击暴击状态：整次 LivingHurt（含黑闪 NORMAL / SE）共用，入口清空防脏读。
+        HitCritState.begin();
+
         // 分型解析<b>对所有攻击者</b>执行：体术抗性需要知道「这一击是不是贴身格斗」，
         // 而怪物近战的攻击者不是 ServerPlayer。区 1 再单独把自己限定到 ServerPlayer。
         SkillDamageType type = resolveDamageType(target, source);
+
+        // 领域量表：术式分型命中灌充（带冷却）
+        if (type == SkillDamageType.TECHNIQUE
+                && event.getAmount() > 0.0F
+                && source.getEntity() instanceof ServerPlayer gaugeAttacker)
+        {
+            PlayerDomainGaugeData.addChargeFromTechniqueHit(gaugeAttacker);
+        }
+
 
         // —— 区 0：施术者面板换算 ——
         // 术式伤害已由出伤点（SkillDamageResolver#technique）在进 deal 之前算成绝对值，
@@ -101,8 +123,8 @@ public final class TechniqueDamageZoneEvents
         // 低强度玩家会把它乘回致死线以下 ⇒ 必杀失效。判定复用分型解析用过的同一个方法，口径一致。
         if ((type == SkillDamageType.MARTIAL || type == SkillDamageType.COMPOSITE)
                 && !TechniqueDamageSources.isPowerAlreadyScaled()
-                && source.getEntity() instanceof ServerPlayer attacker
-                && !(type == SkillDamageType.COMPOSITE && isExecutionersComposite(attacker, target, source)))
+                && source.getEntity() instanceof LivingEntity attacker
+                && shouldScalePhysicalPower(attacker, target, source, type))
         {
             float raw = event.getAmount();
             // ⚠️ 必须「无条件」记下 raw，不能只在 k ≠ 1 时记。
@@ -115,6 +137,17 @@ public final class TechniqueDamageZoneEvents
             //（强度正好等于基准 / 面板未同步 power < 0 / scalingEnabled = false），方向是反的。
             SkillDamageResolver.markRawBeforePower(raw);
             float scaled = SkillDamageResolver.physical(attacker, raw);
+            if (attacker instanceof ServerPlayer serverAttacker
+                    && TenShadowsPresenceBonuses.hasToad(serverAttacker)
+                    && type == SkillDamageType.MARTIAL)
+            {
+                int tech = PlayerCombatPowerData.techniquePower(serverAttacker);
+                if (tech > 0 && Config.combatPowerTechniqueBaseline > 0.0D)
+                {
+                    scaled *= (float) (1.0D + TenShadowsPresenceBonuses.TOAD_MARTIAL_FROM_TECHNIQUE
+                            * tech / Config.combatPowerTechniqueBaseline);
+                }
+            }
             if (Math.abs(scaled - raw) > 0.0001F)
             {
                 event.setAmount(scaled);
@@ -128,6 +161,25 @@ public final class TechniqueDamageZoneEvents
             if (bonus > 0.0F)
             {
                 event.setAmount(event.getAmount() * (1.0F + bonus));
+            }
+        }
+
+        // —— 区 C：暴击（判定 + 随机浮动乘区）——
+        // 分型资格：体术与术式（复合不放行，见 CritRules#canCrit）；真正放行与否还要过
+        // TechniqueDamageSources#critAllowed —— 体术默认放行，术式默认拒绝，单发术式招式
+        // 由出伤点用 dealCrit / runWithTypeCrit 显式放行。
+        // 十划弱点在此之前通过 CritRules.forceNext 注入强制暴击。
+        // 黑闪在 NORMAL 优先级读取 HitCritState.wasCrit（且限体术系暴击）作为硬门槛。
+        if (source.getEntity() instanceof ServerPlayer critAttacker
+                && type != null
+                && event.getAmount() > 0.0F)
+        {
+            maybeForceRatioSpotCrit(critAttacker, target);
+            float afterCrit = CritRules.applyCritZone(
+                    critAttacker, type, event.getAmount(), critAttacker.getRandom());
+            if (Math.abs(afterCrit - event.getAmount()) > 0.0001F)
+            {
+                event.setAmount(afterCrit);
             }
         }
 
@@ -325,7 +377,24 @@ public final class TechniqueDamageZoneEvents
         {
             return SkillDamageType.TECHNIQUE;
         }
+        if (source.getDirectEntity() instanceof FallingBlockEntity falling
+                && falling.getPersistentData().getBoolean(TechniqueDamageSources.TAG_RATIO_DEBRIS))
+        {
+            return SkillDamageType.COMPOSITE;
+        }
         return null;
+    }
+
+    /** 玩家面板或已挂 {@link LivingCombatStats} 的式神：区 0 体术强度换算。 */
+    private static boolean shouldScalePhysicalPower(LivingEntity attacker, LivingEntity target,
+                                                    DamageSource source, SkillDamageType type)
+    {
+        if (attacker instanceof ServerPlayer serverPlayer)
+        {
+            return !(type == SkillDamageType.COMPOSITE
+                    && isExecutionersComposite(serverPlayer, target, source));
+        }
+        return LivingCombatStats.has(attacker);
     }
 
     private static boolean isExecutionersComposite(ServerPlayer attacker, LivingEntity target, DamageSource source)
@@ -344,5 +413,28 @@ public final class TechniqueDamageZoneEvents
             return true;
         }
         return source.getDirectEntity() == attacker;
+    }
+
+    /** 十划弱点：击破成功则强制本击暴击（浮动乘区仍 roll）。 */
+    private static void maybeForceRatioSpotCrit(ServerPlayer attacker, LivingEntity target)
+    {
+        if (!PlayerTechniqueData.isRatio(attacker))
+        {
+            return;
+        }
+        if (RatioSpotLogic.tryBreakSpot(attacker, target))
+        {
+            CritRules.forceNext(attacker);
+        }
+    }
+
+    /** 同一次 hurt 派发结束后清空，避免线程复用脏读。 */
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public static void onLivingHurtClearCrit(LivingHurtEvent event)
+    {
+        if (!event.getEntity().level().isClientSide)
+        {
+            HitCritState.clear();
+        }
     }
 }

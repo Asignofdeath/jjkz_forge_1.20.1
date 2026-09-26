@@ -14,7 +14,9 @@ public enum JjkzCreativeTabCategory
                     ModItems.INNATE_TECHNIQUE_LIMITLESS,
                     ModItems.SLASH_TECHNIQUE_SUKUNA,
                     ModItems.TRIAL_TECHNIQUE,
-                    ModItems.LOVE_RENDEZVOUS
+                    ModItems.LOVE_RENDEZVOUS,
+                    ModItems.RATIO_TECHNIQUE,
+                    ModItems.TEN_SHADOWS_TECHNIQUE
             )),
     WEAPONS(
             "gui.jujutsukaisenzone.creative_tab.category.weapons",
@@ -29,7 +31,24 @@ public enum JjkzCreativeTabCategory
                     ModItems.BARRIER_STUDYBOOK,
                     ModItems.DOMAIN_STUDYBOOK,
                     ModItems.SOUL_STUDYBOOK,
-                    ModItems.TECHNIQUE_INTELLIGENCE
+                    ModItems.TECHNIQUE_INTELLIGENCE,
+                    ModItems.CURSED_OBJECT_RUSTY_POCKET_WATCH,
+                    ModItems.CURSED_OBJECT_BROKEN_GETA,
+                    ModItems.CURSED_OBJECT_TORN_FAN,
+                    ModItems.CURSED_OBJECT_OLD_PIPE,
+                    ModItems.CURSED_OBJECT_CRACKED_ABACUS,
+                    ModItems.CURSED_OBJECT_WARPED_MIRROR,
+                    ModItems.CURSED_OBJECT_WORN_DOLL,
+                    ModItems.CURSED_OBJECT_CRACKED_PHONE,
+                    ModItems.CURSED_OBJECT_NAMELESS_PORTRAIT,
+                    ModItems.CURSED_OBJECT_DRIED_FLOWERS,
+                    ModItems.CURSED_OBJECT_BROKEN_DIARY,
+                    ModItems.CURSED_OBJECT_BLOODIED_BANDAGE,
+                    ModItems.CURSED_OBJECT_SINGLE_BENTO,
+                    ModItems.CURSED_OBJECT_COLD_WEDDING_RING,
+                    ModItems.CURSED_OBJECT_TORN_STUDENT_ID,
+                    ModItems.CURSED_OBJECT_CRACKED_URN,
+                    ModItems.CURSED_OBJECT_SUKUNA_FINGER
             ));
 
     private final String labelKey;

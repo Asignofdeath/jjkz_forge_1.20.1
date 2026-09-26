@@ -22,6 +22,11 @@ import com.darkness.jujutsukaisenzone.player.PlayerHealthData;
 import com.darkness.jujutsukaisenzone.player.PlayerReverseTechniqueData;
 import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
 import com.darkness.jujutsukaisenzone.player.PlayerTechniqueIntelData;
+import com.darkness.jujutsukaisenzone.player.PlayerSpData;
+import com.darkness.jujutsukaisenzone.player.PlayerSpNodeData;
+import com.darkness.jujutsukaisenzone.player.PlayerSeLoadoutData;
+import com.darkness.jujutsukaisenzone.technique.development.SpNodeRegistry;
+import com.darkness.jujutsukaisenzone.technique.se.SeEffectRegistry;
 import com.darkness.jujutsukaisenzone.player.BarrierTechniqueLevel;
 import com.darkness.jujutsukaisenzone.player.PlayerBarrierTechniqueData;
 import com.darkness.jujutsukaisenzone.player.PlayerSeanceTechniqueData;
@@ -142,6 +147,9 @@ public final class JjkzCommands
                         .then(buildCursedEnergyCheatBranch())
                         .then(buildTechniqueIntelCheatBranch())
                         .then(buildCombatPowerBranch())
+                        .then(buildSpCheatBranch())
+                        .then(buildSpNodeCheatBranch())
+                        .then(buildSeCheatBranch())
                         .then(buildBarrierTechniqueCheatBranch())
                         .then(buildSeanceTechniqueCheatBranch())
                         .then(buildStrengthenTechniqueCheatBranch())
@@ -358,6 +366,130 @@ public final class JjkzCommands
      * {@code /jjkz stats add <physical|technique|体术|术式> <数值>} 增减修炼加成
      * （数值可为负，需要 GM 权限）。
      */
+    private static LiteralArgumentBuilder<CommandSourceStack> buildSpCheatBranch()
+    {
+        return Commands.literal("sp")
+                .requires(source -> source.hasPermission(2))
+                .then(Commands.literal("add")
+                        .then(Commands.argument("amount", IntegerArgumentType.integer(1))
+                                .executes(ctx ->
+                                {
+                                    ServerPlayer player = ctx.getSource().getPlayerOrException();
+                                    int amount = IntegerArgumentType.getInteger(ctx, "amount");
+                                    PlayerSpData.add(player, amount);
+                                    player.sendSystemMessage(Component.literal(
+                                            "SP +" + amount + "（可用 " + PlayerSpData.getAvailable(player)
+                                                    + " / 总量 " + PlayerSpData.getTotal(player) + "）"));
+                                    return 1;
+                                })))
+                .then(Commands.literal("get")
+                        .executes(ctx ->
+                        {
+                            ServerPlayer player = ctx.getSource().getPlayerOrException();
+                            player.sendSystemMessage(Component.literal(
+                                    "SP 可用=" + PlayerSpData.getAvailable(player)
+                                            + " 总量=" + PlayerSpData.getTotal(player)
+                                            + " 解放已花=" + PlayerSpData.getSpentLiberation(player)
+                                            + " 节点占用=" + PlayerSpData.getAllocatedToNodes(player)));
+                            return 1;
+                        }));
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> buildSpNodeCheatBranch()
+    {
+        return Commands.literal("spNode")
+                .requires(source -> source.hasPermission(2))
+                .then(Commands.literal("unlock")
+                        .then(Commands.argument("nodeId", StringArgumentType.word())
+                                .executes(ctx ->
+                                {
+                                    ServerPlayer player = ctx.getSource().getPlayerOrException();
+                                    String nodeId = StringArgumentType.getString(ctx, "nodeId");
+                                    var result = PlayerSpNodeData.tryUnlock(player, nodeId);
+                                    player.sendSystemMessage(Component.literal("SP节点解锁结果: " + result
+                                            + "（已点 " + PlayerSpNodeData.unlockedCount(player)
+                                            + "/" + PlayerSpNodeData.getQuality(player) + "）"));
+                                    return result == PlayerSpNodeData.SpNodeUnlockResult.SUCCESS ? 1 : 0;
+                                })))
+                .then(Commands.literal("reset")
+                        .executes(ctx ->
+                        {
+                            ServerPlayer player = ctx.getSource().getPlayerOrException();
+                            PlayerSpNodeData.resetAll(player);
+                            player.sendSystemMessage(Component.literal(
+                                    "已重置 SP 节点，SP 已退回（可用 " + PlayerSpData.getAvailable(player) + "）"));
+                            return 1;
+                        }))
+                .then(Commands.literal("quality")
+                        .then(Commands.argument("value", IntegerArgumentType.integer(1, 32))
+                                .executes(ctx ->
+                                {
+                                    ServerPlayer player = ctx.getSource().getPlayerOrException();
+                                    int value = IntegerArgumentType.getInteger(ctx, "value");
+                                    PlayerSpNodeData.setQuality(player, value);
+                                    player.sendSystemMessage(Component.literal("SP 节点质量上限设为 " + value));
+                                    return 1;
+                                })))
+                .then(Commands.literal("list")
+                        .executes(ctx ->
+                        {
+                            ServerPlayer player = ctx.getSource().getPlayerOrException();
+                            player.sendSystemMessage(Component.literal("已点: " + PlayerSpNodeData.getUnlocked(player)));
+                            for (var def : SpNodeRegistry.all())
+                            {
+                                player.sendSystemMessage(Component.literal(
+                                        "  " + def.nodeId() + " cost=" + def.spCost()
+                                                + " phys+" + def.physicalBonus()
+                                                + " tech+" + def.techniqueBonus()));
+                            }
+                            return 1;
+                        }));
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> buildSeCheatBranch()
+    {
+        return Commands.literal("se")
+                .requires(source -> source.hasPermission(2))
+                .then(Commands.literal("equip")
+                        .then(Commands.argument("slot", IntegerArgumentType.integer(0, PlayerSeLoadoutData.SLOT_COUNT - 1))
+                                .then(Commands.argument("seId", StringArgumentType.word())
+                                        .executes(ctx ->
+                                        {
+                                            ServerPlayer player = ctx.getSource().getPlayerOrException();
+                                            int slot = IntegerArgumentType.getInteger(ctx, "slot");
+                                            String seId = StringArgumentType.getString(ctx, "seId");
+                                            var result = PlayerSeLoadoutData.tryEquip(player, slot, seId);
+                                            player.sendSystemMessage(Component.literal(
+                                                    "SE 装备结果: " + result + " 槽位=" + PlayerSeLoadoutData.getSlots(player)));
+                                            return result == PlayerSeLoadoutData.SeEquipResult.SUCCESS ? 1 : 0;
+                                        }))))
+                .then(Commands.literal("unequip")
+                        .then(Commands.argument("slot", IntegerArgumentType.integer(0, PlayerSeLoadoutData.SLOT_COUNT - 1))
+                                .executes(ctx ->
+                                {
+                                    ServerPlayer player = ctx.getSource().getPlayerOrException();
+                                    int slot = IntegerArgumentType.getInteger(ctx, "slot");
+                                    var result = PlayerSeLoadoutData.tryUnequip(player, slot);
+                                    player.sendSystemMessage(Component.literal(
+                                            "SE 卸下结果: " + result + " 槽位=" + PlayerSeLoadoutData.getSlots(player)));
+                                    return result == PlayerSeLoadoutData.SeEquipResult.SUCCESS ? 1 : 0;
+                                })))
+                .then(Commands.literal("list")
+                        .executes(ctx ->
+                        {
+                            ServerPlayer player = ctx.getSource().getPlayerOrException();
+                            player.sendSystemMessage(Component.literal("当前 SE 槽: " + PlayerSeLoadoutData.getSlots(player)));
+                            for (var def : SeEffectRegistry.all())
+                            {
+                                player.sendSystemMessage(Component.literal(
+                                        "  " + def.seId() + " item=" + def.item()
+                                                + " trigger=" + def.trigger()
+                                                + " chance=" + def.procChance()));
+                            }
+                            return 1;
+                        }));
+    }
+
     private static LiteralArgumentBuilder<CommandSourceStack> buildCombatPowerBranch()
     {
         LiteralArgumentBuilder<CommandSourceStack> add = Commands.literal("add")

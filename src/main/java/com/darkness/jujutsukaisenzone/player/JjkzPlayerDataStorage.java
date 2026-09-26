@@ -2,13 +2,20 @@ package com.darkness.jujutsukaisenzone.player;
 
 import com.darkness.jujutsukaisenzone.JuJutsuKaisenZone;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.StringTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.saveddata.SavedData;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -123,8 +130,19 @@ public final class JjkzPlayerDataStorage extends SavedData
         private static final String TAG_STRENGTHEN_ACTIVE = "strengthenActive";
         private static final String TAG_LAST_PROCESSED_GAME_DAY = "lastProcessedGameDay";
         private static final String TAG_TECHNIQUE_INTEL = "techniqueIntel";
+        private static final String TAG_SP_POINTS = "spPoints";
+        private static final String TAG_SP_SPENT_LIBERATION = "spSpentLiberation";
+        private static final String TAG_SP_NODE_QUALITY = "spNodeQuality";
+        private static final String TAG_SP_UNLOCKED_NODES = "spUnlockedNodes";
+        private static final String TAG_SE_SLOTS = "seSlots";
         private static final String TAG_PHYSICAL_POWER_BONUS = "physicalPowerBonus";
         private static final String TAG_TECHNIQUE_POWER_BONUS = "techniquePowerBonus";
+        private static final String TAG_BRAIN_DAMAGE = "brainDamage";
+        private static final String TAG_DOMAIN_EXPANDS_TODAY = "domainExpandsToday";
+        private static final String TAG_DOMAIN_EXPAND_COUNT_DAY = "domainExpandCountDay";
+        private static final String TAG_DOMAIN_GAUGE = "domainGauge";
+        private static final String TAG_MELTDOWN_REPAIRS_TODAY = "meltdownRepairsToday";
+        private static final String TAG_MELTDOWN_REPAIR_COUNT_DAY = "meltdownRepairCountDay";
 
         boolean cursedEnergyInitialized;
         int cursedEnergyBaseMax;
@@ -152,8 +170,19 @@ public final class JjkzPlayerDataStorage extends SavedData
         boolean strengthenActive;
         long lastProcessedGameDay = -1L;
         final Map<String, Integer> techniqueIntel = new LinkedHashMap<>();
+        int spPoints;
+        int spSpentLiberation;
+        int spNodeQuality = 3;
+        final Set<String> spUnlockedNodes = new LinkedHashSet<>();
+        final List<String> seSlots = new ArrayList<>();
         int physicalPowerBonus;
         int techniquePowerBonus;
+        int brainDamage;
+        int domainExpandsToday;
+        long domainExpandCountDay = -1L;
+        int domainGauge;
+        int meltdownRepairsToday;
+        long meltdownRepairCountDay = -1L;
 
         private static PlayerDataEntry load(CompoundTag tag)
         {
@@ -196,8 +225,35 @@ public final class JjkzPlayerDataStorage extends SavedData
             {
                 entry.techniqueIntel.put(techniqueId, Math.max(0, intelTag.getInt(techniqueId)));
             }
+            entry.spPoints = Math.max(0, tag.getInt(TAG_SP_POINTS));
+            entry.spSpentLiberation = Math.max(0, tag.getInt(TAG_SP_SPENT_LIBERATION));
+            entry.spNodeQuality = tag.contains(TAG_SP_NODE_QUALITY)
+                    ? Math.max(1, tag.getInt(TAG_SP_NODE_QUALITY))
+                    : 3;
+            ListTag nodeList = tag.getList(TAG_SP_UNLOCKED_NODES, Tag.TAG_STRING);
+            for (int i = 0; i < nodeList.size(); i++)
+            {
+                String nodeId = nodeList.getString(i);
+                if (nodeId != null && !nodeId.isBlank())
+                {
+                    entry.spUnlockedNodes.add(nodeId);
+                }
+            }
+            ListTag seList = tag.getList(TAG_SE_SLOTS, Tag.TAG_STRING);
+            for (int i = 0; i < seList.size(); i++)
+            {
+                entry.seSlots.add(seList.getString(i));
+            }
             entry.physicalPowerBonus = Math.max(0, tag.getInt(TAG_PHYSICAL_POWER_BONUS));
             entry.techniquePowerBonus = Math.max(0, tag.getInt(TAG_TECHNIQUE_POWER_BONUS));
+            entry.brainDamage = Math.max(0, tag.getInt(TAG_BRAIN_DAMAGE));
+            entry.domainExpandsToday = Math.max(0, tag.getInt(TAG_DOMAIN_EXPANDS_TODAY));
+            entry.domainExpandCountDay = tag.contains(TAG_DOMAIN_EXPAND_COUNT_DAY) ? tag.getLong(TAG_DOMAIN_EXPAND_COUNT_DAY) : -1L;
+            entry.domainGauge = Math.max(0, tag.getInt(TAG_DOMAIN_GAUGE));
+            entry.meltdownRepairsToday = Math.max(0, tag.getInt(TAG_MELTDOWN_REPAIRS_TODAY));
+            entry.meltdownRepairCountDay = tag.contains(TAG_MELTDOWN_REPAIR_COUNT_DAY)
+                    ? tag.getLong(TAG_MELTDOWN_REPAIR_COUNT_DAY)
+                    : -1L;
             return entry;
         }
 
@@ -237,8 +293,32 @@ public final class JjkzPlayerDataStorage extends SavedData
                 intelTag.putInt(entry.getKey(), Math.max(0, entry.getValue()));
             }
             tag.put(TAG_TECHNIQUE_INTEL, intelTag);
+            tag.putInt(TAG_SP_POINTS, Math.max(0, spPoints));
+            tag.putInt(TAG_SP_SPENT_LIBERATION, Math.max(0, spSpentLiberation));
+            tag.putInt(TAG_SP_NODE_QUALITY, Math.max(1, spNodeQuality));
+            ListTag nodeList = new ListTag();
+            for (String nodeId : spUnlockedNodes)
+            {
+                if (nodeId != null && !nodeId.isBlank())
+                {
+                    nodeList.add(StringTag.valueOf(nodeId));
+                }
+            }
+            tag.put(TAG_SP_UNLOCKED_NODES, nodeList);
+            ListTag seList = new ListTag();
+            for (String seId : seSlots)
+            {
+                seList.add(StringTag.valueOf(seId == null ? "" : seId));
+            }
+            tag.put(TAG_SE_SLOTS, seList);
             tag.putInt(TAG_PHYSICAL_POWER_BONUS, Math.max(0, physicalPowerBonus));
             tag.putInt(TAG_TECHNIQUE_POWER_BONUS, Math.max(0, techniquePowerBonus));
+            tag.putInt(TAG_BRAIN_DAMAGE, Math.max(0, brainDamage));
+            tag.putInt(TAG_DOMAIN_EXPANDS_TODAY, Math.max(0, domainExpandsToday));
+            tag.putLong(TAG_DOMAIN_EXPAND_COUNT_DAY, domainExpandCountDay);
+            tag.putInt(TAG_DOMAIN_GAUGE, Math.max(0, domainGauge));
+            tag.putInt(TAG_MELTDOWN_REPAIRS_TODAY, Math.max(0, meltdownRepairsToday));
+            tag.putLong(TAG_MELTDOWN_REPAIR_COUNT_DAY, meltdownRepairCountDay);
             return tag;
         }
 

@@ -105,7 +105,8 @@ public class LimitlessRedArrowBehavior extends EffectBehavior
             ownerLiving.getPersistentData().putBoolean(TAG_TEMP_RED_EXPLOSION_IMMUNE, true);
         }
 
-        TechniqueDamageSources.runWithType(SkillDamageType.TECHNIQUE, () ->
+        // 单次爆炸 ⇒ 显式放行暴击（术式默认不放行，见 TechniqueDamageSources#critAllowed）
+        TechniqueDamageSources.runWithTypeCrit(SkillDamageType.TECHNIQUE, () ->
                 entity.level().explode(entity, entity.getX(), entity.getY(), entity.getZ(),
                         this.explosionPower, false, ExplosionInteraction.TNT));
 

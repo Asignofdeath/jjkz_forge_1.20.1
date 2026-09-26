@@ -8,6 +8,7 @@ import com.darkness.jujutsukaisenzone.network.ModNetwork;
 import com.darkness.jujutsukaisenzone.network.packet.TechniqueHoldReleaseC2SPacket;
 import com.darkness.jujutsukaisenzone.network.packet.TechniqueMaxOutputC2SPacket;
 import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
+import com.darkness.jujutsukaisenzone.player.PlayerTenShadowsModeData;
 import com.darkness.jujutsukaisenzone.technique.skillset.IInnateTechniqueSkillSet;
 import com.darkness.jujutsukaisenzone.technique.skillset.LimitlessTechniqueSkillSet;
 import com.darkness.jujutsukaisenzone.technique.skillset.SpecialMoveInput;
@@ -257,7 +258,8 @@ public final class TechniqueSkillKeyEvents
             {
                 ModNetwork.sendTechniqueSpecialMoveToServer(modifierMask, slot);
             }
-            else if (modifierMask == 0 && acceptHotbar && !SLOT_IGNORE_HOLD_UNTIL_RELEASE[i])
+            else if (modifierMask == 0 && acceptHotbar && !SLOT_IGNORE_HOLD_UNTIL_RELEASE[i]
+                    && !PlayerTenShadowsModeData.isShikigamiMode(minecraft.player))
             {
                 // 通过客户端缓存查快捷栏位映射的 skillId，再按 skillId 判断是否支持最大输出。
                 // 玩家可在 SkillBarConfigScreen 中任意配置各栏位对应的技能。

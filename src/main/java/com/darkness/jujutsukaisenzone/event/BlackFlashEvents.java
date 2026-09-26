@@ -4,14 +4,17 @@ import com.darkness.jujutsukaisenzone.Config;
 import com.darkness.jujutsukaisenzone.JuJutsuKaisenZone;
 import com.darkness.jujutsukaisenzone.compat.EpicFightCompat;
 import com.darkness.jujutsukaisenzone.player.PlayerBlackFlashData;
+import com.darkness.jujutsukaisenzone.player.PlayerDomainGaugeData;
 import com.darkness.jujutsukaisenzone.player.PlayerCursedEnergyData;
 import com.darkness.jujutsukaisenzone.player.PlayerCursedGradeData;
 import com.darkness.jujutsukaisenzone.player.PlayerShrineBlackFlashMilestoneData;
 import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
 import com.darkness.jujutsukaisenzone.technique.SkillDamageResolver;
 import com.darkness.jujutsukaisenzone.technique.TechniqueDamageBoosts;
+import com.darkness.jujutsukaisenzone.technique.crit.HitCritState;
 import com.darkness.jujutsukaisenzone.technique.development.SkillUnlockLogic;
 import com.darkness.jujutsukaisenzone.technique.skillset.ShrineTechniqueSkillSet;
+import com.darkness.jujutsukaisenzone.technique.skillset.SkillDamageType;
 import com.darkness.jujutsukaisenzone.entity.SpecialEffectEntity;
 import com.darkness.jujutsukaisenzone.entity.data.BlackFlashConfig;
 import com.darkness.jujutsukaisenzone.effect.RushIntoTheZoneClimaxEffect;
@@ -136,11 +139,19 @@ public final class BlackFlashEvents
         }
         PlayerBlackFlashData.setLastHitTick(attacker, attacker.tickCount);
 
-        // Step 1.5: Rush Into The ZONE 最高潮 — 下一次体术攻击必定黑闪（无视触发冷却）
+        // Step 1.5: Rush Into The ZONE 最高潮 — 下一次体术攻击必定黑闪（无视暴击门槛与触发冷却）
         if (PlayerBlackFlashData.hasGuaranteedBlackFlash(attacker))
         {
             RushIntoTheZoneClimaxEffect.consumeGuaranteedBlackFlash(attacker);
             triggerBlackFlash(attacker, target, event, rawBeforePower);
+            return;
+        }
+
+        // Step 1.55: 硬门槛 — 须先暴击（乘区 C 已写入 HitCritState），且必须是体术系暴击。
+        // 放开术式暴击后，只判 wasCrit 会让术式暴击顺带点亮黑闪判定；黑闪是体术的延伸，
+        // 这里显式收口（本方法入口已限定 EpicFight 基础攻击，所以这条是防回归的保险）。
+        if (!HitCritState.wasCrit() || HitCritState.critType() != SkillDamageType.MARTIAL)
+        {
             return;
         }
 
@@ -301,6 +312,7 @@ public final class BlackFlashEvents
         {
             PlayerBlackFlashData.resetAll(player);
             TechniqueDamageBoosts.clear(player);
+            com.darkness.jujutsukaisenzone.technique.crit.CritRules.clearForced(player);
         }
     }
 
@@ -312,6 +324,8 @@ public final class BlackFlashEvents
     private static void triggerBlackFlash(ServerPlayer attacker, LivingEntity target, LivingHurtEvent event,
                                           float rawBeforePower)
     {
+        HitCritState.markBlackFlash();
+
         // 伤害：2.5 次方（符合原著设定）。
         // ⚠️ 必须拿「强度放大之前」的原始伤害取幂，再把面板倍率线性乘回去：
         //    直接对已放大的伤害取幂，pow 会把面板倍率（特级最高 3 倍）一起指数放大成几十倍。
@@ -335,6 +349,8 @@ public final class BlackFlashEvents
                 BlackFlashConfig.SCREEN_SHAKE_DURATION_TICKS,
                 BlackFlashConfig.SCREEN_SHAKE_MAX_DEGREES);
 
+        
+        PlayerDomainGaugeData.addChargeFromBlackFlash(attacker);
         // 黑闪奖励：恢复 500 咒力 + 20 咒术经验
         PlayerCursedEnergyData.setCurrent(attacker,
                 PlayerCursedEnergyData.getCurrent(attacker) + 500);

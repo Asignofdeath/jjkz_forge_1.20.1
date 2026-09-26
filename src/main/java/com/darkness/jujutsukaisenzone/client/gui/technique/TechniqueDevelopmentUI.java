@@ -11,6 +11,7 @@ import com.lowdragmc.lowdraglib.gui.texture.GuiTextureGroup;
 import com.lowdragmc.lowdraglib.gui.texture.TextTexture;
 import com.lowdragmc.lowdraglib.gui.widget.ButtonWidget;
 import com.lowdragmc.lowdraglib.gui.widget.LabelWidget;
+import com.lowdragmc.lowdraglib.gui.widget.Widget;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.network.chat.Component;
@@ -20,11 +21,12 @@ import net.minecraftforge.api.distmarker.OnlyIn;
 /**
  * 打开「术式开发」全屏 LDLib 画布界面。
  * <p>
- * 三个标签页：
+ * 五个标签页：
  * <ul>
- *   <li>术式开发 / 空战能力 —— 技能树画布（同一个 {@link TechniqueDevelopmentCanvasWidget}，切换树 id）</li>
- *   <li>玩家数据 —— 用 {@link PlayerDataPanelWidget} 顶替画布，展示 {@code /jjkz data} +
- *       {@code /jjkz stats} 的内容</li>
+ *   <li>术式开发 / 空战能力 —— 技能树画布</li>
+ *   <li>SP 节点 —— 可重置的战斗强度加点</li>
+ *   <li>SE 术式侵入 —— 咒物热装槽</li>
+ *   <li>玩家数据 —— {@link PlayerDataPanelWidget}</li>
  * </ul>
  */
 @OnlyIn(Dist.CLIENT)
@@ -32,14 +34,16 @@ public final class TechniqueDevelopmentUI
 {
     private static final int TAB_X = 8;
     private static final int TAB_Y = 36;
-    private static final int TAB_WIDTH = 88;
+    private static final int TAB_WIDTH = 78;
     private static final int TAB_HEIGHT = 18;
-    private static final int TAB_GAP = 4;
+    private static final int TAB_GAP = 3;
     private static final int COLOR_TAB_ACTIVE = 0xFF3A5A8A;
     private static final int COLOR_TAB_IDLE = 0xFF2A2A2A;
 
     private static final String KEY_TECHNIQUE_TAB = "gui.jujutsukaisenzone.technique_development";
     private static final String KEY_AERIAL_TAB = "gui.jujutsukaisenzone.aerial_combat_development";
+    private static final String KEY_SP_NODE_TAB = "gui.jujutsukaisenzone.sp_node.title";
+    private static final String KEY_SE_TAB = "gui.jujutsukaisenzone.se.title";
     private static final String KEY_PLAYER_DATA_TAB = "gui.jujutsukaisenzone.player_data";
 
     private TechniqueDevelopmentUI()
@@ -59,24 +63,34 @@ public final class TechniqueDevelopmentUI
         context.section = TechniqueDevelopmentSection.TECHNIQUE;
 
         context.canvas = new TechniqueDevelopmentCanvasWidget(context.section.treeId(player));
-        context.panel = new PlayerDataPanelWidget();
-        context.panel.setVisible(false);
+        context.playerDataPanel = new PlayerDataPanelWidget();
+        context.playerDataPanel.setVisible(false);
+        context.spNodePanel = new SpNodePanelWidget();
+        context.spNodePanel.setVisible(false);
+        context.sePanel = new SeLoadoutPanelWidget();
+        context.sePanel.setVisible(false);
         context.titleLabel = new LabelWidget(8, 8, context.section.titleKey()).setTextColor(0xFFFFFF);
         context.intelLabel = new LabelWidget(8, 22, TechniqueDevelopmentUI::formatIntelLabel).setTextColor(0xFFCCCCCC);
 
         ModularUI ui = new ModularUI(IUIHolder.EMPTY, player);
         ui.setFullScreen();
         ui.widget(context.canvas);
-        ui.widget(context.panel);
+        ui.widget(context.playerDataPanel);
+        ui.widget(context.spNodePanel);
+        ui.widget(context.sePanel);
         ui.widget(context.titleLabel);
         ui.widget(context.intelLabel);
 
         context.techniqueTab = buildTab(context, 0, KEY_TECHNIQUE_TAB, TechniqueDevelopmentSection.TECHNIQUE, player);
         context.aerialTab = buildTab(context, 1, KEY_AERIAL_TAB, TechniqueDevelopmentSection.AERIAL_COMBAT, player);
-        context.playerDataTab = buildTab(context, 2, KEY_PLAYER_DATA_TAB, TechniqueDevelopmentSection.PLAYER_DATA, player);
+        context.spNodeTab = buildTab(context, 2, KEY_SP_NODE_TAB, TechniqueDevelopmentSection.SP_NODES, player);
+        context.seTab = buildTab(context, 3, KEY_SE_TAB, TechniqueDevelopmentSection.SE_LOADOUT, player);
+        context.playerDataTab = buildTab(context, 4, KEY_PLAYER_DATA_TAB, TechniqueDevelopmentSection.PLAYER_DATA, player);
 
         ui.widget(context.techniqueTab);
         ui.widget(context.aerialTab);
+        ui.widget(context.spNodeTab);
+        ui.widget(context.seTab);
         ui.widget(context.playerDataTab);
         ui.initWidgets();
 
@@ -110,23 +124,34 @@ public final class TechniqueDevelopmentUI
             return;
         }
         context.section = section;
-        boolean playerData = section == TechniqueDevelopmentSection.PLAYER_DATA;
+        boolean showCanvas = section.hasSkillTree();
 
-        // 画布与数据面板互斥：数据页不需要技能树，也就跳过一次重建。
-        if (!playerData)
+        if (showCanvas)
         {
             context.canvas.setTreeId(section.treeId(player));
             context.canvas.rebuildGraph();
         }
-        context.canvas.setVisible(!playerData);
-        context.panel.setVisible(playerData);
+        context.canvas.setVisible(showCanvas);
+        setPanelVisible(context.playerDataPanel, section == TechniqueDevelopmentSection.PLAYER_DATA);
+        setPanelVisible(context.spNodePanel, section == TechniqueDevelopmentSection.SP_NODES);
+        setPanelVisible(context.sePanel, section == TechniqueDevelopmentSection.SE_LOADOUT);
         context.titleLabel.setText(section.titleKey());
         context.intelLabel.setVisible(section == TechniqueDevelopmentSection.TECHNIQUE);
         context.techniqueTab.setButtonTexture(buildTabTexture(
                 KEY_TECHNIQUE_TAB, section == TechniqueDevelopmentSection.TECHNIQUE));
         context.aerialTab.setButtonTexture(buildTabTexture(
                 KEY_AERIAL_TAB, section == TechniqueDevelopmentSection.AERIAL_COMBAT));
-        context.playerDataTab.setButtonTexture(buildTabTexture(KEY_PLAYER_DATA_TAB, playerData));
+        context.spNodeTab.setButtonTexture(buildTabTexture(
+                KEY_SP_NODE_TAB, section == TechniqueDevelopmentSection.SP_NODES));
+        context.seTab.setButtonTexture(buildTabTexture(
+                KEY_SE_TAB, section == TechniqueDevelopmentSection.SE_LOADOUT));
+        context.playerDataTab.setButtonTexture(buildTabTexture(
+                KEY_PLAYER_DATA_TAB, section == TechniqueDevelopmentSection.PLAYER_DATA));
+    }
+
+    private static void setPanelVisible(Widget panel, boolean visible)
+    {
+        panel.setVisible(visible);
     }
 
     private static GuiTextureGroup buildTabTexture(String labelKey, boolean active)
@@ -153,16 +178,20 @@ public final class TechniqueDevelopmentUI
         return Component.translatable("gui.jujutsukaisenzone.technique_intel_count", intel).getString();
     }
 
-    /** 一次 open() 期间共享的可变状态，避免把七八个控件在方法间传来传去。 */
+    /** 一次 open() 期间共享的可变状态。 */
     private static final class ScreenContext
     {
         private TechniqueDevelopmentSection section;
         private TechniqueDevelopmentCanvasWidget canvas;
-        private PlayerDataPanelWidget panel;
+        private PlayerDataPanelWidget playerDataPanel;
+        private SpNodePanelWidget spNodePanel;
+        private SeLoadoutPanelWidget sePanel;
         private LabelWidget titleLabel;
         private LabelWidget intelLabel;
         private ButtonWidget techniqueTab;
         private ButtonWidget aerialTab;
+        private ButtonWidget spNodeTab;
+        private ButtonWidget seTab;
         private ButtonWidget playerDataTab;
     }
 
@@ -175,6 +204,12 @@ public final class TechniqueDevelopmentUI
             {
                 return PlayerTechniqueData.getInnateTechnique(player);
             }
+
+            @Override
+            boolean hasSkillTree()
+            {
+                return true;
+            }
         },
         AERIAL_COMBAT(KEY_AERIAL_TAB)
         {
@@ -183,14 +218,53 @@ public final class TechniqueDevelopmentUI
             {
                 return AerialCombatSkills.TREE_ID;
             }
+
+            @Override
+            boolean hasSkillTree()
+            {
+                return true;
+            }
         },
-        /** 数据页没有技能树，{@link #treeId} 不会被使用。 */
+        SP_NODES(KEY_SP_NODE_TAB)
+        {
+            @Override
+            String treeId(LocalPlayer player)
+            {
+                return "";
+            }
+
+            @Override
+            boolean hasSkillTree()
+            {
+                return false;
+            }
+        },
+        SE_LOADOUT(KEY_SE_TAB)
+        {
+            @Override
+            String treeId(LocalPlayer player)
+            {
+                return "";
+            }
+
+            @Override
+            boolean hasSkillTree()
+            {
+                return false;
+            }
+        },
         PLAYER_DATA(KEY_PLAYER_DATA_TAB)
         {
             @Override
             String treeId(LocalPlayer player)
             {
                 return "";
+            }
+
+            @Override
+            boolean hasSkillTree()
+            {
+                return false;
             }
         };
 
@@ -207,5 +281,7 @@ public final class TechniqueDevelopmentUI
         }
 
         abstract String treeId(LocalPlayer player);
+
+        abstract boolean hasSkillTree();
     }
 }

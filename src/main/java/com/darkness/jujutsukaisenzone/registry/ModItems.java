@@ -3,13 +3,19 @@ package com.darkness.jujutsukaisenzone.registry;
 import com.darkness.jujutsukaisenzone.JuJutsuKaisenZone;
 import com.darkness.jujutsukaisenzone.block.JJKZSkyblock;
 import com.darkness.jujutsukaisenzone.item.BarrierStudybookItem;
+import com.darkness.jujutsukaisenzone.item.BrainRecoveryItem;
 import com.darkness.jujutsukaisenzone.item.LimitlessTechniqueBinderItem;
+import com.darkness.jujutsukaisenzone.Config;
 import com.darkness.jujutsukaisenzone.item.LoveRendezvousTechniqueBinderItem;
+import com.darkness.jujutsukaisenzone.item.RatioTechniqueBinderItem;
+import com.darkness.jujutsukaisenzone.item.TenShadowsTechniqueBinderItem;
 import com.darkness.jujutsukaisenzone.item.DomainStudybookItem;
 import com.darkness.jujutsukaisenzone.item.ReverseStudybookItem;
 import com.darkness.jujutsukaisenzone.item.SlashTechniqueSukunaBinderItem;
 import com.darkness.jujutsukaisenzone.item.SmGavelWeaponItem;
 import com.darkness.jujutsukaisenzone.item.SoulStudybookItem;
+import com.darkness.jujutsukaisenzone.item.CursedObjectGrade;
+import com.darkness.jujutsukaisenzone.item.CursedObjectItem;
 import com.darkness.jujutsukaisenzone.item.TechniqueIntelligenceItem;
 import com.darkness.jujutsukaisenzone.item.TrialTechniqueBinderItem;
 import net.minecraft.world.item.BlockItem;
@@ -53,6 +59,18 @@ public final class ModItems
             () -> new LoveRendezvousTechniqueBinderItem(new Item.Properties().stacksTo(1))
     );
 
+    /** 十划咒法 */
+    public static final RegistryObject<Item> RATIO_TECHNIQUE = ITEMS.register(
+            "ratio_technique",
+            () -> new RatioTechniqueBinderItem(new Item.Properties().stacksTo(1))
+    );
+
+    /** 十种影法术 */
+    public static final RegistryObject<Item> TEN_SHADOWS_TECHNIQUE = ITEMS.register(
+            "ten_shadows_technique",
+            () -> new TenShadowsTechniqueBinderItem(new Item.Properties().stacksTo(1))
+    );
+
     /** 法槌（Epic Fight 武器） */
     public static final RegistryObject<Item> SM_GAVEL_WEAPON = ITEMS.register(
             "sm_gavel_weapon",
@@ -93,6 +111,126 @@ public final class ModItems
     public static final RegistryObject<Item> TECHNIQUE_INTELLIGENCE = ITEMS.register(
             "technique_intelligence",
             () -> new TechniqueIntelligenceItem(new Item.Properties())
+    );
+
+    /** 咒物：錆びた懐中時計 */
+    public static final RegistryObject<Item> CURSED_OBJECT_RUSTY_POCKET_WATCH = ITEMS.register(
+            "cursed_object_rusty_pocket_watch",
+            () -> new CursedObjectItem(new Item.Properties().stacksTo(64), "生锈怀表", CursedObjectGrade.COMMON)
+    );
+
+    /** 咒物：折れた下駄 */
+    public static final RegistryObject<Item> CURSED_OBJECT_BROKEN_GETA = ITEMS.register(
+            "cursed_object_broken_geta",
+            () -> new CursedObjectItem(new Item.Properties().stacksTo(64), "断掉的木屐", CursedObjectGrade.COMMON)
+    );
+
+    /** 咒物：破れた扇 */
+    public static final RegistryObject<Item> CURSED_OBJECT_TORN_FAN = ITEMS.register(
+            "cursed_object_torn_fan",
+            () -> new CursedObjectItem(new Item.Properties().stacksTo(64), "破扇", CursedObjectGrade.COMMON)
+    );
+
+    /** 咒物：古ぼけた煙管 */
+    public static final RegistryObject<Item> CURSED_OBJECT_OLD_PIPE = ITEMS.register(
+            "cursed_object_old_pipe",
+            () -> new CursedObjectItem(new Item.Properties().stacksTo(64), "旧烟管", CursedObjectGrade.COMMON)
+    );
+
+    /** 咒物：ひびのそろばん */
+    public static final RegistryObject<Item> CURSED_OBJECT_CRACKED_ABACUS = ITEMS.register(
+            "cursed_object_cracked_abacus",
+            () -> new CursedObjectItem(new Item.Properties().stacksTo(64), "裂纹算盘", CursedObjectGrade.COMMON)
+    );
+
+    /** 咒物：歪んだ手鏡 */
+    public static final RegistryObject<Item> CURSED_OBJECT_WARPED_MIRROR = ITEMS.register(
+            "cursed_object_warped_mirror",
+            () -> new CursedObjectItem(new Item.Properties().stacksTo(64), "歪手镜", CursedObjectGrade.COMMON)
+    );
+
+    /** 咒物：誰かの古びた人形 */
+    public static final RegistryObject<Item> CURSED_OBJECT_WORN_DOLL = ITEMS.register(
+            "cursed_object_worn_doll",
+            () -> new CursedObjectItem(new Item.Properties().stacksTo(64), "某人的破旧玩偶", CursedObjectGrade.RARE)
+    );
+
+    /** 咒物：画面の割れた携帯 */
+    public static final RegistryObject<Item> CURSED_OBJECT_CRACKED_PHONE = ITEMS.register(
+            "cursed_object_cracked_phone",
+            () -> new CursedObjectItem(new Item.Properties().stacksTo(64), "碎屏的手机", CursedObjectGrade.RARE)
+    );
+
+    /** 咒物：名前のない遺影 */
+    public static final RegistryObject<Item> CURSED_OBJECT_NAMELESS_PORTRAIT = ITEMS.register(
+            "cursed_object_nameless_portrait",
+            () -> new CursedObjectItem(new Item.Properties().stacksTo(64), "无名遗像", CursedObjectGrade.SPECIAL)
+    );
+
+    /** 咒物：干からびた献花 */
+    public static final RegistryObject<Item> CURSED_OBJECT_DRIED_FLOWERS = ITEMS.register(
+            "cursed_object_dried_flowers",
+            () -> new CursedObjectItem(new Item.Properties().stacksTo(64), "干枯的献花", CursedObjectGrade.COMMON)
+    );
+
+    /** 咒物：鍵の折れた日記 */
+    public static final RegistryObject<Item> CURSED_OBJECT_BROKEN_DIARY = ITEMS.register(
+            "cursed_object_broken_diary",
+            () -> new CursedObjectItem(new Item.Properties().stacksTo(64), "钥匙断了的日记本", CursedObjectGrade.RARE)
+    );
+
+    /** 咒物：血のにじんだ絆創膏 */
+    public static final RegistryObject<Item> CURSED_OBJECT_BLOODIED_BANDAGE = ITEMS.register(
+            "cursed_object_bloodied_bandage",
+            () -> new CursedObjectItem(new Item.Properties().stacksTo(64), "渗血的创可贴", CursedObjectGrade.COMMON)
+    );
+
+    /** 咒物：一人分の弁当箱 */
+    public static final RegistryObject<Item> CURSED_OBJECT_SINGLE_BENTO = ITEMS.register(
+            "cursed_object_single_bento",
+            () -> new CursedObjectItem(new Item.Properties().stacksTo(64), "一人份便当盒", CursedObjectGrade.COMMON)
+    );
+
+    /** 咒物：冷めた結婚指輪 */
+    public static final RegistryObject<Item> CURSED_OBJECT_COLD_WEDDING_RING = ITEMS.register(
+            "cursed_object_cold_wedding_ring",
+            () -> new CursedObjectItem(new Item.Properties().stacksTo(64), "冰凉的结婚戒指", CursedObjectGrade.RARE)
+    );
+
+    /** 咒物：破れた学生証 */
+    public static final RegistryObject<Item> CURSED_OBJECT_TORN_STUDENT_ID = ITEMS.register(
+            "cursed_object_torn_student_id",
+            () -> new CursedObjectItem(new Item.Properties().stacksTo(64), "撕破的学生证", CursedObjectGrade.COMMON)
+    );
+
+    /** 咒物：割れそうな骨壺 */
+    public static final RegistryObject<Item> CURSED_OBJECT_CRACKED_URN = ITEMS.register(
+            "cursed_object_cracked_urn",
+            () -> new CursedObjectItem(new Item.Properties().stacksTo(64), "裂痕累累的骨灰盒", CursedObjectGrade.SPECIAL)
+    );
+
+    /** 咒物：両面宿儺の指 */
+    public static final RegistryObject<Item> CURSED_OBJECT_SUKUNA_FINGER = ITEMS.register(
+            "cursed_object_sukuna_finger",
+            () -> new CursedObjectItem(new Item.Properties().stacksTo(20), "两面宿傩的手指", CursedObjectGrade.SPECIAL)
+    );
+
+    /** 清神糖：小幅回复脑损 */
+    public static final RegistryObject<Item> BRAIN_SOOTHING_CANDY = ITEMS.register(
+            "brain_soothing_candy",
+            () -> new BrainRecoveryItem(
+                    new Item.Properties().stacksTo(16),
+                    () -> Config.domainBrainFoodHealMinor,
+                    "item.jujutsukaisenzone.brain_soothing_candy.desc")
+    );
+
+    /** 安神丸：大幅回复脑损 */
+    public static final RegistryObject<Item> BRAIN_CALMING_PILL = ITEMS.register(
+            "brain_calming_pill",
+            () -> new BrainRecoveryItem(
+                    new Item.Properties().stacksTo(16),
+                    () -> Config.domainBrainFoodHealMajor,
+                    "item.jujutsukaisenzone.brain_calming_pill.desc")
     );
 
     private ModItems()

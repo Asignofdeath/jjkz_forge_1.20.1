@@ -7,6 +7,8 @@ import com.darkness.jujutsukaisenzone.compat.ShaderedCompat;
 import com.darkness.jujutsukaisenzone.player.BarrierRulesData;
 import com.darkness.jujutsukaisenzone.player.PlayerDomainExpansionData;
 import com.darkness.jujutsukaisenzone.player.PlayerBarrierTechniqueData;
+import com.darkness.jujutsukaisenzone.player.PlayerBrainDamageData;
+import com.darkness.jujutsukaisenzone.player.PlayerDomainGaugeData;
 import com.darkness.jujutsukaisenzone.player.PlayerCursedEnergyData;
 import com.darkness.jujutsukaisenzone.player.PlayerReverseTechniqueData;
 import com.darkness.jujutsukaisenzone.registry.ModBlocks;
@@ -330,6 +332,18 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
         // 领域展开固定半径
         int radius = DOMAIN_RADIUS;
 
+        // 脑损满则禁止展开（强开受伤）
+        if (!PlayerBrainDamageData.tryAllowDomainExpansion(player))
+        {
+            return;
+        }
+        // 领域量表未满则禁止展开
+        if (!PlayerDomainGaugeData.tryAllowDomainExpansion(player))
+        {
+            return;
+        }
+
+
         // 检查并消耗展开领域所需的咒力
         int expansionCost = calculateExpansionCost(0);
         if (!PlayerCursedEnergyData.tryConsume(player, expansionCost))
@@ -379,6 +393,10 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
         );
 
         queue.addLast(instance);
+
+        // 今日次数 / 超额脑损（关域不算，仅成功展开）
+        PlayerBrainDamageData.onDomainExpanded(player);
+        PlayerDomainGaugeData.consumeOnExpand(player);
 
         // 领域只能同时存在一个
         while (queue.size() > MAX_ACTIVE_BARRIER_COUNT)

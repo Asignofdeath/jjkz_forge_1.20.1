@@ -3,6 +3,7 @@ package com.darkness.jujutsukaisenzone.player;
 import com.darkness.jujutsukaisenzone.Config;
 import com.darkness.jujutsukaisenzone.network.ModNetwork;
 import com.darkness.jujutsukaisenzone.player.CombatPowerStats.Contribution;
+import com.darkness.jujutsukaisenzone.technique.skill.tenshadows.TenShadowsPresenceBonuses;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
 
@@ -102,6 +103,41 @@ public final class PlayerCombatPowerData
         {
             technique.add(new Contribution("修炼", data.techniquePowerBonus));
             techniqueTotal += data.techniquePowerBonus;
+        }
+
+        int spPhys = PlayerSpNodeData.sumPhysicalBonus(player);
+        int spTech = PlayerSpNodeData.sumTechniqueBonus(player);
+        if (spPhys != 0)
+        {
+            physical.add(new Contribution("SP节点", spPhys));
+            physicalTotal += spPhys;
+        }
+        if (spTech != 0)
+        {
+            technique.add(new Contribution("SP节点", spTech));
+            techniqueTotal += spTech;
+        }
+
+        int dogBonus = TenShadowsPresenceBonuses.divineDogTechniqueBonus(player);
+        if (dogBonus > 0)
+        {
+            technique.add(new Contribution("十影·玉犬", dogBonus));
+            techniqueTotal += dogBonus;
+        }
+        if (TenShadowsPresenceBonuses.hasSerpent(player))
+        {
+            int physBoost = (int) Math.round(physicalTotal * TenShadowsPresenceBonuses.SERPENT_POWER_MULTIPLIER);
+            int techBoost = (int) Math.round(techniqueTotal * TenShadowsPresenceBonuses.SERPENT_POWER_MULTIPLIER);
+            if (physBoost != 0)
+            {
+                physical.add(new Contribution("十影·大蛇", physBoost));
+                physicalTotal += physBoost;
+            }
+            if (techBoost != 0)
+            {
+                technique.add(new Contribution("十影·大蛇", techBoost));
+                techniqueTotal += techBoost;
+            }
         }
 
         return new CombatPowerStats(

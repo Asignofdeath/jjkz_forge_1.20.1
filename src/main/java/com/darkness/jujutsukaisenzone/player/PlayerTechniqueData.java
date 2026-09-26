@@ -15,6 +15,8 @@ public final class PlayerTechniqueData
     public static final String TECHNIQUE_SHRINE = "shrine";
     public static final String TECHNIQUE_JUDGMENT = "judgment";
     public static final String TECHNIQUE_LOVE_RENDEZVOUS = "love_rendezvous";
+    public static final String TECHNIQUE_RATIO = "ratio";
+    public static final String TECHNIQUE_TEN_SHADOWS = "ten_shadows";
     private static final String TAG_INNATE_TECHNIQUE = "jujutsukaisenzone_innate_technique";
 
     private PlayerTechniqueData()
@@ -36,6 +38,7 @@ public final class PlayerTechniqueData
             ModNetwork.sendTechniqueSync(serverPlayer, normalized);
             TechniqueSkillSetRegistry.syncSkillBarToClient(serverPlayer);
             PlayerMimicryData.onTechniqueChanged(serverPlayer, normalized);
+            PlayerTenShadowsModeData.clearIfTechniqueChanged(serverPlayer, normalized);
             return;
         }
         player.getPersistentData().putString(TAG_INNATE_TECHNIQUE, normalized);
@@ -75,6 +78,16 @@ public final class PlayerTechniqueData
     public static boolean isLoveRendezvous(Player player)
     {
         return TECHNIQUE_LOVE_RENDEZVOUS.equals(getInnateTechnique(player));
+    }
+
+    public static boolean isRatio(Player player)
+    {
+        return TECHNIQUE_RATIO.equals(getInnateTechnique(player));
+    }
+
+    public static boolean isTenShadows(Player player)
+    {
+        return TECHNIQUE_TEN_SHADOWS.equals(getInnateTechnique(player));
     }
 
     /**
@@ -118,6 +131,8 @@ public final class PlayerTechniqueData
             case TECHNIQUE_SHRINE -> "御厨子";
             case TECHNIQUE_JUDGMENT -> "审判";
             case TECHNIQUE_LOVE_RENDEZVOUS -> "星间飞行";
+            case TECHNIQUE_RATIO -> "十划咒法";
+            case TECHNIQUE_TEN_SHADOWS -> "十种影法术";
             default -> techniqueId;
         };
     }

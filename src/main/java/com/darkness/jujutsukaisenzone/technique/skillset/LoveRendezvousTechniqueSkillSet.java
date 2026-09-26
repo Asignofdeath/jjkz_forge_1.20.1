@@ -235,7 +235,6 @@ public final class LoveRendezvousTechniqueSkillSet extends AbstractInnateTechniq
              */
             .node(SkillTreeNodeDef.skill("love_rendezvous_star_sling", SKILL_STAR_SLING)
                     .requires("love_rendezvous_star_gate")
-                    .intelCost(300)
                     .build())
             /*
              * 终结技「飞行，穿越」：把上面几件素材（自身标记 / 目标印记 / 跨序关系）拧成一次出手。
@@ -260,7 +259,6 @@ public final class LoveRendezvousTechniqueSkillSet extends AbstractInnateTechniq
              */
             .node(SkillTreeNodeDef.skill("love_rendezvous_star_chain", SKILL_STAR_CHAIN)
                     .requires("love_rendezvous_star_flight")
-                    .intelCost(450)
                     .build())
             /*
              * 说明节点：「相会」的前提、可控性与中断条件——三段纯静态文案从「飞行，穿越」的

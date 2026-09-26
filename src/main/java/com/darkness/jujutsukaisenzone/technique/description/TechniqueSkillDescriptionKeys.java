@@ -25,6 +25,10 @@ public final class TechniqueSkillDescriptionKeys
     public static final String DOMAIN_EXPANSION_TAG =
             "gui." + JuJutsuKaisenZone.MODID + ".skill_tree.domain_expansion_tag";
 
+    /** 「本技能不参与暴击」的悬停标注行，与 {@code mechanic_skill_tag} 同一形态。 */
+    public static final String NO_CRIT_TAG =
+            "gui." + JuJutsuKaisenZone.MODID + ".skill_tree.no_crit_tag";
+
     /** 简洁页底部的「按住 Shift」提示行。 */
     public static final String SHIFT_FOR_DETAILS =
             "gui." + JuJutsuKaisenZone.MODID + ".skill.shift_for_details";

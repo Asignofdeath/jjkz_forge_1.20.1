@@ -2,6 +2,7 @@ package com.darkness.jujutsukaisenzone.technique;
 
 import com.darkness.jujutsukaisenzone.player.BarrierTechniqueLevel;
 import com.darkness.jujutsukaisenzone.player.PlayerBarrierTechniqueData;
+import com.darkness.jujutsukaisenzone.player.PlayerBrainDamageData;
 import com.darkness.jujutsukaisenzone.player.PlayerSeanceTechniqueData;
 import com.darkness.jujutsukaisenzone.player.PlayerStrengthenTechniqueData;
 import com.darkness.jujutsukaisenzone.player.SeanceTechniqueLevel;
@@ -65,6 +66,7 @@ public final class TechniqueDailyUpgradeLogic
         resolveBarrierDayEnd(player);
         resolveSeanceDayEnd(player);
         resolveStrengthenDayEnd(player);
+        PlayerBrainDamageData.recoverForDaysPassed(player, currentDay - lastDay);
         PlayerBarrierTechniqueData.setLastProcessedGameDay(player, currentDay);
     }
 

@@ -10,12 +10,14 @@ import com.darkness.jujutsukaisenzone.player.PlayerCursedEnergyData;
 import com.darkness.jujutsukaisenzone.player.PlayerCombatPowerData;
 import com.darkness.jujutsukaisenzone.player.PlayerCursedGradeData;
 import com.darkness.jujutsukaisenzone.player.PlayerDomainExpansionData;
+import com.darkness.jujutsukaisenzone.player.PlayerBrainDamageData;
 import com.darkness.jujutsukaisenzone.player.PlayerFactionData;
 import com.darkness.jujutsukaisenzone.player.PlayerHealthData;
 import com.darkness.jujutsukaisenzone.player.PlayerReverseTechniqueData;
 import com.darkness.jujutsukaisenzone.player.PlayerShrineBlackFlashMilestoneData;
 import com.darkness.jujutsukaisenzone.player.PlayerSkillBarConfig;
 import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
+import com.darkness.jujutsukaisenzone.player.PlayerTenShadowsContractData;
 import com.darkness.jujutsukaisenzone.player.PlayerTechniqueIntelData;
 import com.darkness.jujutsukaisenzone.player.PlayerSeanceTechniqueData;
 import com.darkness.jujutsukaisenzone.player.PlayerStrengthenTechniqueData;
@@ -72,6 +74,7 @@ public final class CursedEnergyEvents
             // 不补这一步玩家一死就会丢掉全部技能成长（开发树、技能栏、空战能力全部退回未解锁）。
             SkillUnlockLogic.copyProgressionFrom(serverPlayer, event.getOriginal());
             PlayerSkillBarConfig.copyAllFrom(serverPlayer, event.getOriginal());
+            PlayerTenShadowsContractData.copyFrom(serverPlayer, event.getOriginal());
             syncPlayerState(serverPlayer);
         }
     }
@@ -183,6 +186,8 @@ public final class CursedEnergyEvents
         ModNetwork.sendReverseTechniqueSync(serverPlayer, PlayerReverseTechniqueData.hasReverseTechnique(serverPlayer));
         PlayerBarrierTechniqueData.syncToClient(serverPlayer);
         ModNetwork.sendDomainExpansionLearnedSync(serverPlayer, PlayerDomainExpansionData.hasLearned(serverPlayer));
+        PlayerBrainDamageData.refreshDebuffs(serverPlayer);
+        PlayerBrainDamageData.syncToClient(serverPlayer);
         ModNetwork.sendSeanceTechniqueLearnedSync(
                 serverPlayer,
                 PlayerSeanceTechniqueData.hasLearned(serverPlayer),
@@ -194,6 +199,9 @@ public final class CursedEnergyEvents
                 PlayerStrengthenTechniqueData.isActive(serverPlayer));
         ModNetwork.sendTechniqueSync(serverPlayer, PlayerTechniqueData.getInnateTechnique(serverPlayer));
         PlayerTechniqueIntelData.syncToClient(serverPlayer);
+        com.darkness.jujutsukaisenzone.player.PlayerSpData.syncToClient(serverPlayer);
+        com.darkness.jujutsukaisenzone.player.PlayerSpNodeData.syncToClient(serverPlayer);
+        com.darkness.jujutsukaisenzone.player.PlayerSeLoadoutData.syncToClient(serverPlayer);
         // 术式情报会影响术式强度，必须在它同步之后下发面板
         PlayerCombatPowerData.syncToClient(serverPlayer);
         SkillUnlockLogic.syncToClient(serverPlayer);
@@ -203,5 +211,9 @@ public final class CursedEnergyEvents
         TechniqueSkillSetRegistry.syncSkillBarToClient(serverPlayer);
         ModNetwork.sendMimicrySync(serverPlayer);
         GradeAdvancements.syncForPlayer(serverPlayer);
+        if (PlayerTechniqueData.isTenShadows(serverPlayer))
+        {
+            PlayerTenShadowsContractData.syncToClient(serverPlayer);
+        }
     }
 }

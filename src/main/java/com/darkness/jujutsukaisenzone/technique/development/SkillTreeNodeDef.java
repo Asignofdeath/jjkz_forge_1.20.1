@@ -165,6 +165,32 @@ public final class SkillTreeNodeDef
     }
 
     /**
+     * 判定这个说明节点是不是「领域说明节点」——即它的可见性条件声明了「已习得领域展开」。
+     * <p>
+     * 按条件判定而不是按节点 id：领域节点在各术式里命名各异（诛伏赐死 / 无量空处 / 伏魔神龛 /
+     * 爱与幽会），唯一的共同点是这条可见性条件；将来新增领域说明节点会自动带上标注，不必回来登记。
+     * <p>
+     * 两处读者共用这一个判据（勿各自实现一份）：{@code SkillTreeNodeWidget} 的悬停框据此打
+     * 「领域展开」标注行；{@code CritSkillPolicy#validate} 据此校验「不参与暴击的说明节点」
+     * 确实是领域节点——不是的话那行标注永远不会出现。
+     */
+    public boolean isDomainInfoNode()
+    {
+        if (!isInfoNode())
+        {
+            return false;
+        }
+        for (UnlockCondition condition : visibilityConditions)
+        {
+            if (condition.type() == UnlockConditionType.HAS_DOMAIN_EXPANSION)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * 两个节点之间是否算一条「连线」——决定要不要画前置线、要不要参与点选高亮的连通关系。
      * <p>
      * <b>说明节点不参与任何连线。</b>它在 {@link #prerequisiteNodeIds()} 里声明的节点只被

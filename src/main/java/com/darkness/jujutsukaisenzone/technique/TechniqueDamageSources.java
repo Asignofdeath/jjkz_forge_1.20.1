@@ -52,6 +52,10 @@ import java.util.function.Supplier;
  * 仅在结算期间写入 {@link #ACTIVE_DAMAGE_TYPE}。走 {@code thrown} / {@code explode} /
  * EpicFight 等通道时，用 {@link #runWithType} / {@link #callWithType} 包住出伤即可挂上分型；
  * 防御管线（{@code TechniqueDamageZoneEvents} 区 2）按它决定吃体抗还是术抗。
+ * <p>
+ * 暴击许可同理：本类维护 {@link #CRIT_OVERRIDE}（出伤点表态）+ {@link #critAllowed}（分型默认）。
+ * 默认口径是「体术可暴、术式不可暴」，理由是术式里高频出伤太多；单发术式招式必须显式走
+ * {@link #dealCrit} / {@link #runWithTypeCrit}。改出伤点之前先读 {@link #critAllowed} 的文档。
  */
 @Mod.EventBusSubscriber(modid = JuJutsuKaisenZone.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public final class TechniqueDamageSources
@@ -78,8 +82,22 @@ public final class TechniqueDamageSources
      */
     private static final ThreadLocal<Boolean> POWER_ALREADY_SCALED = ThreadLocal.withInitial(() -> Boolean.FALSE);
 
+    /**
+     * 这一击的暴击许可覆盖。
+     * <p>
+     * {@code null} = 出伤点没表态 ⇒ 按分型取默认（见 {@link #critAllowed(SkillDamageType)}）：
+     * <b>体术默认可暴击，术式默认不可</b>。出伤点用 {@link #runWithCrit} / {@link #dealCrit} /
+     * {@link #runWithTypeCrit} 表态——单发术式招式显式放行，体术侧的多段招式可显式拒绝。
+     * <p>
+     * 只在调用栈内存活（服务端主线程独占），与 {@link #POWER_ALREADY_SCALED} 同一形态；
+     * 但默认值是 {@code null} 而不是 {@code false}——「没表态」必须能与「明确拒绝」区分开。
+     */
+    private static final ThreadLocal<Boolean> CRIT_OVERRIDE = new ThreadLocal<>();
+
     /** 赫击飞方块的 persistentData 标记：落地砸人仍算术式伤害。 */
     public static final String TAG_RED_DEBRIS = "jujutsukaisenzone_red_debris";
+    /** 十划「瓦落瓦落」掀起的坠落碎块（复合伤害）。 */
+    public static final String TAG_RATIO_DEBRIS = "jujutsukaisenzone_ratio_debris";
 
     /**
      * 术式专属伤害类型（数据包 {@code data/jujutsukaisenzone/damage_type/technique.json}）。
@@ -222,10 +240,99 @@ public final class TechniqueDamageSources
         }
     }
 
+    /**
+     * 放行暴击的一次术式伤害。
+     * <p>
+     * 与 {@link #deal(LivingEntity, LivingEntity, float, SkillDamageType)} 的差别只有一个：
+     * 在结算栈内把暴击许可置为 {@code true}，让术式分型也能吃到乘区 C 的暴击判定。
+     * <b>只给单发招式用</b>（赫箭爆炸、星痕撞击 / 爆裂、法槌这类一次结算的）——
+     * 周期性 / 每 tick 出伤的招式走它，暴击提示会随 tick 刷屏，而且逐 tick 掷骰的期望
+     * 与单次掷骰无异，只是方差被平均掉。
+     */
+    public static boolean dealCrit(LivingEntity target, @Nullable LivingEntity owner, float amount, SkillDamageType damageType)
+    {
+        return callWithCrit(true, () -> deal(target, owner, amount, damageType));
+    }
+
+    /** 同 {@link #dealCrit(LivingEntity, LivingEntity, float, SkillDamageType)}，分型默认术式。 */
+    public static boolean dealCrit(LivingEntity target, @Nullable LivingEntity owner, float amount)
+    {
+        return dealCrit(target, owner, amount, SkillDamageType.TECHNIQUE);
+    }
+
+    /**
+     * 明确拒绝暴击的一次伤害。
+     * <p>
+     * 术式分型默认本就不可暴击，所以这个入口只对<b>体术</b>有意义：留给「体术但多段 / 高频」
+     * 的招式主动收闸门用（默认的体术是放行的）。
+     * <p>
+     * ⚠️ 目前<b>没有调用点</b>：所有体术招式都按默认放行，多段招式也只逐段各掷一次骰（不做
+     * 「整招只掷一次」的预算）。保留它是为了以后真需要给某个体术招式收闸门时有现成入口——
+     * 别因为编辑器报「未使用」就顺手删掉。
+     */
+    public static boolean dealNoCrit(LivingEntity target, @Nullable LivingEntity owner, float amount, SkillDamageType damageType)
+    {
+        return callWithCrit(false, () -> deal(target, owner, amount, damageType));
+    }
+
     /** 当前是否处于 {@link #deal} 的结算栈内（区 0 用它避免重复乘强度）。 */
     public static boolean isPowerAlreadyScaled()
     {
         return POWER_ALREADY_SCALED.get();
+    }
+
+    /**
+     * 这一击能不能暴击。
+     * <p>
+     * 判据次序：<b>出伤点的显式表态 → 分型默认</b>。
+     * <ul>
+     *   <li>体术（{@link SkillDamageType#MARTIAL}）默认可暴击。这条默认值不能省：EpicFight
+     *       基础攻击与原版近战<b>不走</b> {@link #deal}，拿不到任何表态，一旦默认改为「一律不可暴击」，
+     *       现在唯一的暴击来源会被整个关掉。</li>
+     *   <li>术式 / 复合默认不可暴击。术式里「每 1~5 tick 出一次伤」的招式很多（苍、捌、解、茈、
+     *       灶开、领域斩击……），单发招式用 {@link #dealCrit} / {@link #runWithTypeCrit} 显式放行。</li>
+     * </ul>
+     * 默认取向刻意选「没表态就不给暴击」：漏标的后果是「该暴的没暴」，而不是「高频技能失控」。
+     */
+    public static boolean critAllowed(@Nullable SkillDamageType damageType)
+    {
+        Boolean override = CRIT_OVERRIDE.get();
+        if (override != null)
+        {
+            return override;
+        }
+        return damageType == SkillDamageType.MARTIAL;
+    }
+
+    /** 在调用栈内覆盖暴击许可（嵌套安全：退出时恢复外层值，与 {@link #callWithType} 同一写法）。 */
+    public static <T> T callWithCrit(boolean allowed, Supplier<T> action)
+    {
+        Boolean previous = CRIT_OVERRIDE.get();
+        CRIT_OVERRIDE.set(allowed);
+        try
+        {
+            return action.get();
+        }
+        finally
+        {
+            if (previous == null)
+            {
+                CRIT_OVERRIDE.remove();
+            }
+            else
+            {
+                CRIT_OVERRIDE.set(previous);
+            }
+        }
+    }
+
+    /** 同 {@link #callWithCrit}，无返回值。 */
+    public static void runWithCrit(boolean allowed, Runnable action)
+    {
+        callWithCrit(allowed, () -> {
+            action.run();
+            return null;
+        });
     }
 
     /**
@@ -282,6 +389,21 @@ public final class TechniqueDamageSources
                 ACTIVE_DAMAGE_TYPE.set(previousType);
             }
         }
+    }
+
+    /**
+     * 同 {@link #runWithType}，并在结算栈内放行暴击。
+     * <p>
+     * 给「不能或不该改走 {@link #deal}、但确实是一次结算」的通道用：例如
+     * {@code runWithType(TECHNIQUE, () -> target.hurt(thrownSource, dmg))} 这种直连 {@code hurt}
+     * 的写法，想参与暴击就换成它。高频通道不要用。
+     */
+    public static void runWithTypeCrit(SkillDamageType damageType, Runnable action)
+    {
+        callWithCrit(true, () -> callWithType(damageType, () -> {
+            action.run();
+            return null;
+        }));
     }
 
     /**

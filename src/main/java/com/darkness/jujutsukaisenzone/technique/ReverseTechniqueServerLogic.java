@@ -3,6 +3,7 @@ package com.darkness.jujutsukaisenzone.technique;
 import com.darkness.jujutsukaisenzone.compat.EpicFightCompat;
 import com.darkness.jujutsukaisenzone.player.PlayerCursedEnergyData;
 import com.darkness.jujutsukaisenzone.player.PlayerReverseTechniqueData;
+import com.darkness.jujutsukaisenzone.registry.ModAttributes;
 import net.minecraft.core.particles.DustParticleOptions;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -45,7 +46,9 @@ public final class ReverseTechniqueServerLogic
         float maxHealth = (float) player.getAttributeValue(Attributes.MAX_HEALTH);
         if (player.getHealth() < maxHealth)
         {
-            float heal = Math.min(HEAL_PER_TICK, maxHealth - player.getHealth());
+            float healPerTick = HEAL_PER_TICK
+                    * (float) ModAttributes.reverseTechniqueEfficiencyMultiplier(player);
+            float heal = Math.min(healPerTick, maxHealth - player.getHealth());
             if (heal > 0)
             {
                 player.heal(heal);

@@ -13,6 +13,9 @@ import net.minecraft.network.chat.Component;
  *       （通则见 {@link IInnateTechniqueSkillSet#useSpecialMove}）。</li>
  * </ul>
  * <p>
+ * 技能升级表默认也只按 {@link #baseSkillId()} 查（变体自动吃同一倍率）。
+ * 若某变体的伤害段数 / 倍率 / 其它可升级数值与原技能故意分叉，再为该 {@link #variantId()} 单独配升级行。
+ * <p>
  * 技能集通过 {@link IInnateTechniqueSkillSet#getSpecialMoves(String)} 按原技能声明，
  * 注册时由 {@code TechniqueSpecialMoveAttacher} 自动挂到术式开发树的对应技能节点下
  * （连线到原技能、默认复用原技能图标），因此新增特别招式不需要手写技能树节点。

@@ -15,6 +15,8 @@ public enum SkillUnlockResult
     CONDITIONS_NOT_MET,
     INSUFFICIENT_INTEL,
     INSUFFICIENT_VANILLA_XP,
+    INSUFFICIENT_SP,
+    ACTIVE_NOT_MAX_LEVEL,
     WRONG_TECHNIQUE;
 
     public Component toMessage()

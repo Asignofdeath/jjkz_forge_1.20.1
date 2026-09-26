@@ -1,5 +1,7 @@
 package com.darkness.jujutsukaisenzone.technique.development;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -27,5 +29,16 @@ public final class TechniqueSkillTreeRegistry
             return Optional.empty();
         }
         return Optional.ofNullable(TREES.get(techniqueId));
+    }
+
+    /**
+     * 全部已注册技能树。
+     * <p>
+     * 供「静态声明表 vs 技能表」的启动自检用（见 {@code CritSkillPolicy#validate}）：
+     * 那份自检需要「所有技能 id / 所有节点 id」的完整视图，逐个 {@link #get} 拿不到。
+     */
+    public static Collection<TechniqueSkillTree> all()
+    {
+        return List.copyOf(TREES.values());
     }
 }

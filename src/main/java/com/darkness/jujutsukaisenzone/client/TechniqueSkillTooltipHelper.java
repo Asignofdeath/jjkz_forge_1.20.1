@@ -1,6 +1,7 @@
 package com.darkness.jujutsukaisenzone.client;
 
 import com.darkness.jujutsukaisenzone.technique.aerial.AerialCombatSkills;
+import com.darkness.jujutsukaisenzone.technique.crit.CritSkillPolicy;
 import com.darkness.jujutsukaisenzone.technique.description.SkillDescriptionDamageColors;
 import com.darkness.jujutsukaisenzone.technique.description.TechniqueSkillDescriptionKeys;
 import com.darkness.jujutsukaisenzone.technique.description.TechniqueSkillDescriptionView;
@@ -51,6 +52,7 @@ public final class TechniqueSkillTooltipHelper
         }
         TechniqueSkillDescriptionView view = TechniqueSkillDescriptions.resolve(player, techniqueId, skill);
         boolean mechanic = SkillUnlockLogic.isMechanicSkill(techniqueId, skill.skillId());
+        boolean noCrit = CritSkillPolicy.isNoCritSkill(skill.skillId());
         String briefKey = TechniqueSkillDescriptions.resolveBriefKey(player, techniqueId, skill);
         /*
          * 悬停框有两页：简洁页是默认视图，完整页靠按住 Shift 唤出。
@@ -61,9 +63,9 @@ public final class TechniqueSkillTooltipHelper
          */
         if (!Screen.hasShiftDown() && hasBrief(briefKey))
         {
-            return buildBrief(view, briefKey, mechanic);
+            return buildBrief(view, briefKey, mechanic, noCrit);
         }
-        return mechanic ? buildMechanic(view) : build(view);
+        return mechanic ? buildMechanic(view, noCrit) : build(view, noCrit);
     }
 
     /**
@@ -90,18 +92,23 @@ public final class TechniqueSkillTooltipHelper
      * 它是悬停框的默认视图；按住 Shift 换到完整页（见 {@link #build(Player, String, TechniqueSkill)}）。
      * 机制型技能的浅紫类型标注在这里照旧保留，与完整页一致。
      */
-    private static List<Component> buildBrief(TechniqueSkillDescriptionView view, String briefKey, boolean mechanic)
+    private static List<Component> buildBrief(TechniqueSkillDescriptionView view, String briefKey, boolean mechanic,
+                                              boolean noCrit)
     {
         if (view == null || view.displayName().getString().isEmpty())
         {
             return Collections.emptyList();
         }
-        List<Component> lines = new ArrayList<>(5);
+        List<Component> lines = new ArrayList<>(6);
         lines.add(view.displayName().copy().withStyle(ChatFormatting.GOLD));
         if (mechanic)
         {
             lines.add(Component.translatable(TechniqueSkillDescriptionKeys.MECHANIC_SKILL_TAG)
                     .withStyle(ChatFormatting.LIGHT_PURPLE));
+        }
+        if (noCrit)
+        {
+            lines.add(noCritTag());
         }
         lines.add(Component.translatable(TechniqueSkillDescriptionKeys.SHIFT_FOR_DETAILS)
                 .withStyle(ChatFormatting.DARK_GRAY));
@@ -120,16 +127,20 @@ public final class TechniqueSkillTooltipHelper
      * 标注行「机制型技能」与特别招式的 {@code special_move_tag} 同一形态（见
      * {@code SkillTreeNodeWidget#buildSpecialMoveTooltip}）：标题之下、正文之上，同为浅紫。
      */
-    private static List<Component> buildMechanic(TechniqueSkillDescriptionView view)
+    private static List<Component> buildMechanic(TechniqueSkillDescriptionView view, boolean noCrit)
     {
         if (view == null || view.displayName().getString().isEmpty())
         {
             return Collections.emptyList();
         }
-        List<Component> lines = new ArrayList<>(4);
+        List<Component> lines = new ArrayList<>(5);
         lines.add(view.displayName().copy().withStyle(ChatFormatting.GOLD));
         lines.add(Component.translatable(TechniqueSkillDescriptionKeys.MECHANIC_SKILL_TAG)
                 .withStyle(ChatFormatting.LIGHT_PURPLE));
+        if (noCrit)
+        {
+            lines.add(noCritTag());
+        }
         if (!view.description().getString().isBlank())
         {
             lines.add(Component.empty());
@@ -138,15 +149,36 @@ public final class TechniqueSkillTooltipHelper
         return Collections.unmodifiableList(lines);
     }
 
+    /**
+     * 「本技能不参与暴击」标注行。
+     * <p>
+     * 名单见 {@link CritSkillPolicy}：收的是按设计就不该暴击的招式（高频 / 周期性出伤、
+     * 坠落碎块）。它只出现在<b>极少数</b>技能上，所以用一行标注而不是写进每个技能的正文。
+     */
+    private static Component noCritTag()
+    {
+        return Component.translatable(TechniqueSkillDescriptionKeys.NO_CRIT_TAG)
+                .withStyle(ChatFormatting.LIGHT_PURPLE);
+    }
+
     public static List<Component> build(TechniqueSkillDescriptionView view)
+    {
+        return build(view, false);
+    }
+
+    public static List<Component> build(TechniqueSkillDescriptionView view, boolean noCrit)
     {
         if (view == null || view.displayName().getString().isEmpty())
         {
             return Collections.emptyList();
         }
 
-        List<Component> lines = new ArrayList<>(4);
+        List<Component> lines = new ArrayList<>(5);
         lines.add(view.displayName().copy().withStyle(ChatFormatting.GOLD));
+        if (noCrit)
+        {
+            lines.add(noCritTag());
+        }
         if (view.maintainSkill())
         {
             lines.add(Component.translatable(

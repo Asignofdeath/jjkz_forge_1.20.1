@@ -812,8 +812,9 @@ public final class StarMarkRules
 
                 float damage = (float) (speed * IMPACT_DAMAGE_PER_SPEED);
                 /* 两边都要结算，所以用 | 而不是 ||（后者会在第一记生效时短路跳过第二记） */
-                boolean dealt = TechniqueDamageSources.deal(living, owner, damage);
-                dealt |= TechniqueDamageSources.deal(ballLiving, owner, damage);
+                /* 撞击有 IMPACT_COOLDOWN_TICKS 去重，是一次结算而不是逐 tick 灼烧 ⇒ 放行暴击 */
+                boolean dealt = TechniqueDamageSources.dealCrit(living, owner, damage);
+                dealt |= TechniqueDamageSources.dealCrit(ballLiving, owner, damage);
 
                 ball.getPersistentData().putLong(TAG_IMPACT_AT, now);
                 if (detonating)

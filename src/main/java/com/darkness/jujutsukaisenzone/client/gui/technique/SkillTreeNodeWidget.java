@@ -6,11 +6,12 @@ import com.lowdragmc.lowdraglib.utils.Rect;
 import com.lowdragmc.lowdraglib.utils.Size;
 import com.darkness.jujutsukaisenzone.client.TechniqueSkillTooltipHelper;
 import com.darkness.jujutsukaisenzone.network.ModNetwork;
+import com.darkness.jujutsukaisenzone.technique.crit.CritSkillPolicy;
+import com.darkness.jujutsukaisenzone.technique.development.SkillUpgradeCostRegistry;
+import com.darkness.jujutsukaisenzone.technique.development.SkillUpgradeLogic;
 import com.darkness.jujutsukaisenzone.technique.description.TechniqueSkillDescriptionKeys;
 import com.darkness.jujutsukaisenzone.technique.development.SkillUnlockLogic;
 import com.darkness.jujutsukaisenzone.technique.development.SkillTreeNodeDef;
-import com.darkness.jujutsukaisenzone.technique.development.UnlockCondition;
-import com.darkness.jujutsukaisenzone.technique.development.UnlockConditionType;
 import com.darkness.jujutsukaisenzone.technique.skillset.TechniqueSpecialMove;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
@@ -23,6 +24,7 @@ import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import org.joml.Vector4f;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -188,14 +190,22 @@ public final class SkillTreeNodeWidget extends com.lowdragmc.lowdraglib.gui.widg
         {
             Component title = TechniqueSkillTreeViewHelper.getDisplayName(player, techniqueId, nodeDef);
             Component body = Component.translatable(nodeDef.infoDescriptionKey()).withStyle(ChatFormatting.GRAY);
-            if (isDomainInfoNode(nodeDef))
+            if (nodeDef.isDomainInfoNode())
             {
-                setHoverTooltips(
-                        title.copy().withStyle(ChatFormatting.AQUA),
-                        Component.translatable(TechniqueSkillDescriptionKeys.DOMAIN_EXPANSION_TAG)
-                                .withStyle(ChatFormatting.RED),
-                        Component.empty(),
-                        body);
+                List<Component> domainLines = new ArrayList<>(5);
+                domainLines.add(title.copy().withStyle(ChatFormatting.AQUA));
+                domainLines.add(Component.translatable(TechniqueSkillDescriptionKeys.DOMAIN_EXPANSION_TAG)
+                        .withStyle(ChatFormatting.RED));
+                // 领域斩击是每 10 tick 的持续伤害 ⇒ 该领域的说明节点要标明不参与暴击。
+                // 领域没有 skillId，只能按 nodeId 判定（名单见 CritSkillPolicy）。
+                if (CritSkillPolicy.isNoCritInfoNode(nodeDef.nodeId()))
+                {
+                    domainLines.add(Component.translatable(TechniqueSkillDescriptionKeys.NO_CRIT_TAG)
+                            .withStyle(ChatFormatting.LIGHT_PURPLE));
+                }
+                domainLines.add(Component.empty());
+                domainLines.add(body);
+                setHoverTooltips(domainLines);
                 return;
             }
             setHoverTooltips(
@@ -262,24 +272,6 @@ public final class SkillTreeNodeWidget extends com.lowdragmc.lowdraglib.gui.widg
                         .withStyle(ChatFormatting.DARK_GRAY));
     }
 
-    /**
-     * 判定说明节点是不是「领域说明节点」——即它的可见性条件声明了「已习得领域展开」。
-     * <p>
-     * 按条件判定而不是按节点 id：领域节点在各术式里命名各异（诛伏赐死 / 无量空处 / 伏魔神龛 /
-     * 爱与幽会），唯一的共同点是这条可见性条件；将来新增领域说明节点会自动带上标注，不必回来登记。
-     */
-    private static boolean isDomainInfoNode(SkillTreeNodeDef nodeDef)
-    {
-        for (UnlockCondition condition : nodeDef.visibilityConditions())
-        {
-            if (condition.type() == UnlockConditionType.HAS_DOMAIN_EXPANSION)
-            {
-                return true;
-            }
-        }
-        return false;
-    }
-
     private void clearHoverTooltips()
     {
         setHoverTooltips(List.of());
@@ -288,7 +280,17 @@ public final class SkillTreeNodeWidget extends com.lowdragmc.lowdraglib.gui.widg
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button)
     {
-        if (button != 0 || !isMouseOverElement(mouseX, mouseY))
+        if (!isMouseOverElement(mouseX, mouseY))
+        {
+            return super.mouseClicked(mouseX, mouseY, button);
+        }
+
+        // 右键：升级已解锁的主动技能（左键留给点选高亮与解锁）。
+        if (button == 1)
+        {
+            return tryUpgradeOnRightClick();
+        }
+        if (button != 0)
         {
             return super.mouseClicked(mouseX, mouseY, button);
         }
@@ -316,6 +318,28 @@ public final class SkillTreeNodeWidget extends com.lowdragmc.lowdraglib.gui.widg
         if (state == TechniqueSkillTreeViewHelper.NodeVisualState.SKILL_CAN_UNLOCK)
         {
             ModNetwork.sendUnlockSkillRequest(techniqueId, nodeDef.nodeId());
+        }
+        return true;
+    }
+
+    private boolean tryUpgradeOnRightClick()
+    {
+        if (!nodeDef.isSkillNode())
+        {
+            return true;
+        }
+        Player player = TechniqueSkillTreeViewHelper.localPlayer();
+        if (player == null)
+        {
+            return true;
+        }
+        TechniqueSkillTreeViewHelper.NodeVisualState state =
+                TechniqueSkillTreeViewHelper.getVisualState(player, techniqueId, nodeDef);
+        if (state == TechniqueSkillTreeViewHelper.NodeVisualState.SKILL_UNLOCKED
+                && SkillUpgradeCostRegistry.isUpgradeable(nodeDef.skillId())
+                && SkillUpgradeLogic.canUpgradeSkill(player, techniqueId, nodeDef.skillId()))
+        {
+            ModNetwork.sendUpgradeSkillRequest(techniqueId, nodeDef.skillId());
         }
         return true;
     }

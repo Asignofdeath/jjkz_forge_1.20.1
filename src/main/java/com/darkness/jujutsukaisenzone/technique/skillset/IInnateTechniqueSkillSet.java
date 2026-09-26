@@ -1,5 +1,6 @@
 package com.darkness.jujutsukaisenzone.technique.skillset;
 
+import com.darkness.jujutsukaisenzone.commandwheel.CommandWheelEntry;
 import com.darkness.jujutsukaisenzone.technique.development.TechniqueSkillTree;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
@@ -247,5 +248,15 @@ public interface IInnateTechniqueSkillSet
     /** 蓄力满后松手发射。 */
     default void releaseHoldReleaseChargeBySkill(ServerPlayer player, String skillId, int slot)
     {
+    }
+
+    /**
+     * 指令圆盘上的术式专用条目；无则空列表。
+     * <p>
+     * 有独立快捷键的共通技能（反转 / 结界等）不进圆盘。
+     */
+    default List<CommandWheelEntry> commandWheelEntries()
+    {
+        return Collections.emptyList();
     }
 }

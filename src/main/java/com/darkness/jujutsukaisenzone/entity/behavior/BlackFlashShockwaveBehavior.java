@@ -76,7 +76,8 @@ public class BlackFlashShockwaveBehavior extends EffectBehavior
         {
             if (target == owner || !target.isAlive()) continue;
             if (target.distanceToSqr(entity) > radius * radius) continue;
-            TechniqueDamageSources.deal(target, owner, BlackFlashConfig.SHOCKWAVE_DAMAGE);
+            // 冲击波只结算一次（本方法末尾 discard）⇒ 放行暴击
+            TechniqueDamageSources.dealCrit(target, owner, BlackFlashConfig.SHOCKWAVE_DAMAGE);
         }
 
         entity.discard();

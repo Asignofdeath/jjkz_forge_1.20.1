@@ -130,6 +130,13 @@
 
 **目的**：`./gradlew` 被明令禁止（游戏锁 `build/`、能卡 10min~1h）。但「改签名 / 改调用点」这类改动，编译器能报的错基本可穷尽 ⇒ 直接用 javac 编译整个 `src/main/java`，classpath 从 gradle 缓存现场拼。446 文件约 20 秒，**不写 `build/`**，输出到 `%TEMP%`。
 
+> 已落地成脚本，**优先直接跑它**（省去每次重打）：
+> ```
+> export PATH="/c/Users/19316/.gradle/jdks/eclipse_adoptium-17-amd64-windows/jdk-17.0.20.1+1/bin:/c/Users/19316/.workbuddy/binaries/PortableGit/versions/1.2.0/usr/bin:/c/Windows/System32:$PATH"
+> /c/Users/19316/.workbuddy/binaries/python/envs/default/Scripts/python.exe "C:/D/MineMOD/JuJutsuKaisenZone_forge-1.20.1/tools/jjkz_static_check.py"
+> ```
+> 2026-09-26 基线：555 文件 / 290 jar / **exit 0 / 0 错误**。下面的原理与坑仍然有效（脚本就是它）。
+
 实测基线：2026-09-25 防御层改动后 **exit 0 / 0 错误**。
 
 ```python

@@ -20,6 +20,16 @@ import com.darkness.jujutsukaisenzone.technique.skill.JudgmentWeaponLogic;
 import com.darkness.jujutsukaisenzone.technique.skillset.JudgmentTechniqueSkillSet;
 import com.darkness.jujutsukaisenzone.technique.skillset.LimitlessTechniqueSkillSet;
 import com.darkness.jujutsukaisenzone.technique.skillset.LoveRendezvousTechniqueSkillSet;
+import com.darkness.jujutsukaisenzone.technique.skillset.RatioTechniqueSkillSet;
+import com.darkness.jujutsukaisenzone.technique.skillset.TenShadowsTechniqueSkillSet;
+import com.darkness.jujutsukaisenzone.technique.skill.RatioSpotLogic;
+import com.darkness.jujutsukaisenzone.technique.skill.RatioIchimonjiLogic;
+import com.darkness.jujutsukaisenzone.technique.skill.RatioImpactLogic;
+import com.darkness.jujutsukaisenzone.technique.skill.RatioCollapseLogic;
+import com.darkness.jujutsukaisenzone.technique.skill.RatioAbsolutionLogic;
+import com.darkness.jujutsukaisenzone.technique.skill.RatioOvertimeLogic;
+import com.darkness.jujutsukaisenzone.player.PlayerRatioOvertimeData;
+import com.darkness.jujutsukaisenzone.player.PlayerRatioBreakData;
 import com.darkness.jujutsukaisenzone.technique.skill.StarFlightSkillLogic;
 import com.darkness.jujutsukaisenzone.technique.skill.StarMarkDetonation;
 import com.darkness.jujutsukaisenzone.technique.skill.StarMarkRules;
@@ -62,6 +72,8 @@ public final class TechniqueSkillDescriptions
         registerShrineSkills();
         registerJudgmentSkills();
         registerLoveRendezvousSkills();
+        registerRatioSkills();
+        registerTenShadowsSkills();
         registerCommonSkills();
         registerAerialSkills();
     }
@@ -418,6 +430,72 @@ public final class TechniqueSkillDescriptions
     {
         return SkillUnlockLogic.isSkillUnlockedById(
                 player, PlayerTechniqueData.TECHNIQUE_JUDGMENT, skillId);
+    }
+
+
+    private static void registerRatioSkills()
+    {
+        TechniqueSkillDescriptionRegistry.register(
+                RatioTechniqueSkillSet.SKILL_RATIO_MARK,
+                (player, techniqueId, skill) -> new Object[] {
+                        Integer.toString(RatioSpotLogic.SPOT_DURATION_TICKS / 20),
+                        TechniqueSkillStatFormat.formatNumber(RatioSpotLogic.FORCED_CRIT_MULT),
+                        Integer.toString(PlayerRatioBreakData.MAX_BREAKS)
+                });
+        TechniqueSkillDescriptionRegistry.register(
+                RatioTechniqueSkillSet.SKILL_ICHIMONJI,
+                (player, techniqueId, skill) -> new Object[] {
+                        Integer.toString(RatioIchimonjiLogic.BASE_HITS_BLUNT),
+                        Integer.toString(RatioIchimonjiLogic.BASE_HITS_SHARP),
+                        Integer.toString(RatioIchimonjiLogic.MAX_BREAKS_CONSUMED),
+                        SkillDamageResolver.martialRatioText(RatioIchimonjiLogic.DAMAGE_PER_HIT),
+                        TechniqueSkillStatFormat.formatNumber(RatioIchimonjiLogic.RANGE)
+                });
+        TechniqueSkillDescriptionRegistry.register(
+                RatioTechniqueSkillSet.SKILL_IMPACT,
+                (player, techniqueId, skill) -> new Object[] {
+                        TechniqueSkillStatFormat.formatNumber(RatioImpactLogic.RANGE),
+                        SkillDamageResolver.martialRatioText(RatioImpactLogic.DAMAGE),
+                        Integer.toString(RatioImpactLogic.STUN_TICKS / 20),
+                        TechniqueSkillStatFormat.formatNumber(
+                                RatioImpactLogic.FOLLOWUP_WINDOW_TICKS / 20.0D)
+                });
+        TechniqueSkillDescriptionRegistry.register(
+                RatioTechniqueSkillSet.SKILL_COLLAPSE,
+                (player, techniqueId, skill) -> new Object[] {
+                        Integer.toString(RatioCollapseLogic.BASE_DEBRIS),
+                        Integer.toString(RatioCollapseLogic.MAX_BREAKS_CONSUMED),
+                        TechniqueSkillStatFormat.formatNumber(RatioCollapseLogic.BREAK_RADIUS),
+                        SkillDamageResolver.ratioText(RatioCollapseLogic.HURT_DAMAGE)
+                });
+        TechniqueSkillDescriptionRegistry.register(
+                RatioTechniqueSkillSet.SKILL_OVERTIME_VOW,
+                (player, techniqueId, skill) -> new Object[] {
+                        Integer.toString(Math.round((1.0F - RatioOvertimeLogic.WORK_DAMAGE_MULT) * 100.0F)),
+                        Integer.toString(Math.round((RatioOvertimeLogic.OVERTIME_DAMAGE_MULT - 1.0F) * 100.0F))
+                });
+        TechniqueSkillDescriptionRegistry.register(
+                RatioTechniqueSkillSet.SKILL_OVERTIME,
+                (player, techniqueId, skill) -> new Object[] {});
+        TechniqueSkillDescriptionRegistry.register(
+                RatioTechniqueSkillSet.SKILL_ABSOLUTION,
+                (player, techniqueId, skill) -> new Object[] {
+                        SkillDamageResolver.martialRatioText(RatioAbsolutionLogic.DAMAGE),
+                        TechniqueSkillStatFormat.formatNumber(RatioAbsolutionLogic.RANGE),
+                        Integer.toString(PlayerRatioOvertimeData.EFFICIENCY_DURATION_TICKS / 20),
+                        Integer.toString(5),
+                        Integer.toString(2),
+                        TechniqueSkillStatFormat.formatNumber(PlayerRatioOvertimeData.EFFICIENCY_BONUS_CAP)
+                });
+    }
+
+    private static void registerTenShadowsSkills()
+    {
+        TechniqueSkillDescriptionRegistry.register(
+                TenShadowsTechniqueSkillSet.SKILL_HAND_SHADOW,
+                (player, techniqueId, skill) -> new Object[] {
+                        Integer.toString(TenShadowsTechniqueSkillSet.HAND_SHADOW_INVIS_TICKS / 20)
+                });
     }
 
     private static void registerLoveRendezvousSkills()

@@ -2,10 +2,10 @@ package com.darkness.jujutsukaisenzone;
 
 import com.mojang.logging.LogUtils;
 import com.darkness.jujutsukaisenzone.client.TechniqueDevelopmentKeyHandler;
-import com.darkness.jujutsukaisenzone.client.TechniqueExpansionKeyHandler;
 import com.darkness.jujutsukaisenzone.client.gui.SkillBarConfigScreen;
 import com.darkness.jujutsukaisenzone.compat.EpicFightCompat;
 import com.darkness.jujutsukaisenzone.event.TechniqueSkillKeyEvents;
+import com.darkness.jujutsukaisenzone.network.CommandWheelNetwork;
 import com.darkness.jujutsukaisenzone.network.ModNetwork;
 import com.darkness.jujutsukaisenzone.registry.ModAttributes;
 import com.darkness.jujutsukaisenzone.registry.ModBlockEntities;
@@ -26,7 +26,10 @@ import com.darkness.jujutsukaisenzone.technique.skillset.JudgmentTechniqueSkillS
 import com.darkness.jujutsukaisenzone.technique.aerial.AerialCombatSkillRegistry;
 import com.darkness.jujutsukaisenzone.technique.skillset.LimitlessTechniqueSkillSet;
 import com.darkness.jujutsukaisenzone.technique.skillset.LoveRendezvousTechniqueSkillSet;
+import com.darkness.jujutsukaisenzone.technique.skillset.RatioTechniqueSkillSet;
 import com.darkness.jujutsukaisenzone.technique.skillset.ShrineTechniqueSkillSet;
+import com.darkness.jujutsukaisenzone.technique.skillset.TenShadowsTechniqueSkillSet;
+import com.darkness.jujutsukaisenzone.technique.shikigami.tenshadows.TenShadowsShikigamiMode;
 import com.darkness.jujutsukaisenzone.technique.skillset.TechniqueSkillSetRegistry;
 import com.darkness.jujutsukaisenzone.registry.ModBlocks;
 import net.minecraft.client.Minecraft;
@@ -88,13 +91,23 @@ public class JuJutsuKaisenZone
         ModAttributes.register(modEventBus);
         ModSounds.register(modEventBus);
         ModNetwork.register();
+        CommandWheelNetwork.register();
 
         TechniqueSkillSetRegistry.register(LimitlessTechniqueSkillSet.INSTANCE);
         TechniqueSkillSetRegistry.register(ShrineTechniqueSkillSet.INSTANCE);
         TechniqueSkillSetRegistry.register(JudgmentTechniqueSkillSet.INSTANCE);
         TechniqueSkillSetRegistry.register(LoveRendezvousTechniqueSkillSet.INSTANCE);
+        TechniqueSkillSetRegistry.register(RatioTechniqueSkillSet.INSTANCE);
+        TechniqueSkillSetRegistry.register(TenShadowsTechniqueSkillSet.INSTANCE);
+        TenShadowsShikigamiMode.bootstrap();
         AerialCombatSkillRegistry.bootstrap();
         TechniqueSkillDescriptions.bootstrap();
+        com.darkness.jujutsukaisenzone.technique.development.SkillUpgradeCostRegistry.bootstrap();
+        com.darkness.jujutsukaisenzone.technique.development.MechanicLiberationRegistry.bootstrap();
+        com.darkness.jujutsukaisenzone.technique.development.SpNodeRegistry.bootstrap();
+        com.darkness.jujutsukaisenzone.technique.se.SeEffectRegistry.bootstrap();
+        // 暴击声明表自检：必须在全部技能集 / 技能树注册完成之后（它要拿完整技能表来对照）
+        com.darkness.jujutsukaisenzone.technique.crit.CritSkillPolicy.validate();
         CommonKeySkillRegistry.register(ReverseTechniqueCommonKeySkill.INSTANCE);
         CommonKeySkillRegistry.register(BarrierTechniqueCommonKeySkill.INSTANCE);
         CommonKeySkillRegistry.register(MimicryCommonKeySkill.INSTANCE);
@@ -125,6 +138,20 @@ public class JuJutsuKaisenZone
         Config.items.forEach((item) -> LOGGER.info("ITEM >> {}", item.toString()));
 
         event.enqueueWork(MimicryVoiceLineDefaults::register);
+        event.enqueueWork(com.darkness.jujutsukaisenzone.technique.se.SeEffectRegistry::rebuildItemIndex);
+        event.enqueueWork(() -> net.minecraftforge.common.world.ForgeChunkManager.setForcedChunkLoadingCallback(
+                MODID,
+                (level, helper) ->
+                {
+                    /* 会话不持久：重启后清掉已无实体的强制加载票，避免泄漏 */
+                    for (java.util.UUID id : java.util.List.copyOf(helper.getEntityTickets().keySet()))
+                    {
+                        if (level.getEntity(id) == null)
+                        {
+                            helper.removeAllTickets(id);
+                        }
+                    }
+                }));
     }
 
     // You can use SubscribeEvent and let the Event Bus discover methods to call
@@ -148,7 +175,6 @@ public class JuJutsuKaisenZone
             CommonKeySkillRegistry.registerKeyMappings(event);
             event.register(SKILL_BAR_CONFIG_KEY);
             event.register(TechniqueDevelopmentKeyHandler.KEY_MAPPING);
-            event.register(TechniqueExpansionKeyHandler.KEY_MAPPING);
             event.register(TechniqueSkillKeyEvents.KEY_ADJUST_MODE);
             event.register(TechniqueSkillKeyEvents.KEY_ADJUST_TIER_DOWN);
             event.register(TechniqueSkillKeyEvents.KEY_ADJUST_TIER_UP);
