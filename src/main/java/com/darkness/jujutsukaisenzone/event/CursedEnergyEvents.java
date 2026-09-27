@@ -202,6 +202,10 @@ public final class CursedEnergyEvents
         com.darkness.jujutsukaisenzone.player.PlayerSpData.syncToClient(serverPlayer);
         com.darkness.jujutsukaisenzone.player.PlayerSpNodeData.syncToClient(serverPlayer);
         com.darkness.jujutsukaisenzone.player.PlayerSeLoadoutData.syncToClient(serverPlayer);
+        // 咒力特质是 SE 装载的门卡，客户端要拿到它才能把装不上的条目置灰。
+        com.darkness.jujutsukaisenzone.player.PlayerCursedEnergyTraitData.syncToClient(serverPlayer);
+        // AttributeMap 挂在实体上、不落盘 ⇒ 登录 / 重生后必须按当前装载重算 SE 的 Attribute 层代价。
+        com.darkness.jujutsukaisenzone.player.PlayerSePenaltyApplier.recompute(serverPlayer);
         // 术式情报会影响术式强度，必须在它同步之后下发面板
         PlayerCombatPowerData.syncToClient(serverPlayer);
         SkillUnlockLogic.syncToClient(serverPlayer);

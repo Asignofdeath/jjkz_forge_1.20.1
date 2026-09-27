@@ -49,6 +49,9 @@ import java.util.Map;
  *   <li><b>区 C · 暴击</b> —— 暴击几率属性判定 + 随机浮动乘区；体术默认参与，术式需出伤点显式放行
  *       （见 {@code TechniqueDamageSources#critAllowed}），复合不参与；黑闪须先暴击且须为体术系</li>
  *   <li><b>区 3 · 目标减免</b> —— ZONE 状态减伤（自 {@code BlackFlashEvents} 迁入，判定与数值不变）</li>
+ *   <li><b>区 4 · 韧性条减免</b> —— 怪物韧性未破（{@code stunShield > 0}）时的减伤，
+ *       取自 {@code MobPoiseEvents#damageReductionFor}。与区 3 同属「交接之后施加」的一类：
+ *       不参与区 2 的封顶基准，语义与 ZONE 减伤一致。</li>
  * </ol>
  * 以上三区在 {@link LivingHurtEvent}（{@link EventPriority#HIGH}）内完成；<b>区 2 · 目标防御层</b>
  * （护甲 → 体术抗性 / 术式抗性，见 {@link SkillDefenseResolver}）单独挂在
@@ -72,8 +75,11 @@ import java.util.Map;
  *       ⇒ 唯一能对「总减伤」精确封顶的位置。</li>
  * </ul>
  * <p>
- * 后续新乘区（易伤、克制、标签抗性……）一律加进本类并写明顺序，<b>不要</b>再到别的
+ * 后续新乘区（易伤、标签抗性……）一律加进本类并写明顺序，<b>不要</b>再到别的
  * 监听器里裸写 {@code setAmount} 乘算。
+ * <p>
+ * ⚠️ 「克制」<b>不是</b>乘区：咒力特质克制表已于 2026-09-27 删除，破韧速度只由
+ * {@code MobPoiseEvents} 的扣盾量决定，不进本管线。
  */
 @Mod.EventBusSubscriber(modid = JuJutsuKaisenZone.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public final class TechniqueDamageZoneEvents
@@ -100,12 +106,25 @@ public final class TechniqueDamageZoneEvents
         // 而怪物近战的攻击者不是 ServerPlayer。区 1 再单独把自己限定到 ServerPlayer。
         SkillDamageType type = resolveDamageType(target, source);
 
-        // 领域量表：术式分型命中灌充（带冷却）
-        if (type == SkillDamageType.TECHNIQUE
-                && event.getAmount() > 0.0F
+        // 叙事分型 → 跳字可见的 DamageType（EF / 原版近战等不走 deal 的通道）。
+        // 黑闪会在 NORMAL 优先级再投影成 black_flash，覆盖此处的 martial/composite。
+        if (type != null)
+        {
+            TechniqueDamageSources.projectDisplayType(source, target.level(), type);
+        }
+
+        // 领域量表：术式命中灌充；体术命中仅在装了 DomainGaugeSeMechanic 时灌（共用冷却）
+        if (event.getAmount() > 0.0F
                 && source.getEntity() instanceof ServerPlayer gaugeAttacker)
         {
-            PlayerDomainGaugeData.addChargeFromTechniqueHit(gaugeAttacker);
+            if (type == SkillDamageType.TECHNIQUE)
+            {
+                PlayerDomainGaugeData.addChargeFromTechniqueHit(gaugeAttacker);
+            }
+            else if (type == SkillDamageType.MARTIAL)
+            {
+                PlayerDomainGaugeData.addChargeFromMartialHit(gaugeAttacker);
+            }
         }
 
 
@@ -203,6 +222,19 @@ public final class TechniqueDamageZoneEvents
                 && PlayerBlackFlashData.isZoneActive(zonePlayer))
         {
             event.setAmount(event.getAmount() * (float) (1.0D - Config.blackFlashZoneDefenseBonus));
+        }
+
+        // —— 区 4：韧性条减免（怪物韧性未破时的减伤）——
+        // 与区 3 同样挂在交接之后：不进区 2 的封顶基准，语义与 ZONE 减伤一致。
+        // ⚠️ 必须是独立乘区、乘在最终伤害上——<b>绝不</b>走 resistanceReduction 通道，
+        //    否则会被 SkillDefenseResolver#applyPenetration 当成抗性吃掉，那就成了「吃穿甲」。
+        if (event.getAmount() > 0.0F)
+        {
+            double poiseReduction = MobPoiseEvents.damageReductionFor(target);
+            if (poiseReduction > 0.0D)
+            {
+                event.setAmount((float) (event.getAmount() * (1.0D - poiseReduction)));
+            }
         }
     }
 

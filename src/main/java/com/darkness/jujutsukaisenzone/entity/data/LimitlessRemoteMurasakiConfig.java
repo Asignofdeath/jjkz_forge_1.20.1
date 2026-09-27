@@ -92,8 +92,15 @@ public final class LimitlessRemoteMurasakiConfig
     public static final double ARROW_BLOCK_ERASE_RADIUS = 7.0D;
     /** 箭体球体每 tick 伤害。 */
     public static final float ARROW_SPHERE_DAMAGE_PER_TICK = 400.0F;
-    /** 最大飞行距离（格）：64 区块。 */
+    /**
+     * 【配置项·默认值】最大飞行距离（区块数）：64 区块。
+     * <p>
+     * 运行时真值由 {@code SkillCombatConfigRegistry#resolveRemoteMurasakiMaxFlightDistance} 给出，
+     * ⛔ 业务代码不要直接引用本常量。
+     */
     public static final int MAX_FLIGHT_CHUNK_COUNT = 64;
+    /** 【配置项·默认值】最大飞行距离每升一级咒术等级的增量（区块数）。 */
+    public static final double MAX_FLIGHT_CHUNK_COUNT_PER_RANK = 0.0D;
     public static final double MAX_FLIGHT_DISTANCE = SpecialEffectChunkForce.blocksFromChunks(MAX_FLIGHT_CHUNK_COUNT);
     /** 临时区块强制加载参数。 */
     public static final SpecialEffectChunkForce.Options CHUNK_FORCE_OPTIONS = SpecialEffectChunkForce.Options.defaults();

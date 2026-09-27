@@ -3,6 +3,7 @@ package com.darkness.jujutsukaisenzone.client.gui.creative;
 import com.darkness.jujutsukaisenzone.registry.ModItems;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraftforge.registries.RegistryObject;
 
 import java.util.List;
 
@@ -48,18 +49,17 @@ public enum JjkzCreativeTabCategory
                     ModItems.CURSED_OBJECT_COLD_WEDDING_RING,
                     ModItems.CURSED_OBJECT_TORN_STUDENT_ID,
                     ModItems.CURSED_OBJECT_CRACKED_URN,
+                    ModItems.CURSED_OBJECT_CHIPPED_CUTTING_BOARD,
                     ModItems.CURSED_OBJECT_SUKUNA_FINGER
             ));
 
     private final String labelKey;
-    private final List<ItemStack> stacks;
+    private final List<RegistryObject<Item>> items;
 
-    JjkzCreativeTabCategory(String labelKey, List<net.minecraftforge.registries.RegistryObject<Item>> items)
+    JjkzCreativeTabCategory(String labelKey, List<RegistryObject<Item>> items)
     {
         this.labelKey = labelKey;
-        this.stacks = items.stream()
-                .map(item -> new ItemStack(item.get()))
-                .toList();
+        this.items = List.copyOf(items);
     }
 
     public String getLabelKey()
@@ -67,8 +67,11 @@ public enum JjkzCreativeTabCategory
         return labelKey;
     }
 
+    /** 每次取用时生成栈；咒物给未探查空白件（可堆叠，右键探查后再实例化）。 */
     public List<ItemStack> getStacks()
     {
-        return stacks;
+        return items.stream()
+                .map(item -> new ItemStack(item.get()))
+                .toList();
     }
 }

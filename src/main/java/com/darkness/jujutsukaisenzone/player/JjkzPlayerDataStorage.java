@@ -9,11 +9,9 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.saveddata.SavedData;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -134,7 +132,8 @@ public final class JjkzPlayerDataStorage extends SavedData
         private static final String TAG_SP_SPENT_LIBERATION = "spSpentLiberation";
         private static final String TAG_SP_NODE_QUALITY = "spNodeQuality";
         private static final String TAG_SP_UNLOCKED_NODES = "spUnlockedNodes";
-        private static final String TAG_SE_SLOTS = "seSlots";
+        private static final String TAG_CURSED_ENERGY_TRAIT = "cursedEnergyTrait";
+        private static final String TAG_SE_EQUIPPED = "seEquipped";
         private static final String TAG_PHYSICAL_POWER_BONUS = "physicalPowerBonus";
         private static final String TAG_TECHNIQUE_POWER_BONUS = "techniquePowerBonus";
         private static final String TAG_BRAIN_DAMAGE = "brainDamage";
@@ -172,9 +171,12 @@ public final class JjkzPlayerDataStorage extends SavedData
         final Map<String, Integer> techniqueIntel = new LinkedHashMap<>();
         int spPoints;
         int spSpentLiberation;
-        int spNodeQuality = 3;
+        /** 质量上限（SP 节点与 SE 共用的占位账，见 {@code PlayerQualityPoolData}）。 */
+        int spNodeQuality = PlayerSpNodeData.DEFAULT_QUALITY;
         final Set<String> spUnlockedNodes = new LinkedHashSet<>();
-        final List<String> seSlots = new ArrayList<>();
+        String cursedEnergyTrait = CursedEnergyTrait.NORMAL.id();
+        /** 已装载 SE：seId → 装载时咒物实例的特质 + 代价（卸下按此退回）。 */
+        final Map<String, SeEquippedEntry> seEquipped = new LinkedHashMap<>();
         int physicalPowerBonus;
         int techniquePowerBonus;
         int brainDamage;
@@ -229,7 +231,7 @@ public final class JjkzPlayerDataStorage extends SavedData
             entry.spSpentLiberation = Math.max(0, tag.getInt(TAG_SP_SPENT_LIBERATION));
             entry.spNodeQuality = tag.contains(TAG_SP_NODE_QUALITY)
                     ? Math.max(1, tag.getInt(TAG_SP_NODE_QUALITY))
-                    : 3;
+                    : PlayerSpNodeData.DEFAULT_QUALITY;
             ListTag nodeList = tag.getList(TAG_SP_UNLOCKED_NODES, Tag.TAG_STRING);
             for (int i = 0; i < nodeList.size(); i++)
             {
@@ -239,10 +241,36 @@ public final class JjkzPlayerDataStorage extends SavedData
                     entry.spUnlockedNodes.add(nodeId);
                 }
             }
-            ListTag seList = tag.getList(TAG_SE_SLOTS, Tag.TAG_STRING);
-            for (int i = 0; i < seList.size(); i++)
+            entry.cursedEnergyTrait = tag.contains(TAG_CURSED_ENERGY_TRAIT)
+                    ? CursedEnergyTrait.byId(tag.getString(TAG_CURSED_ENERGY_TRAIT)).id()
+                    : CursedEnergyTrait.NORMAL.id();
+            // 装载是「集合」语义：每项为 {id, trait, penaltyStat, penaltyAmount}；
+            // 兼容旧档纯字符串列表 / 仅有 trait 的 compound（缺代价时 amount=0）。
+            ListTag seCompoundList = tag.getList(TAG_SE_EQUIPPED, Tag.TAG_COMPOUND);
+            if (!seCompoundList.isEmpty())
             {
-                entry.seSlots.add(seList.getString(i));
+                for (int i = 0; i < seCompoundList.size(); i++)
+                {
+                    CompoundTag seTag = seCompoundList.getCompound(i);
+                    String seId = seTag.getString("id");
+                    if (seId == null || seId.isBlank())
+                    {
+                        continue;
+                    }
+                    entry.seEquipped.put(seId, SeEquippedEntry.fromTag(seTag, entry.cursedEnergyTrait));
+                }
+            }
+            else
+            {
+                ListTag legacy = tag.getList(TAG_SE_EQUIPPED, Tag.TAG_STRING);
+                for (int i = 0; i < legacy.size(); i++)
+                {
+                    String seId = legacy.getString(i);
+                    if (seId != null && !seId.isBlank())
+                    {
+                        entry.seEquipped.put(seId, new SeEquippedEntry(entry.cursedEnergyTrait, null));
+                    }
+                }
             }
             entry.physicalPowerBonus = Math.max(0, tag.getInt(TAG_PHYSICAL_POWER_BONUS));
             entry.techniquePowerBonus = Math.max(0, tag.getInt(TAG_TECHNIQUE_POWER_BONUS));
@@ -305,12 +333,19 @@ public final class JjkzPlayerDataStorage extends SavedData
                 }
             }
             tag.put(TAG_SP_UNLOCKED_NODES, nodeList);
+            tag.putString(TAG_CURSED_ENERGY_TRAIT,
+                    cursedEnergyTrait == null ? CursedEnergyTrait.NORMAL.id() : cursedEnergyTrait);
             ListTag seList = new ListTag();
-            for (String seId : seSlots)
+            for (Map.Entry<String, SeEquippedEntry> seEntry : seEquipped.entrySet())
             {
-                seList.add(StringTag.valueOf(seId == null ? "" : seId));
+                String seId = seEntry.getKey();
+                if (seId == null || seId.isBlank() || seEntry.getValue() == null)
+                {
+                    continue;
+                }
+                seList.add(seEntry.getValue().toTag(seId));
             }
-            tag.put(TAG_SE_SLOTS, seList);
+            tag.put(TAG_SE_EQUIPPED, seList);
             tag.putInt(TAG_PHYSICAL_POWER_BONUS, Math.max(0, physicalPowerBonus));
             tag.putInt(TAG_TECHNIQUE_POWER_BONUS, Math.max(0, techniquePowerBonus));
             tag.putInt(TAG_BRAIN_DAMAGE, Math.max(0, brainDamage));

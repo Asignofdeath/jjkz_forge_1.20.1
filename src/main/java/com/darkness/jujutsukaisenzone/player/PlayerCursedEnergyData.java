@@ -57,7 +57,10 @@ public final class PlayerCursedEnergyData
             return 0;
         }
         int rank = PlayerCursedGradeData.getRawRank(player);
-        return Math.max(0, baseMax + CursedGradeBonuses.getMaxEnergyBonus(rank));
+        int effective = Math.max(0, baseMax + CursedGradeBonuses.getMaxEnergyBonus(rank));
+        int sePenalty = (int) Math.ceil(PlayerSeLoadoutData.sumPenaltyAmount(
+                player, com.darkness.jujutsukaisenzone.technique.se.PanelStat.ApplyKind.CURSED_ENERGY_MAX_SUBTRACT));
+        return Math.max(0, effective - sePenalty);
     }
 
     public static boolean isHeavenlyRestricted(Player player)

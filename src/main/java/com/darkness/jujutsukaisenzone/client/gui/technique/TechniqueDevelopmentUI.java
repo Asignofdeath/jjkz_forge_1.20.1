@@ -46,6 +46,9 @@ public final class TechniqueDevelopmentUI
     private static final String KEY_SE_TAB = "gui.jujutsukaisenzone.se.title";
     private static final String KEY_PLAYER_DATA_TAB = "gui.jujutsukaisenzone.player_data";
 
+    /** 客户端会话内记忆：关闭界面后再打开时复用上次标签页。 */
+    private static TechniqueDevelopmentSection lastSection = TechniqueDevelopmentSection.TECHNIQUE;
+
     private TechniqueDevelopmentUI()
     {
     }
@@ -60,17 +63,23 @@ public final class TechniqueDevelopmentUI
         }
 
         ScreenContext context = new ScreenContext();
-        context.section = TechniqueDevelopmentSection.TECHNIQUE;
+        TechniqueDevelopmentSection initial = lastSection;
+        context.section = initial;
 
-        context.canvas = new TechniqueDevelopmentCanvasWidget(context.section.treeId(player));
+        String canvasTreeId = initial.hasSkillTree()
+                ? initial.treeId(player)
+                : TechniqueDevelopmentSection.TECHNIQUE.treeId(player);
+        context.canvas = new TechniqueDevelopmentCanvasWidget(canvasTreeId);
+        context.canvas.setVisible(initial.hasSkillTree());
         context.playerDataPanel = new PlayerDataPanelWidget();
-        context.playerDataPanel.setVisible(false);
+        context.playerDataPanel.setVisible(initial == TechniqueDevelopmentSection.PLAYER_DATA);
         context.spNodePanel = new SpNodePanelWidget();
-        context.spNodePanel.setVisible(false);
+        context.spNodePanel.setVisible(initial == TechniqueDevelopmentSection.SP_NODES);
         context.sePanel = new SeLoadoutPanelWidget();
-        context.sePanel.setVisible(false);
-        context.titleLabel = new LabelWidget(8, 8, context.section.titleKey()).setTextColor(0xFFFFFF);
+        context.sePanel.setVisible(initial == TechniqueDevelopmentSection.SE_LOADOUT);
+        context.titleLabel = new LabelWidget(8, 8, initial.titleKey()).setTextColor(0xFFFFFF);
         context.intelLabel = new LabelWidget(8, 22, TechniqueDevelopmentUI::formatIntelLabel).setTextColor(0xFFCCCCCC);
+        context.intelLabel.setVisible(initial == TechniqueDevelopmentSection.TECHNIQUE);
 
         ModularUI ui = new ModularUI(IUIHolder.EMPTY, player);
         ui.setFullScreen();
@@ -123,6 +132,7 @@ public final class TechniqueDevelopmentUI
         {
             return;
         }
+        lastSection = section;
         context.section = section;
         boolean showCanvas = section.hasSkillTree();
 

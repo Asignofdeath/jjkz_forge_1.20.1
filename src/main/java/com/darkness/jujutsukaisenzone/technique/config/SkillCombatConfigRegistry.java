@@ -17,7 +17,23 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * 技能战斗数值：由 {@code config/jujutsukaisenzone-common.toml} 的 {@code [skillCombat]} 段加载。
+ * 技能战斗数值的<b>唯一权威来源</b>：真值来自 {@code config/jujutsukaisenzone-common.toml}
+ * 的 {@code [skillCombat]} 段，配置未加载时退回 {@link #buildCodeDefaults()} 的代码默认值。
+ * <p>
+ * <b>权威规则（新增 skillCombat 项时照此办理）</b>：
+ * <ol>
+ *   <li>数值只在 {@code entity/data/*Config}（或 {@code *SkillGrowth}）里手写<b>一次</b>，
+ *       同时标注 {@code 【配置项·默认值】}。</li>
+ *   <li>{@code Config.java} 的 {@code defineInRange(...)} 默认值与 {@link #buildCodeDefaults()}
+ *       都<b>引用</b>那个常量，不许再写一遍数字字面量 —— 写三遍的后果是改一处不生效也不报错。</li>
+ *   <li>业务代码读取数值<b>一律</b>走 {@code *SkillGrowth}（或本类的 {@code resolve*}），
+ *       <b>不许直接引用那个常量</b>：常量只是默认值，直接引用会同时丢掉配置修改与咒术等级成长。
+ *       {@code tools/jjkz_static_check.py} 有一条守卫检查在盯这件事。</li>
+ * </ol>
+ * <p>
+ * ⚠️ 按强度面板接管的项：{@code damage} 一类的 {@code perRank} 在
+ * {@code Config.combatPowerScalingEnabled} 为 true 时会被乘 0（等级成长改由「术式强度」承担），
+ * 所以配置文件里能看到该项、但它当下不生效。这是刻意的，不是 bug。
  */
 public final class SkillCombatConfigRegistry
 {
@@ -116,28 +132,33 @@ public final class SkillCombatConfigRegistry
         Map<String, Map<String, SkillCombatStatDef>> map = new HashMap<>();
 
         put(map, SKILL_LIMITLESS_BLUE,
-                stat("damage", LimitlessBlueConfig.DAMAGE, 2.0F),
-                stat("pull_radius", LimitlessBlueConfig.PULL_RADIUS, 1.0D));
+                stat("damage", LimitlessBlueConfig.DAMAGE, LimitlessBlueConfig.DAMAGE_PER_RANK),
+                stat("pull_radius", LimitlessBlueConfig.PULL_RADIUS, LimitlessBlueConfig.PULL_RADIUS_PER_RANK));
 
         put(map, SKILL_LIMITLESS_RED,
-                stat("explosion_power", LimitlessRedConfig.ARROW_EXPLOSION_POWER, 2.0F),
-                stat("knockback_radius", LimitlessRedConfig.ARROW_KNOCKBACK_RADIUS, 0.0D));
+                stat("explosion_power", LimitlessRedConfig.ARROW_EXPLOSION_POWER,
+                        LimitlessRedConfig.EXPLOSION_POWER_PER_RANK),
+                stat("knockback_radius", LimitlessRedConfig.ARROW_KNOCKBACK_RADIUS,
+                        LimitlessRedConfig.KNOCKBACK_RADIUS_PER_RANK));
 
         put(map, SKILL_LIMITLESS_REMOTE_PURPLE,
-                stat("max_flight_chunks", LimitlessRemoteMurasakiConfig.MAX_FLIGHT_CHUNK_COUNT, 0.0D));
+                stat("max_flight_chunks", LimitlessRemoteMurasakiConfig.MAX_FLIGHT_CHUNK_COUNT,
+                        LimitlessRemoteMurasakiConfig.MAX_FLIGHT_CHUNK_COUNT_PER_RANK));
 
         put(map, SKILL_SHRINE_KAI,
-                stat("damage", ShrineKaiConfig.COLUMN_DAMAGE, 2.0F));
+                stat("damage", ShrineKaiConfig.COLUMN_DAMAGE, ShrineKaiConfig.COLUMN_DAMAGE_PER_RANK));
 
         put(map, SKILL_SHRINE_KAI_FLYOBJ,
-                stat("damage", ShrineKaiConfig.COLUMN_DAMAGE, 2.0F));
+                stat("damage", ShrineKaiConfig.COLUMN_DAMAGE, ShrineKaiConfig.COLUMN_DAMAGE_PER_RANK));
 
         put(map, SKILL_SHRINE_HACHI,
-                stat("damage", ShrineHachiConfig.DAMAGE, 2.0F));
+                stat("damage", ShrineHachiConfig.DAMAGE, ShrineHachiConfig.DAMAGE_PER_RANK));
 
         put(map, SKILL_SHRINE_DOMAIN,
-                stat("slash_damage", ShrineDomainSkillGrowth.BASELINE_SLASH_DAMAGE, 5.0F),
-                stat("power_slash_damage", ShrineDomainSkillGrowth.BASELINE_POWER_SLASH_DAMAGE, 10.0F));
+                stat("slash_damage", ShrineDomainSkillGrowth.BASELINE_SLASH_DAMAGE,
+                        ShrineDomainSkillGrowth.BASELINE_SLASH_DAMAGE_PER_RANK),
+                stat("power_slash_damage", ShrineDomainSkillGrowth.BASELINE_POWER_SLASH_DAMAGE,
+                        ShrineDomainSkillGrowth.BASELINE_POWER_SLASH_DAMAGE_PER_RANK));
 
         return map;
     }

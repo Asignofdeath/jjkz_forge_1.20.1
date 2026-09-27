@@ -1,6 +1,7 @@
 package com.darkness.jujutsukaisenzone.gameplay;
 
 import com.darkness.jujutsukaisenzone.compat.ParCoolPresence;
+import com.darkness.jujutsukaisenzone.compat.StylizedDamagePresence;
 import com.google.common.collect.ImmutableList;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.network.NetworkHooks;
@@ -133,6 +134,79 @@ public final class ModRules
         public static void setEnabled(boolean value)
         {
             enabled = value;
+        }
+    }
+
+    /**
+     * 本模组对 StylizedDamage 的样式联动（全服）。
+     * <p>
+     * 样式/选择器在检测到 StylizedDamage 时就会注册进对方引擎。
+     * 本开关只控制服务端是否把叙事分型投影到 message_id（体术黄 / 术式蓝 / 复合紫 / 黑闪红）。
+     * 开启时要求服务端已安装 {@code stylizeddamage}。
+     */
+    public static final class StylizedDamageStyles
+    {
+        private static volatile boolean enabled;
+
+        private StylizedDamageStyles()
+        {
+        }
+
+        public static boolean isEnabled()
+        {
+            return enabled;
+        }
+
+        /**
+         * 尝试设置联动开关。开启时要求服务端已安装 StylizedDamage。
+         *
+         * @return 失败原因；{@code null} 表示成功
+         */
+        @Nullable
+        public static String trySetEnabled(boolean value)
+        {
+            if (value && !StylizedDamagePresence.isLoaded())
+            {
+                return "服务器未安装 StylizedDamage（别样的伤害跳字），无法开启跳字联动。";
+            }
+            enabled = value;
+            return null;
+        }
+
+        public static boolean isServerReady()
+        {
+            return StylizedDamagePresence.isLoaded();
+        }
+
+        public static boolean hasPlayerMod(ServerPlayer player)
+        {
+            return hasMod(player, StylizedDamagePresence.MOD_ID);
+        }
+
+        private static boolean hasMod(ServerPlayer player, String modId)
+        {
+            var connectionData = NetworkHooks.getConnectionData(player.connection.connection);
+            if (connectionData == null)
+            {
+                return false;
+            }
+            ImmutableList<String> modList = connectionData.getModList();
+            return modList != null && modList.contains(modId);
+        }
+
+        public static String serverStatusLine()
+        {
+            return "服务端 StylizedDamage：" + yesNo(isServerReady());
+        }
+
+        public static String playerStatusLine(ServerPlayer player)
+        {
+            return "客户端 StylizedDamage：" + yesNo(hasPlayerMod(player));
+        }
+
+        private static String yesNo(boolean value)
+        {
+            return value ? "已安装" : "未安装";
         }
     }
 

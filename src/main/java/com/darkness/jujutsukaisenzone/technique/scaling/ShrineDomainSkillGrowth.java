@@ -20,13 +20,21 @@ public final class ShrineDomainSkillGrowth
 
 {
 
-    /** 四级基准：普通斩击每次伤害（1.5 颗心）。 */
+    /** 【配置项·默认值】四级基准：普通斩击每次伤害（1.5 颗心）。 */
 
     public static final float BASELINE_SLASH_DAMAGE = 3.0F;
 
-    /** 四级基准：强力斩击每次伤害（3 颗心）。 */
+    /** 【配置项·默认值】普通斩击每升一级咒术等级的增量。 */
+
+    public static final float BASELINE_SLASH_DAMAGE_PER_RANK = 5.0F;
+
+    /** 【配置项·默认值】四级基准：强力斩击每次伤害（3 颗心）。 */
 
     public static final float BASELINE_POWER_SLASH_DAMAGE = 6.0F;
+
+    /** 【配置项·默认值】强力斩击每升一级咒术等级的增量。 */
+
+    public static final float BASELINE_POWER_SLASH_DAMAGE_PER_RANK = 10.0F;
 
 
 

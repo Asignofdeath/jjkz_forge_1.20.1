@@ -22,8 +22,15 @@ public final class ShrineKaiConfig
     public static final int COLUMN_HEIGHT = 8;
     /** 解柱形采样半径（格） */
     public static final double COLUMN_RADIUS = 1.5D;
-    /** 解柱内生物每 tick 伤害 */
+    /**
+     * 【配置项·默认值】解柱内生物每 tick 伤害。
+     * <p>
+     * 运行时真值由 {@code ShrineSkillGrowth#kaiColumnDamage} / {@code #kaiFlyobjColumnDamage} 给出
+     * （两者默认值相同，但对应 {@code [skillCombat]} 下的两个独立条目），⛔ 业务代码不要直接引用本常量。
+     */
     public static final float COLUMN_DAMAGE = 10.0F;
+    /** 【配置项·默认值】解柱伤害每升一级咒术等级的增量。 */
+    public static final float COLUMN_DAMAGE_PER_RANK = 2.0F;
     /** 解到达终点后 Photon 存活时长（tick） */
     public static final int ARRIVAL_POST_PHOTON_TICKS = 40;
 

@@ -8,6 +8,7 @@ import com.darkness.jujutsukaisenzone.registry.ModEntities;
 import com.darkness.jujutsukaisenzone.registry.ModSounds;
 import com.darkness.jujutsukaisenzone.technique.TechniqueDamageSources;
 import com.darkness.jujutsukaisenzone.technique.scaling.ShrineSkillGrowth;
+import com.darkness.jujutsukaisenzone.technique.se.ShrineFinishCutMarks;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
@@ -209,6 +210,7 @@ public class ShrineKaiArrowBehavior extends EffectBehavior
             if (owner != null && target.getUUID().equals(owner.getUUID())) continue;
             if (TechniqueDamageSources.deal(target, owner, ShrineSkillGrowth.kaiColumnDamage(owner)))
             {
+                ShrineFinishCutMarks.tryMarkFromKaiHit(owner, target);
                 SoundEvent hitSound = this.slashType == 2
                         ? ModSounds.SHRINE_SLASH_KAI_2_HIT.get()
                         : ModSounds.SHRINE_SLASH_KAI_1_HIT.get();

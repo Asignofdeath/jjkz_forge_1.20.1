@@ -3,12 +3,16 @@ package com.darkness.jujutsukaisenzone.player;
 import com.darkness.jujutsukaisenzone.Config;
 import com.darkness.jujutsukaisenzone.network.ModNetwork;
 import com.darkness.jujutsukaisenzone.player.CombatPowerStats.Contribution;
+import com.darkness.jujutsukaisenzone.technique.se.PanelStat;
+import com.darkness.jujutsukaisenzone.technique.se.SeEffectRegistry;
+import com.darkness.jujutsukaisenzone.technique.se.SePenalty;
 import com.darkness.jujutsukaisenzone.technique.skill.tenshadows.TenShadowsPresenceBonuses;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 玩家「体术强度 / 术式强度」的唯一来源（服务端权威，客户端只读缓存）。
@@ -86,11 +90,14 @@ public final class PlayerCombatPowerData
         {
             intelTotal += Math.max(0, value);
         }
-        int intelBonus = (int) Math.round(Config.combatPowerIntelPerLevel * intelTotal);
-        if (intelBonus != 0)
+        IntelBonusResult intel = resolveIntelBonus(intelTotal, techniqueTotal);
+        if (intel.bonus() != 0)
         {
-            technique.add(new Contribution("术式情报 x" + intelTotal, intelBonus));
-            techniqueTotal += intelBonus;
+            String label = intel.softCapped()
+                    ? "术式情报 x" + intelTotal + "（软顶）"
+                    : "术式情报 x" + intelTotal;
+            technique.add(new Contribution(label, intel.bonus()));
+            techniqueTotal += intel.bonus();
         }
 
         JjkzPlayerDataStorage.PlayerDataEntry data = JjkzPlayerDataStorage.get(player).getOrCreate(player);
@@ -140,6 +147,50 @@ public final class PlayerCombatPowerData
             }
         }
 
+        // ======== SE 代价 / 质量超载 ========
+        // ⚠️ 必须加在<b>最后</b>，两个原因缺一不可：
+        //   1. 早于「十影·大蛇」会被大蛇的倍率放大 —— 同一个「−8 点」在不同流派里数值不同；
+        //   2. 早于天与咒缚分支会被 technique.clear() 整个抹掉 —— 天与咒缚玩家白嫖。
+        // Attribute 层的代价（抗性/穿透/效率/暴击/最大生命）不在这里，走 PlayerSePenaltyApplier。
+        for (Map.Entry<String, SeEquippedEntry> e : PlayerSeLoadoutData.getEquippedMap(player).entrySet())
+        {
+            SePenalty penalty = e.getValue().penalty;
+            if (!penalty.stat().isPowerRow())
+            {
+                continue;
+            }
+            int amount = penalty.powerRowPenalty();
+            if (amount == 0)
+            {
+                continue;
+            }
+            String label = "SE·" + SeEffectRegistry.find(e.getKey())
+                    .map(def -> def.item().getDescription().getString())
+                    .orElse(e.getKey());
+            if (penalty.stat() == PanelStat.PHYSICAL_POWER)
+            {
+                physical.add(new Contribution(label, -amount));
+                physicalTotal -= amount;
+            }
+            else
+            {
+                technique.add(new Contribution(label, -amount));
+                techniqueTotal -= amount;
+            }
+        }
+
+        int overload = PlayerQualityPoolData.overload(player);
+        int overloadPenaltyPerPoint = Math.max(0, Config.seOverloadPowerPenaltyPerPoint);
+        int overloadPenalty = overload * overloadPenaltyPerPoint;
+        if (overloadPenalty != 0)
+        {
+            String label = "质量超载 x" + overload;
+            physical.add(new Contribution(label, -overloadPenalty));
+            technique.add(new Contribution(label, -overloadPenalty));
+            physicalTotal -= overloadPenalty;
+            techniqueTotal -= overloadPenalty;
+        }
+
         return new CombatPowerStats(
                 Math.max(0, physicalTotal),
                 Math.max(0, techniqueTotal),
@@ -156,6 +207,42 @@ public final class PlayerCombatPowerData
             return new CombatPowerStats(-1, -1);
         }
         return new CombatPowerStats(tag.getInt(TAG_PHYSICAL), tag.getInt(TAG_TECHNIQUE));
+    }
+
+    /**
+     * 术式情报 → 术式强度。
+     * <p>
+     * 线性：{@code bonus = intel × rate}。<br>
+     * 软顶：加情报前的术式强度已达 {@link Config#combatPowerIntelSoftCap} 时，
+     * 超出 headroom 的情报按 {@code rate × S × ln(1 + excessIntel / S)} 换算。
+     */
+    static IntelBonusResult resolveIntelBonus(int intelTotal, int techniqueBeforeIntel)
+    {
+        if (intelTotal <= 0 || Config.combatPowerIntelPerLevel <= 0.0D)
+        {
+            return new IntelBonusResult(0, false);
+        }
+        double rate = Config.combatPowerIntelPerLevel;
+        double linear = rate * intelTotal;
+        int softCap = Config.combatPowerIntelSoftCap;
+        if (softCap <= 0)
+        {
+            return new IntelBonusResult((int) Math.round(linear), false);
+        }
+        double headroom = Math.max(0.0D, softCap - (double) techniqueBeforeIntel);
+        if (linear <= headroom + 1.0e-9D)
+        {
+            return new IntelBonusResult((int) Math.round(linear), false);
+        }
+        double excessIntel = (linear - headroom) / rate;
+        double scale = Math.max(0.001D, Config.combatPowerIntelSoftScale);
+        double excessPower = rate * scale * Math.log(1.0D + excessIntel / scale);
+        int bonus = (int) Math.round(headroom + excessPower);
+        return new IntelBonusResult(Math.max(0, bonus), true);
+    }
+
+    record IntelBonusResult(int bonus, boolean softCapped)
+    {
     }
 
     /** 修炼书 / 道具 / 未来的装备词条统一走这里。 */

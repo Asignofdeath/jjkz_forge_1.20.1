@@ -27,15 +27,14 @@ public final class LimitlessBlueBlockPull
     {
     }
 
-    public static void tryConvertWave(
-            ServerLevel level,
-            Vec3 center,
-            Set<Long> convertedPositions,
-            int maxCount)
-    {
-        tryConvertWave(level, center, convertedPositions, maxCount, LimitlessBlueConfig.BLOCK_PULL_RADIUS);
-    }
-
+    /**
+     * 转换一圈范围内的方块为 {@link FallingBlockEntity}。
+     * <p>
+     * ⚠️ {@code blockPullRadius} <b>必须由调用方传入配置解析后的值</b>
+     * （{@code LimitlessBlueSkillGrowth#pullRadius}）。曾经存在一个直接读
+     * {@code LimitlessBlueConfig.BLOCK_PULL_RADIUS} 常量的 4 参重载，谁调用谁就绕开配置 ——
+     * 那条路已删除，别再把它加回来。
+     */
     public static void tryConvertWave(
             ServerLevel level,
             Vec3 center,

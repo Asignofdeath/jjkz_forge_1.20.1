@@ -4,6 +4,7 @@ import com.darkness.jujutsukaisenzone.player.CombatPowerStats;
 import com.darkness.jujutsukaisenzone.player.PlayerBarrierTechniqueData;
 import com.darkness.jujutsukaisenzone.player.PlayerCombatPowerData;
 import com.darkness.jujutsukaisenzone.player.PlayerCursedEnergyData;
+import com.darkness.jujutsukaisenzone.player.PlayerCursedEnergyTraitData;
 import com.darkness.jujutsukaisenzone.player.PlayerCursedGradeData;
 import com.darkness.jujutsukaisenzone.player.PlayerBrainDamageData;
 import com.darkness.jujutsukaisenzone.player.PlayerDomainGaugeData;
@@ -47,6 +48,8 @@ import java.util.Locale;
  * <p>
  * 坐标说明：本控件固定在 (0,0) 且铺满全屏，因此 {@code drawInBackground} 里的坐标
  * 无论 LDLib 是否按自身位置做位移，落在屏幕上的结果都一致。
+ * <p>
+ * 非显而易见的属性旁带感叹号说明（悬停查看）。
  */
 @OnlyIn(Dist.CLIENT)
 public final class PlayerDataPanelWidget extends Widget
@@ -84,6 +87,7 @@ public final class PlayerDataPanelWidget extends Widget
     private final int[] pageTabRight = new int[PAGE_COUNT];
     private int pageTabTop;
     private int pageTabBottom;
+    private final List<PanelHelpIcon.Hit> helpHits = new ArrayList<>();
 
     public PlayerDataPanelWidget()
     {
@@ -103,11 +107,13 @@ public final class PlayerDataPanelWidget extends Widget
     public void drawInBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks)
     {
         super.drawInBackground(graphics, mouseX, mouseY, partialTicks);
+        helpHits.clear();
 
         Minecraft minecraft = Minecraft.getInstance();
         LocalPlayer player = minecraft.player;
         if (player == null)
         {
+            setHoverTooltips(List.of());
             return;
         }
 
@@ -136,16 +142,30 @@ public final class PlayerDataPanelWidget extends Widget
         Font font = minecraft.font;
         if (page == PAGE_STATUS)
         {
-            drawColumn(graphics, font, leftX, startY, contentWidth, bottom, buildStatusLeftColumn(player));
-            drawColumn(graphics, font, rightX, startY, contentWidth, bottom, buildStatusRightColumn(player));
+            drawColumn(graphics, font, leftX, startY, contentWidth, bottom, mouseX, mouseY,
+                    buildStatusLeftColumn(player));
+            drawColumn(graphics, font, rightX, startY, contentWidth, bottom, mouseX, mouseY,
+                    buildStatusRightColumn(player));
         }
         else
         {
-            drawColumn(graphics, font, leftX, startY, contentWidth, bottom, buildOverviewLeftColumn(player));
-            drawColumn(graphics, font, rightX, startY, contentWidth, bottom, buildOverviewRightColumn(player));
+            drawColumn(graphics, font, leftX, startY, contentWidth, bottom, mouseX, mouseY,
+                    buildOverviewLeftColumn(player));
+            drawColumn(graphics, font, rightX, startY, contentWidth, bottom, mouseX, mouseY,
+                    buildOverviewRightColumn(player));
         }
 
         drawPageBar(graphics, font, left, top, width, height);
+
+        String hoverKey = PanelHelpIcon.findHoverKey(helpHits, mouseX, mouseY);
+        if (hoverKey != null)
+        {
+            setHoverTooltips(PanelHelpIcon.tooltipLines(hoverKey));
+        }
+        else
+        {
+            setHoverTooltips(List.of());
+        }
     }
 
     @Override
@@ -186,23 +206,30 @@ public final class PlayerDataPanelWidget extends Widget
         int rank = PlayerCursedGradeData.getRank(player);
         lines.add(Line.row(tr("cursed_grade"), PlayerCursedGradeData.getRankDisplayName(rank)));
         lines.add(Line.row(tr("cursed_experience"), Integer.toString(PlayerCursedGradeData.getExperience(player))));
-        lines.add(Line.row(tr("heavenly_restriction"), yesNo(PlayerCursedEnergyData.isHeavenlyRestricted(player))));
+        lines.add(Line.rowHelp(tr("heavenly_restriction"),
+                yesNo(PlayerCursedEnergyData.isHeavenlyRestricted(player)),
+                helpKey("heavenly_restriction")));
+        lines.add(Line.rowHelp(tr("cursed_energy_trait"),
+                PlayerCursedEnergyTraitData.getTrait(player).displayName().getString(),
+                helpKey("cursed_energy_trait")));
 
         lines.add(Line.section(tr("section.resource")));
         lines.add(Line.row(tr("cursed_energy"),
                 PlayerCursedEnergyData.getCurrent(player) + " / " + PlayerCursedEnergyData.getMax(player)));
         lines.add(Line.row(tr("health"), String.format(Locale.ROOT, "%.1f / %.1f", player.getHealth(),
                 PlayerHealthData.getMax(player))));
-        lines.add(Line.row(tr("sp"), Integer.toString(PlayerSpData.getAvailable(player))));
+        lines.add(Line.rowHelp(tr("sp"), Integer.toString(PlayerSpData.getAvailable(player)),
+                helpKey("sp")));
         int brain = PlayerBrainDamageData.getBrainDamage(player);
-        int maxBrain = Config.domainBrainMax > 0 ? Config.domainBrainMax : 100;
-        lines.add(Line.row(tr("brain_damage"), brain + " / " + maxBrain
-                + (brain >= maxBrain ? "（" + tr("value.brain_full") + "）" : "")));
+        int maxBrain = PlayerBrainDamageData.getBrainMax(player);
+        lines.add(Line.rowHelp(tr("brain_damage"), brain + " / " + maxBrain
+                        + (brain >= maxBrain ? "（" + tr("value.brain_full") + "）" : ""),
+                helpKey("brain_damage")));
         String innateForIntel = PlayerTechniqueData.getInnateTechnique(player);
         int intel = innateForIntel == null || innateForIntel.isBlank()
                 ? 0
                 : PlayerTechniqueIntelData.getIntel(player, innateForIntel);
-        lines.add(Line.row(tr("intel"), Integer.toString(intel), COLOR_TECHNIQUE));
+        lines.add(Line.rowHelp(tr("intel"), Integer.toString(intel), COLOR_TECHNIQUE, helpKey("intel")));
 
         return lines;
     }
@@ -235,28 +262,33 @@ public final class PlayerDataPanelWidget extends Widget
         }
         var physicalPenetration = player.getAttribute(ModAttributes.PHYSICAL_PENETRATION.get());
         var techniquePenetration = player.getAttribute(ModAttributes.TECHNIQUE_PENETRATION.get());
-        lines.add(Line.row(tr("physical_penetration"),
+        lines.add(Line.rowHelp(tr("physical_penetration"),
                 formatPercent(physicalPenetration == null ? 0.0D : physicalPenetration.getValue()),
-                COLOR_PHYSICAL));
-        lines.add(Line.row(tr("technique_penetration"),
+                COLOR_PHYSICAL, helpKey("physical_penetration")));
+        lines.add(Line.rowHelp(tr("technique_penetration"),
                 formatPercent(techniquePenetration == null ? 0.0D : techniquePenetration.getValue()),
-                COLOR_TECHNIQUE));
+                COLOR_TECHNIQUE, helpKey("technique_penetration")));
         var critChance = player.getAttribute(ModAttributes.CRIT_CHANCE.get());
-        lines.add(Line.row(tr("crit_chance"),
+        lines.add(Line.rowHelp(tr("crit_chance"),
                 formatPercent(critChance == null ? 5.0D : critChance.getValue()),
-                COLOR_PHYSICAL));
+                COLOR_PHYSICAL, helpKey("crit_chance")));
+        // 破韧效力：作用于怪物韧性条，不专属体术也不专属术式，故不染色。
+        var breakPotency = player.getAttribute(ModAttributes.BREAK_POTENCY.get());
+        lines.add(Line.rowHelp(tr("break_potency"),
+                formatPercent(breakPotency == null ? 0.0D : breakPotency.getValue()),
+                helpKey("break_potency")));
 
         // 与 /jjkz data 对齐：护甲 / 双抗（属性均 setSyncable）；穿甲 / 术穿在战斗强度分区。
         lines.add(Line.section(tr("section.defense")));
         lines.add(Line.row(tr("armor"), Integer.toString(player.getArmorValue())));
         var physicalResistance = player.getAttribute(ModAttributes.PHYSICAL_RESISTANCE.get());
         var techniqueResistance = player.getAttribute(ModAttributes.TECHNIQUE_RESISTANCE.get());
-        lines.add(Line.row(tr("physical_resistance"),
+        lines.add(Line.rowHelp(tr("physical_resistance"),
                 formatPercent(physicalResistance == null ? 0.0D : physicalResistance.getValue()),
-                COLOR_PHYSICAL));
-        lines.add(Line.row(tr("technique_resistance"),
+                COLOR_PHYSICAL, helpKey("physical_resistance")));
+        lines.add(Line.rowHelp(tr("technique_resistance"),
                 formatPercent(techniqueResistance == null ? 0.0D : techniqueResistance.getValue()),
-                COLOR_TECHNIQUE));
+                COLOR_TECHNIQUE, helpKey("technique_resistance")));
 
         return lines;
     }
@@ -268,15 +300,17 @@ public final class PlayerDataPanelWidget extends Widget
         lines.add(Line.section(tr("section.status")));
         lines.add(Line.row(tr("reverse_technique"), learnedText(PlayerReverseTechniqueData.hasReverseTechnique(player))));
         var reverseEfficiency = player.getAttribute(ModAttributes.REVERSE_TECHNIQUE_EFFICIENCY.get());
-        lines.add(Line.row(tr("reverse_technique_efficiency"),
-                formatPercent(reverseEfficiency == null ? 100.0D : reverseEfficiency.getValue())));
+        lines.add(Line.rowHelp(tr("reverse_technique_efficiency"),
+                formatPercent(reverseEfficiency == null ? 100.0D : reverseEfficiency.getValue()),
+                helpKey("reverse_technique_efficiency")));
         lines.add(Line.row(tr("domain_expansion"), learnedText(PlayerDomainExpansionData.hasLearned(player))));
         int gauge = PlayerDomainGaugeData.getGauge(player);
-        int gaugeMax = PlayerDomainGaugeData.getMax();
-        lines.add(Line.row(tr("domain_gauge"), gauge + " / " + gaugeMax));
+        int gaugeMax = PlayerDomainGaugeData.getMax(player);
+        lines.add(Line.rowHelp(tr("domain_gauge"), gauge + " / " + gaugeMax, helpKey("domain_gauge")));
         var domainChargeEfficiency = player.getAttribute(ModAttributes.DOMAIN_GAUGE_CHARGE_EFFICIENCY.get());
-        lines.add(Line.row(tr("domain_gauge_charge_efficiency"),
-                formatPercent(domainChargeEfficiency == null ? 100.0D : domainChargeEfficiency.getValue())));
+        lines.add(Line.rowHelp(tr("domain_gauge_charge_efficiency"),
+                formatPercent(domainChargeEfficiency == null ? 100.0D : domainChargeEfficiency.getValue()),
+                helpKey("domain_gauge_charge_efficiency")));
         return lines;
     }
 
@@ -334,19 +368,18 @@ public final class PlayerDataPanelWidget extends Widget
     }
 
     /**
-     * 画一栏内容：先量出该栏最长标签宽度作为值列起点，再逐行绘制。
-     *
-     * @return 结束时的 y（未使用，便于后续扩展）
+     * 画一栏内容：先量出该栏最长标签（含感叹号）宽度作为值列起点，再逐行绘制。
      */
-    private static int drawColumn(GuiGraphics graphics, Font font, int x, int y, int maxWidth, int bottom,
-                                  List<Line> lines)
+    private int drawColumn(GuiGraphics graphics, Font font, int x, int y, int maxWidth, int bottom,
+                           int mouseX, int mouseY, List<Line> lines)
     {
         int labelWidth = 0;
         for (Line line : lines)
         {
             if (!line.section() && line.value() != null)
             {
-                labelWidth = Math.max(labelWidth, font.width(line.label()) + 4);
+                labelWidth = Math.max(labelWidth,
+                        PanelHelpIcon.labelWithHelpWidth(font, line.label(), line.helpKey() != null) + 4);
             }
         }
         // 值列最多占一半宽，避免长标签把值挤出面板。
@@ -372,6 +405,11 @@ public final class PlayerDataPanelWidget extends Widget
                 continue;
             }
             graphics.drawString(font, line.label(), x, y, COLOR_LABEL, false);
+            if (line.helpKey() != null)
+            {
+                PanelHelpIcon.drawAfterLabel(graphics, font, line.label(), x, y, mouseX, mouseY,
+                        line.helpKey(), helpHits);
+            }
             if (line.value() != null)
             {
                 int valueX = x + labelWidth;
@@ -404,6 +442,11 @@ public final class PlayerDataPanelWidget extends Widget
         return Component.translatable("gui.jujutsukaisenzone.player_data." + path).getString();
     }
 
+    private static String helpKey(String id)
+    {
+        return "gui.jujutsukaisenzone.player_data.help." + id;
+    }
+
     private static String yesNo(boolean value)
     {
         return tr(value ? "value.yes" : "value.no");
@@ -420,22 +463,35 @@ public final class PlayerDataPanelWidget extends Widget
         return tr("level." + level.name().toLowerCase(Locale.ROOT));
     }
 
-    /** 一行内容：{@code section} 为真时是分节标题（{@code value} 为 null）。 */
-    private record Line(String label, String value, int valueColor, boolean section)
+    /**
+     * 一行内容：{@code section} 为真时是分节标题（{@code value} 为 null）。
+     * {@code helpKey} 非空时在标签旁画感叹号。
+     */
+    private record Line(String label, String value, int valueColor, boolean section, String helpKey)
     {
         static Line section(String title)
         {
-            return new Line(title, null, COLOR_VALUE, true);
+            return new Line(title, null, COLOR_VALUE, true, null);
         }
 
         static Line row(String label, String value)
         {
-            return new Line(label, value, COLOR_VALUE, false);
+            return new Line(label, value, COLOR_VALUE, false, null);
         }
 
         static Line row(String label, String value, int valueColor)
         {
-            return new Line(label, value, valueColor, false);
+            return new Line(label, value, valueColor, false, null);
+        }
+
+        static Line rowHelp(String label, String value, String helpKey)
+        {
+            return new Line(label, value, COLOR_VALUE, false, helpKey);
+        }
+
+        static Line rowHelp(String label, String value, int valueColor, String helpKey)
+        {
+            return new Line(label, value, valueColor, false, helpKey);
         }
     }
 }

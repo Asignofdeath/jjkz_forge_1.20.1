@@ -12,7 +12,21 @@ import org.jetbrains.annotations.Nullable;
 
 /**
 
- * 「苍」随咒术等级成长的数值表（数值来自 {@code data/jujutsukaisenzone/skill_combat/limitless_blue.json}）。
+ * 「苍」随咒术等级成长的数值表。
+
+ * <p>
+
+ * 真值来自 {@code config/jujutsukaisenzone-common.toml} 的 {@code [skillCombat.limitlessBlue]} 段，
+
+ * 经 {@link SkillCombatConfigRegistry} 汇总；配置未加载时退回 {@code LimitlessBlueConfig} 上标注
+
+ * 【配置项·默认值】的常量。
+
+ * <p>
+
+ * ⛔ 本注释此前写的是 {@code data/jujutsukaisenzone/skill_combat/limitless_blue.json}——那个文件
+
+ * 从来不存在。数值方案中途从数据包改成了 Forge 配置，注释没跟着改；别再照抄那个路径。
 
  */
 

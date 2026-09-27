@@ -9,21 +9,33 @@ public final class LimitlessBlueConfig
 
     /** 苍锚点存活时长（tick） */
     public static final int LIFETIME_TICKS = 30;
-    /** 苍吸附半径（格） */
+    /**
+     * 【配置项·默认值】苍吸附半径（格）。
+     * <p>
+     * 对应 {@code [skillCombat.limitlessBlue].pullRadiusBaseline}；运行时真值由
+     * {@code LimitlessBlueSkillGrowth#pullRadius} 给出。⛔ 业务代码不要直接引用本常量
+     * ——绕过 {@code SkillCombatConfigRegistry} 就会同时丢掉配置修改与咒术等级成长。
+     */
     public static final double PULL_RADIUS = 20.0D;
+    /** 【配置项·默认值】苍吸附半径每升一级咒术等级的增量（格）。 */
+    public static final double PULL_RADIUS_PER_RANK = 1.0D;
     /** Shift+1 时施法者靠近苍中心到此半径内即停止吸附 */
     public static final double OWNER_PULL_STOP_RADIUS = 1.75D;
     /** 苍伤害判定半径（格） */
     public static final double DAMAGE_RADIUS = 7.0D;
     /** 苍吸附强度系数 */
     public static final double PULL_STRENGTH = 0.99D;
-    /** 苍每间隔伤害值 */
+    /**
+     * 【配置项·默认值】苍每间隔伤害值。
+     * <p>
+     * 对应 {@code [skillCombat.limitlessBlue].damageBaseline}；运行时真值由
+     * {@code LimitlessBlueSkillGrowth#damage} 给出，⛔ 业务代码不要直接引用本常量。
+     */
     public static final float DAMAGE = 8.0F;
+    /** 【配置项·默认值】苍伤害每升一级咒术等级的增量。 */
+    public static final float DAMAGE_PER_RANK = 2.0F;
     /** 苍伤害间隔（tick） */
     public static final int DAMAGE_INTERVAL = 4;
-
-    /** 苍吸附方块半径（格），与 {@link #PULL_RADIUS} 一致 */
-    public static final double BLOCK_PULL_RADIUS = PULL_RADIUS;
     /** 每波随机采样尝试次数 */
     public static final int BLOCK_PULL_SAMPLE_ATTEMPTS = 192;
     /** 每波最多转化方块数 */

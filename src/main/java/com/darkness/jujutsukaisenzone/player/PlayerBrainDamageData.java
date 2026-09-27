@@ -33,9 +33,9 @@ public final class PlayerBrainDamageData
     {
         if (player instanceof ServerPlayer serverPlayer)
         {
-            return clampDamage(getData(serverPlayer).brainDamage);
+            return clampDamage(player, getData(serverPlayer).brainDamage);
         }
-        return clampDamage(player.getPersistentData().getInt(CLIENT_TAG_DAMAGE));
+        return clampDamage(player, player.getPersistentData().getInt(CLIENT_TAG_DAMAGE));
     }
 
     public static int getExpandsToday(Player player)
@@ -63,9 +63,17 @@ public final class PlayerBrainDamageData
         return Math.max(0, Config.domainBrainFreeDailyExpansions);
     }
 
+    public static int getBrainMax(Player player)
+    {
+        int base = Config.domainBrainMax > 0 ? Config.domainBrainMax : 100;
+        int penalty = (int) Math.ceil(PlayerSeLoadoutData.sumPenaltyAmount(
+                player, com.darkness.jujutsukaisenzone.technique.se.PanelStat.ApplyKind.BRAIN_DAMAGE_MAX_SUBTRACT));
+        return Math.max(1, base - penalty);
+    }
+
     public static boolean isFull(Player player)
     {
-        return getBrainDamage(player) >= Config.domainBrainMax;
+        return getBrainDamage(player) >= getBrainMax(player);
     }
 
     /**
@@ -116,10 +124,10 @@ public final class PlayerBrainDamageData
             if (gain > 0)
             {
                 int before = data.brainDamage;
-                data.brainDamage = clampDamage(data.brainDamage + gain);
+                data.brainDamage = clampDamage(player, data.brainDamage + gain);
                 player.displayClientMessage(
                         Component.literal("今日领域展开过多，脑损 +" + (data.brainDamage - before)
-                                        + "（当前 " + data.brainDamage + "/" + Config.domainBrainMax + "）")
+                                        + "（当前 " + data.brainDamage + "/" + getBrainMax(player) + "）")
                                 .withStyle(ChatFormatting.RED),
                         true);
             }
@@ -190,7 +198,7 @@ public final class PlayerBrainDamageData
             gain += Math.max(0, Config.domainMeltdownRepairHighBrainExtra);
         }
         int before = data.brainDamage;
-        data.brainDamage = clampDamage(data.brainDamage + gain);
+        data.brainDamage = clampDamage(player, data.brainDamage + gain);
         int actualGain = data.brainDamage - before;
 
         markDirty(player);
@@ -199,7 +207,7 @@ public final class PlayerBrainDamageData
 
         player.displayClientMessage(
                 Component.literal("术式熔断已修复，脑损 +" + actualGain
-                                + "（当前 " + data.brainDamage + "/" + Config.domainBrainMax
+                                + "（当前 " + data.brainDamage + "/" + getBrainMax(player)
                                 + "，今日第 " + repairIndex + " 次）")
                         .withStyle(ChatFormatting.LIGHT_PURPLE),
                 true);
@@ -222,7 +230,7 @@ public final class PlayerBrainDamageData
             return;
         }
         long totalRecover = daysPassed * (long) Config.domainBrainRecoverPerDay;
-        data.brainDamage = clampDamage(before - (int) Math.min(before, totalRecover));
+        data.brainDamage = clampDamage(player, before - (int) Math.min(before, totalRecover));
         syncExpandDay(player);
         syncRepairDay(player);
         markDirty(player);
@@ -232,7 +240,7 @@ public final class PlayerBrainDamageData
         {
             player.sendSystemMessage(Component.literal(
                     "经过休息，脑损缓解 " + (before - data.brainDamage)
-                            + "（当前 " + data.brainDamage + "/" + Config.domainBrainMax + "）"));
+                            + "（当前 " + data.brainDamage + "/" + getBrainMax(player) + "）"));
         }
     }
 
@@ -249,7 +257,7 @@ public final class PlayerBrainDamageData
         {
             return 0;
         }
-        data.brainDamage = clampDamage(before - amount);
+        data.brainDamage = clampDamage(player, before - amount);
         markDirty(player);
         refreshDebuffs(player);
         syncToClient(player);
@@ -258,7 +266,7 @@ public final class PlayerBrainDamageData
 
     public static void setBrainDamage(ServerPlayer player, int value)
     {
-        getData(player).brainDamage = clampDamage(value);
+        getData(player).brainDamage = clampDamage(player, value);
         markDirty(player);
         refreshDebuffs(player);
         syncToClient(player);
@@ -266,7 +274,7 @@ public final class PlayerBrainDamageData
 
     public static void applyClientSnapshot(Player player, int brainDamage, int expandsToday, int meltdownRepairsToday)
     {
-        player.getPersistentData().putInt(CLIENT_TAG_DAMAGE, clampDamage(brainDamage));
+        player.getPersistentData().putInt(CLIENT_TAG_DAMAGE, clampDamage(player, brainDamage));
         player.getPersistentData().putInt(CLIENT_TAG_EXPANDS_TODAY, Math.max(0, expandsToday));
         player.getPersistentData().putInt(CLIENT_TAG_MELTDOWN_REPAIRS, Math.max(0, meltdownRepairsToday));
     }
@@ -368,10 +376,9 @@ public final class PlayerBrainDamageData
         return player.server.overworld().getDayTime() / 24000L;
     }
 
-    private static int clampDamage(int value)
+    private static int clampDamage(Player player, int value)
     {
-        int max = Config.domainBrainMax > 0 ? Config.domainBrainMax : 100;
-        return Math.max(0, Math.min(max, value));
+        return Math.max(0, Math.min(getBrainMax(player), value));
     }
 
     private static JjkzPlayerDataStorage.PlayerDataEntry getData(ServerPlayer player)

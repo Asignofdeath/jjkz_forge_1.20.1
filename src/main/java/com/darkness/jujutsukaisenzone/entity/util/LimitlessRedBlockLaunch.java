@@ -41,6 +41,7 @@ public final class LimitlessRedBlockLaunch
     public static void launchFromExplosion(ServerLevel level, Explosion explosion, List<BlockPos> affectedBlocks)
     {
         Vec3 center = explosion.getPosition();
+        // jjkz-config-default-ok: 只是进入 if 之前的占位，下面必定被 arrowBehavior.explosionPower() 覆盖
         float radius = LimitlessRedConfig.ARROW_EXPLOSION_POWER;
         if (explosion.getDirectSourceEntity() instanceof SpecialEffectEntity entity
                 && entity.getEffectBehavior() instanceof LimitlessRedArrowBehavior arrowBehavior)

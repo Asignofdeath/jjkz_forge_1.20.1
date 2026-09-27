@@ -106,6 +106,10 @@ public class JuJutsuKaisenZone
         com.darkness.jujutsukaisenzone.technique.development.MechanicLiberationRegistry.bootstrap();
         com.darkness.jujutsukaisenzone.technique.development.SpNodeRegistry.bootstrap();
         com.darkness.jujutsukaisenzone.technique.se.SeEffectRegistry.bootstrap();
+        com.darkness.jujutsukaisenzone.technique.se.SeMechanicRegistry.bootstrap();
+        // SE 声明表自检：必须在全部术式技能集注册完成之后（专用 SE 要拿完整术式 id 表来对照）
+        // validate 末尾会核对 SeEffectDef ↔ SeMechanic 成对
+        com.darkness.jujutsukaisenzone.technique.se.SeEffectRegistry.validate();
         // 暴击声明表自检：必须在全部技能集 / 技能树注册完成之后（它要拿完整技能表来对照）
         com.darkness.jujutsukaisenzone.technique.crit.CritSkillPolicy.validate();
         CommonKeySkillRegistry.register(ReverseTechniqueCommonKeySkill.INSTANCE);

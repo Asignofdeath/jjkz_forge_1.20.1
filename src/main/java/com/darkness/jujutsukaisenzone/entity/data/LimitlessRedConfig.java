@@ -35,10 +35,19 @@ public final class LimitlessRedConfig
     public static final double ARROW_SPAWN_FORWARD = 0.8D;
     /** 赫箭生成 Y 偏移 */
     public static final double ARROW_SPAWN_Y_OFFSET = 0.12D;
-    /** 赫箭命中爆炸威力 */
+    /**
+     * 【配置项·默认值】赫箭命中爆炸威力。
+     * <p>
+     * 运行时真值由 {@code LimitlessRedSkillGrowth#explosionPower} 给出，
+     * ⛔ 业务代码不要直接引用本常量。
+     */
     public static final float ARROW_EXPLOSION_POWER = 14.0F;
-    /** 赫箭爆炸击飞半径 */
+    /** 【配置项·默认值】赫爆炸威力每升一级咒术等级的增量。 */
+    public static final float EXPLOSION_POWER_PER_RANK = 2.0F;
+    /** 【配置项·默认值】赫箭爆炸击飞半径；运行时真值走 {@code LimitlessRedSkillGrowth#knockbackRadius}。 */
     public static final double ARROW_KNOCKBACK_RADIUS = 18.0D;
+    /** 【配置项·默认值】赫击飞范围每升一级咒术等级的增量（格）。 */
+    public static final double KNOCKBACK_RADIUS_PER_RANK = 0.0D;
     /** 赫箭爆炸击飞基础强度 */
     public static final double ARROW_KNOCKBACK_BASE = 3.2D;
     /** 赫箭爆炸击飞上抛分量 */

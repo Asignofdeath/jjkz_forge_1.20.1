@@ -9,25 +9,25 @@ import net.minecraftforge.network.NetworkEvent;
 import java.util.function.Supplier;
 
 /**
- * 客户端 → 服务端：卸下指定 SE 槽。
+ * 客户端 → 服务端：卸下指定 SE（不再有槽位参数，装载是集合语义）。
  */
 public final class UnequipSeC2SPacket
 {
-    private final int slot;
+    private final String seId;
 
-    public UnequipSeC2SPacket(int slot)
+    public UnequipSeC2SPacket(String seId)
     {
-        this.slot = slot;
+        this.seId = seId == null ? "" : seId;
     }
 
     public static void encode(UnequipSeC2SPacket packet, FriendlyByteBuf buffer)
     {
-        buffer.writeVarInt(packet.slot);
+        buffer.writeUtf(packet.seId);
     }
 
     public static UnequipSeC2SPacket decode(FriendlyByteBuf buffer)
     {
-        return new UnequipSeC2SPacket(buffer.readVarInt());
+        return new UnequipSeC2SPacket(buffer.readUtf());
     }
 
     public static void handle(UnequipSeC2SPacket packet, Supplier<NetworkEvent.Context> contextSupplier)
@@ -36,11 +36,11 @@ public final class UnequipSeC2SPacket
         context.enqueueWork(() ->
         {
             ServerPlayer player = context.getSender();
-            if (player == null)
+            if (player == null || packet.seId.isBlank())
             {
                 return;
             }
-            PlayerSeLoadoutData.SeEquipResult result = PlayerSeLoadoutData.tryUnequip(player, packet.slot);
+            PlayerSeLoadoutData.SeEquipResult result = PlayerSeLoadoutData.tryUnequip(player, packet.seId);
             if (result != PlayerSeLoadoutData.SeEquipResult.SUCCESS)
             {
                 player.sendSystemMessage(Component.translatable(

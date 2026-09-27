@@ -18,7 +18,8 @@ import java.util.Set;
  */
 public final class PlayerSpNodeData
 {
-    public static final int DEFAULT_QUALITY = 3;
+    /** 质量<b>上限</b>的默认值。语义是权重和（Σ spCost），不再是「可点节点个数」。 */
+    public static final int DEFAULT_QUALITY = 6;
     private static final String CLIENT_TAG_NODES = "jujutsukaisenzone_sp_nodes";
     private static final String CLIENT_TAG_QUALITY = "jujutsukaisenzone_sp_node_quality";
 
@@ -103,7 +104,8 @@ public final class PlayerSpNodeData
         {
             return SpNodeUnlockResult.ALREADY_UNLOCKED;
         }
-        if (data.spUnlockedNodes.size() >= Math.max(1, data.spNodeQuality))
+        // 质量是「权重和」：SP 节点与 SE 共用一个池，这里问池子是否还放得下这个节点的 spCost。
+        if (PlayerQualityPoolData.wouldExceedHardLimit(player, def.cost()))
         {
             return SpNodeUnlockResult.QUALITY_LIMIT;
         }

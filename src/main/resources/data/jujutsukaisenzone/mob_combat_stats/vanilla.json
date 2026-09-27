@@ -1,5 +1,6 @@
 {
   "_comment": "原版生物战斗属性表（百分比点数）。体抗/术抗=防御；穿甲=穿护甲%+体抗；术穿=穿术抗。缺省字段视为 0。可用 /reload 热更；已存在实体在再次入世（区块加载）时刷新。",
+  "_poise": "韧性条。可选的 poise 块：value=韧性上限(value<=0 显式关闭，不写则按「体抗+术抗>=45」派生)；regen=每秒回复；damage_reduction=未破时减免比例(不写按档位：45~59→0.15，60~74→0.25，>=75→0.30~0.35)；specialized=true 时 resistance 才生效（false ⇒ Break 效力全额打在这只怪身上）；resistance=Break 效力在该怪身上的打折系数(0~1，1.0=不打折)。**Break 效力是加速破韧的唯一通道**，没有特质克制一类的第二个乘数。",
   "entries": {
     "minecraft:zombie": {
       "physical_resistance": 5,
@@ -113,13 +114,27 @@
       "physical_resistance": 25,
       "technique_resistance": 25,
       "physical_penetration": 5,
-      "technique_penetration": 20
+      "technique_penetration": 20,
+      "poise": {
+        "value": 110,
+        "regen": 4,
+        "damage_reduction": 0.25,
+        "specialized": true,
+        "resistance": 0.35
+      }
     },
     "minecraft:shulker": {
       "physical_resistance": 30,
       "technique_resistance": 20,
       "physical_penetration": 0,
-      "technique_penetration": 15
+      "technique_penetration": 15,
+      "poise": {
+        "value": 90,
+        "regen": 4,
+        "damage_reduction": 0.15,
+        "specialized": true,
+        "resistance": 0.35
+      }
     },
     "minecraft:blaze": {
       "physical_resistance": 5,
@@ -191,7 +206,14 @@
       "physical_resistance": 35,
       "technique_resistance": 10,
       "physical_penetration": 25,
-      "technique_penetration": 0
+      "technique_penetration": 0,
+      "poise": {
+        "value": 70,
+        "regen": 4,
+        "damage_reduction": 0.15,
+        "specialized": true,
+        "resistance": 0.35
+      }
     },
     "minecraft:illusioner": {
       "physical_resistance": 5,
@@ -203,7 +225,14 @@
       "physical_resistance": 40,
       "technique_resistance": 15,
       "physical_penetration": 20,
-      "technique_penetration": 0
+      "technique_penetration": 0,
+      "poise": {
+        "value": 80,
+        "regen": 4,
+        "damage_reduction": 0.15,
+        "specialized": true,
+        "resistance": 0.35
+      }
     },
     "minecraft:snow_golem": {
       "physical_resistance": 0,
@@ -257,19 +286,40 @@
       "physical_resistance": 45,
       "technique_resistance": 35,
       "physical_penetration": 30,
-      "technique_penetration": 15
+      "technique_penetration": 15,
+      "poise": {
+        "value": 160,
+        "regen": 5,
+        "damage_reduction": 0.25,
+        "specialized": true,
+        "resistance": 0.35
+      }
     },
     "minecraft:wither": {
       "physical_resistance": 30,
       "technique_resistance": 40,
       "physical_penetration": 15,
-      "technique_penetration": 30
+      "technique_penetration": 30,
+      "poise": {
+        "value": 180,
+        "regen": 5,
+        "damage_reduction": 0.3,
+        "specialized": true,
+        "resistance": 0.35
+      }
     },
     "minecraft:ender_dragon": {
       "physical_resistance": 35,
       "technique_resistance": 40,
       "physical_penetration": 20,
-      "technique_penetration": 25
+      "technique_penetration": 25,
+      "poise": {
+        "value": 200,
+        "regen": 5,
+        "damage_reduction": 0.3,
+        "specialized": true,
+        "resistance": 0.35
+      }
     }
   }
 }

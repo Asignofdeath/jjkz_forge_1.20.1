@@ -123,6 +123,27 @@ public final class ModAttributes
                     60.0D)
                     .setSyncable(true));
 
+    /**
+     * 破韧效力（百分比点数，默认 0 = 0%）。
+     * <p>
+     * 作用于怪物韧性条的破韧速度：{@code poiseDmg = base × (1 + B_eff)}，
+     * 其中 {@code B_eff = normalize(值/100) × (特攻怪 ? poiseResistance : 1)}。
+     * <b>软上限 +80%（超出部分收益减半）、硬上限 +150%</b>，见
+     * {@code PoiseRules#BREAK_POTENCY_SOFT_CAP} 一族——上限取 150 就是为了对齐硬上限。
+     * <p>
+     * ⚠️ 它是<b>唯一</b>能加速破韧的通道（咒力特质克制表已删除），所以在特攻怪身上会被打折
+     * （{@code PoiseStats#poiseResistance}）——不打折的话堆 Break 的玩家会把所有怪的条一起秒掉，
+     * 韧性条本身就没意义了。
+     */
+    public static final RegistryObject<Attribute> BREAK_POTENCY = ATTRIBUTES.register(
+            "break_potency",
+            () -> new RangedAttribute(
+                    "attribute.name.jujutsukaisenzone.break_potency",
+                    0.0D,
+                    0.0D,
+                    150.0D)
+                    .setSyncable(true));
+
     private ModAttributes()
     {
     }
@@ -142,6 +163,18 @@ public final class ModAttributes
     public static double domainGaugeChargeEfficiencyMultiplier(@Nullable LivingEntity entity)
     {
         return efficiencyMultiplier(entity, DOMAIN_GAUGE_CHARGE_EFFICIENCY);
+    }
+
+    /**
+     * 破韧效力的<b>原始比值</b>（{@code 属性值 / 100}，未经软/硬上限折算）。
+     * 无属性（非玩家等）时 0.
+     * <p>
+     * ⚠️ 拿到的值<b>不能</b>直接乘进破韧公式：还差特攻怪打折与软上限两道，
+     * 那两步在 {@code PoiseRules#effectiveBreakPotency} 里做，别在这里重复实现。
+     */
+    public static double breakPotency(@Nullable LivingEntity entity)
+    {
+        return efficiencyMultiplier(entity, BREAK_POTENCY);
     }
 
     private static double efficiencyMultiplier(@Nullable LivingEntity entity, RegistryObject<Attribute> attribute)
@@ -175,5 +208,6 @@ public final class ModAttributes
         event.add(EntityType.PLAYER, REVERSE_TECHNIQUE_EFFICIENCY.get());
         event.add(EntityType.PLAYER, DOMAIN_GAUGE_CHARGE_EFFICIENCY.get());
         event.add(EntityType.PLAYER, CRIT_CHANCE.get());
+        event.add(EntityType.PLAYER, BREAK_POTENCY.get());
     }
 }

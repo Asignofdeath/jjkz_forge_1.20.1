@@ -66,6 +66,23 @@ public final class DomainExpansionRouter
     }
 
     /**
+     * 玩家是否作为主人持有任意活跃领域（含展开动画中）。
+     * <p>
+     * 用于领域量表等「领域维持期间」门控；遍历所有领域实现的活跃表。
+     */
+    public static boolean hasActiveDomain(ServerPlayer player)
+    {
+        for (AbstractDomainExpansion domain : ALL_DOMAINS)
+        {
+            if (domain.hasActiveDomain(player))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * 检查指定位置是否在任何活跃领域范围内（遍历所有领域实例）。
      *
      * @param level 服务端世界

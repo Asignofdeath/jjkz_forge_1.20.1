@@ -200,3 +200,163 @@ for k, v in files.most_common(20): print(v, '|', k)
 - `-proc:none` 跳过注解处理器（Mixin 处理器在这里不需要）。
 - 报错前**先看涉事文件的 mtime**：用户可能在 IDEA 里**同时编辑**该文件。2026-09-25 出现过「1 个错误」实为检查当时文件正被写入（差 25 秒），重跑即 0。
 - 查 Forge API 源码（比反编译靠谱）：解压上面那个官方 `-sources.jar`。例：`EntityAttributeModificationEvent` 的 `getTypes()` / `add()` 签名就是这么确认的。
+- 2026-09-27 基线：578 文件 / 292 jar / exit 0。
+- **2026-09-27 起 `tools/jjkz_static_check.py` 末尾多一段「配置常量旁路」守卫**（见下一节）：
+  输出多一行 `配置常量旁路(应为 0): N`。判定口径与豁免标记见该节。
+
+## 配置来源与权威规则（2026-09-27）
+
+**三处配置通道，别混**（用户问过「json 是不是集中在某个文件夹」，答案：不集中）：
+1. **数据包 JSON**：`src/main/resources/data/jujutsukaisenzone/`。我们自建的数值表只有
+   `mob_combat_stats/vanilla.json`（怪物战斗属性 + `poise` 块）、
+   `ten_shadows_shikigami_stats/{untamed,tamed_base}.json`、`capabilities/weapons/*.json`。
+   `/reload` 热更，整合包可覆盖 ⇒ **内容向**的东西放这儿。
+2. **Forge 配置 TOML**：`Config.java`（`ModConfig.Type.COMMON`）→ `run/config/jujutsukaisenzone-common.toml`，
+   7 段：`[skillCombat] / [combatPower] / [combatDefense] / [domainBrain] / [domainGauge] /
+   [domainMeltdownRepair] / [se]`。**改完要重启**（旧认知：得删 `run/config/*.toml` 才生效）。
+3. **Java 常量**：`entity/data/*Config`（8 个）+ `technique/scaling/*SkillGrowth` + `PoiseRules` 常量族。
+
+### skillCombat 的权威规则（新增项照此办理）
+- 数值**只在 `*Config` / `*SkillGrowth` 里手写一次**，javadoc 打 `【配置项·默认值】`标记。
+- `Config.java` 的 `defineInRange` 默认值与 `SkillCombatConfigRegistry#buildCodeDefaults()`
+  **都引用那个常量** —— 曾经三处各写一遍，改一处不生效也不报错。
+- 业务代码读取**一律走 `*SkillGrowth` / `SkillCombatConfigRegistry.resolve*`**，
+  ⛔ 不许直接引用常量（直接引用同时丢掉配置修改与咒术等级成长）。
+- ⚠️ `damage` 类的 `perRank` 在 `Config.combatPowerScalingEnabled = true`（默认）时被乘 0
+  （等级成长改由「术式强度」面板承担，见 `SkillCombatConfigRegistry#reloadFromForgeConfig`）。
+  所以配置文件里能看到该键、但它当下不生效 —— **刻意行为，不是 bug**。
+- ⚠️ `entity/data/*Config` 混装两类东西：**配置项**（`DAMAGE` / `PULL_RADIUS`…）与
+  **纯实现细节**（`BLOCK_PULL_SAMPLE_ATTEMPTS`、`*_INTERVAL`、`*_FADE_IN_TICKS`…）。
+  只有前者会进 skillCombat；后者别顺手配置化（会把 TOML 撑成上千行）。
+
+### 「配置常量旁路」守卫（`tools/jjkz_static_check.py` 尾部）
+- `CONFIG_DEFAULTS` 列 18 个常量 → **只允许 3 类读者**：声明它的 `*Config` 自己、
+  `Config.java`、`SkillCombatConfigRegistry.java`；其余文件命中就列出 `file:line`。
+- **确实只能读默认值**的场合：在「本行或上 3 行内」写 `jjkz-config-default-ok` 豁免，必须跟理由。
+  现有豁免 3 处：`LimitlessRedArrowBehavior` 字段占位 + 老存档兜底、`LimitlessRedBlockLaunch` 的 `if` 前占位。
+- 实现坑：必须先跳过以 `*` / `//` / `/*` 开头的行，否则 javadoc 里的 `{@code X.Y}` 全误报；
+  豁免窗口用 `window` + `del window[:-3]`。
+- 当前基线：`srcs = 578  jars = 292  exit = 0  错误总行数: 0  配置常量旁路(应为 0): 0`。
+
+### 尚未做的第三步（等用户拍板）
+配置通道是否从 Forge TOML 整体搬到数据包（`data/.../skill_combat/*.json` +
+`SimpleJsonResourceReloadListener`，照 `MobCombatStatsReloadListener`）。倾向做，但会替掉
+玩家侧配置入口（TOML 段 + `JjkzModConfigScreen`），属**体验变更**，不能自作主张。
+
+## EpicFight 硬直护盾（stun shield）——怪物韧性条的载体（2026-09-27）
+
+EF 源码在 `C:\D\MineMOD\epicfight-1.20.1\epicfight-1.20.1\src\main\java\`（20.14.16-mc1.20.1-forge）。
+**先读源码再设计，别凭记忆猜 API**（我第一版靠记忆推断，结论是错的）。
+
+- ✅ **白条是白送的**：`client/gui/HealthBar#draw` 在 y ∈ [-0.08, -0.0488] 画盾条
+  （底色 `BATTLE_ICON` uv (1,0)-(63,5)、填充 (1,5)-(62,10)），血条占 [-0.0488, +0.0488] ⇒ 恰好贴在正下方。
+  盾值 = `LivingEntityPatch#getStunShield/getMaxStunShield`（`EntityDataAccessor`，自动同步 + NBT 存档
+  `stun_shield` / `max_stun_shield`）。
+- ✅ **霸体也是白送的**：`events/EntityEvents#hurtEvent` :203「盾 > impact ⇒ SHORT/LONG 降级为 NONE」、
+  :222「只有 `getStunShield() == 0` 才真上硬直」。
+- ⛔ **但盾只挡硬直、不挡伤害**：`HurtableEntityPatch#damageStunShield` = `setStunShield(getStunShield() - impact)`，
+  扣的是 `impact`（IMPACT 属性，默认 0.5）**不是** `event.getAmount()`。
+- ⛔ **不是所有怪都有盾**：`GlobalMobPatch extends HurtableEntityPatch<Mob>`（**不是** `LivingEntityPatch`）
+  ⇒ `getStunShield()` 恒 0、`setStunShield()` 空实现；且 `HealthBar` / `RenderEngine:561` 只认 `LivingEntityPatch`。
+  真正能挂盾的只有 `EntityPatchProvider#registerEntityPatches`(:82-118) 登记的那 ~25 种。
+  **监守者 / 潜影贝 / 远古守卫者 / 守卫者都不在里面**（尽管它们体抗+术抗很高）。
+  补法：`EntityPatchRegistryEvent`（`IModBusEvent`；`EntityPatchProvider:122` 触发、:125 才 `putAll`）
+  → 自建 patch 注册。`MobPatch<E>` 需实现 7 个抽象方法：`applyStun` / `isStunned` / `overrideRender` /
+  `getModelMatrix` / `updateMotion` / `getHitAnimation` / `getFaction`（后两个影响动画表现，必须单独验）。
+  铁傀儡 / 劫掠兽可直接 `extends IronGolemPatch` / `extends RavagerPatch`（均非 final）只 override `damageStunShield`。
+- ⛔ `HealthBar#shouldDraw`：:46 对 `forge:bosses` 直接 false（凋灵 / 末影龙连血条都没有）；
+  :75 还要求「有 debuff 或掉血 或 是锁定目标」⇒ **满血未锁定时白条也不显示**。
+- ⛔ `setStunShield` 内部 clamp 到 `[0, maxStunShield]` ⇒ **必须先 setMax 再 setStun**，反过来夹成 0。
+- ✅ 时序安全：EF 从 NBT 恢复盾在 `mixin/common/MixinLivingEntity#readAdditionalSaveData`（反序列化期间），
+  早于 `EntityJoinLevelEvent` ⇒ 在 join 里设的值不会被它覆盖。
+- 锁定目标 = `EpicFightCameraAPI#getFocusingEntity()`（`LocalPlayerPatch#getTarget()` 就是它）。
+  `EntityStunEvent`（`api/forgeevent`，可取消）在 `EntityEvents:211` 触发、:215 才扣盾；
+  取消它只跳过「扣盾 + 硬直」，**不会取消伤害**（那个 `return` 在 `ifPresent` 里）。
+- 自定义世界空间 HUD 的范式：`extends EntityUI`（public，构造即自动加入 `ENTITY_UI_LIST`，
+  渲染循环在 `RenderEngine:559-569`）；最简范例 `client/gui/TargetIndicator`。坐标用
+  `getModelViewMatrixAlignedToCamera` + `drawColoredQuadAsLevelModel`。
+
+### 韧性条系统的落地约定（阶段 0–5 已实现）
+- **口径：盾就是韧性**（复用 EF 载体，同步 / 存档 / 白条全免费）。
+- 资格：数据包 `mob_combat_stats` 的 `poise` 块优先；没写则「体抗 + 术抗 ≥ 45」派生
+  （45 正好把劫掠兽 45、铁傀儡 55 划进来，把猪灵蛮兵 35、唤魔者 30 划出去）。
+- 减伤档：45~59→15%，60~74→25%，≥75→35%；破韧公式 `poiseDmg = base × (1 + B_eff)`，
+  `B_eff = min(B,1.5) × (specialized ? resistance : 1.0)`。
+  **`specialized` 只决定 `resistance` 生不生效**，与其它一切无关。
+- 文件：`entity/combat/PoiseStats`（record）、`entity/combat/PoiseRules`（全部常量与判定）、
+  `event/MobPoiseEvents`（EF 桥接 + 扣盾 + 回复 + 减免查询，**不写 setAmount**）、
+  `MobCombatStats`(+poise 字段，保留旧 4 参构造)、`MobCombatStatsReloadListener`、`vanilla.json`、
+  `TechniqueDamageZoneEvents`（**新增「区 4 · 韧性条减免」**）。
+
+#### 阶段 3：破韧结算（为什么要自己写）
+⛔ **EF 只在伤害源是 `EpicFightDamageSource` 时才碰盾**：`EntityEvents#hurtEvent` :145
+`epicfightDamageSource = source instanceof EpicFightDamageSource ? (…) : null`，:195 要求它非空才进扣盾段。
+本模组术式伤害走**原版 `DamageSource`**（`TechniqueDamageSources` 里
+`new DamageSource(techniqueType(level), null, owner)`）⇒ **EF 整块跳过**；EF 自家近战也只扣
+`impact`（默认 0.5）⇒ 铁傀儡 80 点要 160 刀。**两个通道都扣不动**，所以结算必须由我们提供。
+
+- 扣盾点：`MobPoiseEvents#onLivingHurt`，`LivingHurtEvent` @ **LOWEST**。
+  - 挂 LOWEST 的理由：要等所有乘区（含区 4 韧性减免）改完 `amount` 再判断这一刀是否真落地。
+  - `LivingHurtEvent` 只在 `LivingEntity#actuallyHurt` 内部派发 ⇒ **天然滤掉无敌帧里被吞掉的重复命中**，
+    不需要自己查 `invulnerableTime`。
+  - 只认 `event.getSource().getEntity() instanceof Player`（破韧/Break 都是玩家侧成长轴）；
+    `getEntity()` 对弹射物会沿 owner 追到玩家，对术式伤害（`directEntity = null`）返回 `owner`，正合用。
+  - 扣的量与 `event.getAmount()` **无关**，固定 `POISE_DAMAGE_BASE = 10`。
+  - 已破（盾 = 0）时直接 return：不再往下扣，破损期的锁上限交给下一阶段。
+- 回复点：`MobPoiseEvents#onLivingTick`（`LivingEvent.LivingTickEvent`）。
+  延迟 `REGEN_DELAY_TICKS = 60`、每 `REGEN_INTERVAL_TICKS = 20` 结算一次；
+  ⚠️ 取模判断放最前（该事件每 tick 对**每个**生物派发，先取模省掉绝大多数 tick 的能力查找）。
+  命中时刻表用 `Collections.synchronizedMap(new WeakHashMap<LivingEntity, Long>())`——
+  key 是**实体本身**而不是 UUID：`Entity` 没覆写 `equals`，用的是同一性比较，正是所需语义，
+  而且怪物卸载/消失后条目随实体一起 GC，不用另写卸载清理。
+- 当前手感（`vanilla.json` 显式 poise 块）：劫掠兽 70→7 刀、铁傀儡 80→8 刀、潜影贝 90→9 刀、
+  远古守卫者 110→11 刀、监守者 160→16 刀、凋灵 180→18 刀；回复 4/s（部分 5/s）。
+  ⚠️ 潜影贝 / 远古守卫者 / 监守者目前**拿不到条**（无 `LivingEntityPatch`），阶段 6 补。
+- 未做：完整夺权（EF 系命中仍额外扣 0.5 `impact`；已用 `EntityStunEvent` 取消 NONE 类解决，见阶段 6）。
+
+#### 阶段 4：破损态
+- 触发：**这一击把「正数」的条打到 0**。破损期内继续命中<b>不刷新</b>窗口（否则贴脸打 = 永久破防）。
+- 参数（全在 `PoiseRules`）：`BROKEN_DURATION_SECONDS = 10`（`…_TICKS = 200`，是
+  `REGEN_INTERVAL_TICKS` 的整数倍，到期必然落在结算刻上）、虚弱 II、易伤各 25 点。
+- 易伤走 **Attribute 层**：`ModAttributes.PHYSICAL_RESISTANCE` / `TECHNIQUE_RESISTANCE`
+  各 `-25`，专用 UUID `…-3005` / `…-3006`（**必须与 `MobCombatStatsEvents` 的 `…-3001`~`…-3004` 不同**，
+  否则会把数据包套上的体抗/术抗整个顶掉），`Operation.ADDITION`。
+- ⛔ **盾 == 0 时 `HealthBar` 直接 `return`（`HealthBar.java:176-178`）——整根白条是「消失」不是「空」。**
+  所以「破损期锁 30% 上限」**不是**视觉反馈，它只是一道兜底闸（防止别的路径在窗口内把盾加回去、
+  顺手把霸体还回来）。想给破损态做视觉反馈得自己画，别指望 EF。
+- ⛔ **破损期内必须禁止回复**：EF 的霸体判据是 `盾 > impact`，回一点点霸体就提前回来，
+  「移除霸体增幅」就成了假话。**霸体全程失效 ⟺ 盾全程为 0**，没有第二条路。
+- `clearBroken` 以「`BROKEN_UNTIL` 里有没有本实体」为闸：它在每个生物入世时都会被调到，
+  不设闸会连别人（药水等）挂的虚弱一起删掉。
+- ⛔ **末影龙两处都要豁免**（`onLivingHurt` + `onLivingTick` 的 `isEnderDragon` 早退）：
+  `applyPoise` 里跳过它只是不挂盾，不豁免扣盾就会去打 EF 的水晶盾、并把它的上限锁到 30%。
+
+#### 阶段 5（已删除）：特质克制表 + 破韧质量闸门
+
+2026-09-27 用户拍板删除，原话「删除四种特质带来的破韧性增幅，break效率视为唯一解法。删除克制系统。保留咒力特质。」
+
+**为什么删**：这套机制在游戏里**一次都没生效过**——7 只怪没填 `poise.trait`、`BREAK_POTENCY` 没有任何
+获取来源、也没有任何 UI 显示怪的特质。等于花了大力气写了一层看不见摸不着的乘数，无法凭讨论判断好坏。
+
+**删除清单**（已从代码移除，别再找）：
+`PoiseRules.{COUNTER_ADVANTAGE, COUNTER_DISADVANTAGE, COUNTER_NEUTRAL, BREAK_ONLY_PENALTY,
+counterMultiplier, beats, breakQualityFactor}`、`PoiseStats` 的第 6 个分量 `trait`、
+`MobCombatStatsReloadListener#readTrait`、`MobPoiseEvents` 里对 `PlayerCursedEnergyTraitData` 的读取。
+`CursedEnergyTrait` 枚举**保留**，只服务 SE 装载门卡 `requiredTraits`。
+
+⛔ **质量闸门必须跟着删**：它罚的是「用通用属性绕过特质」，特质没了就罚无对象；而且 Break 成了唯一
+解法还罚它，等于自相矛盾。⇒ **破损态恒满档**（虚弱 II + 体抗/术抗各 −25），与怎么破的无关。
+
+#### 阶段 5（保留部分）：Break 效力
+- **Break 效力 = `ModAttributes.BREAK_POTENCY`**（玩家专属，百分比点数，0~150，上限对齐硬上限）。
+  `ModAttributes.breakPotency(entity)` 只返回**原始比值**；软上限折算（>0.8 部分减半、硬顶 1.5）
+  与特攻怪打折（`resistance`）在 `PoiseRules.effectiveBreakPotency` 里。
+  现在它**只有 `poiseDamage` 一个调用点**（质量闸门已删）。
+- ⚠️ **它目前没有任何获取来源** ⇒ 玩家恒 0，所有怪的破韧速度恒基线。要让它有来源只剩「加进 SP 节点」
+  一条路（用户已说过要加，还没做）。
+- 面板/命令：`PlayerDataPanelWidget`（`gui.jujutsukaisenzone.player_data.break_potency`，不染色——
+  破韧不专属体术也不专属术式）、`JjkzPlayerDataDisplay`（命令里连咒力特质一起打，用 `trait.id()` 而不是
+  `displayName()`：服务端 `Component#getString()` 解析不了客户端的语言键）。
+
+
+

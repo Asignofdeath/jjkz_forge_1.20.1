@@ -59,6 +59,8 @@ import com.darkness.jujutsukaisenzone.network.packet.SyncTechniqueIntelS2CPacket
 import com.darkness.jujutsukaisenzone.network.packet.SyncSpS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncSpNodesS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncSeLoadoutS2CPacket;
+import com.darkness.jujutsukaisenzone.network.packet.SyncCursedEnergyTraitS2CPacket;
+import com.darkness.jujutsukaisenzone.network.packet.SyncStylizedDamageStylesRuleS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncSkillLevelsS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.UpgradeSkillC2SPacket;
 import com.darkness.jujutsukaisenzone.network.packet.UpgradeSkillS2CPacket;
@@ -449,6 +451,16 @@ public final class ModNetwork
                 .decoder(SyncSeLoadoutS2CPacket::decode)
                 .consumerMainThread(SyncSeLoadoutS2CPacket::handle)
                 .add();
+        CHANNEL.messageBuilder(SyncCursedEnergyTraitS2CPacket.class, packetId++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(SyncCursedEnergyTraitS2CPacket::encode)
+                .decoder(SyncCursedEnergyTraitS2CPacket::decode)
+                .consumerMainThread(SyncCursedEnergyTraitS2CPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(SyncStylizedDamageStylesRuleS2CPacket.class, packetId++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(SyncStylizedDamageStylesRuleS2CPacket::encode)
+                .decoder(SyncStylizedDamageStylesRuleS2CPacket::decode)
+                .consumerMainThread(SyncStylizedDamageStylesRuleS2CPacket::handle)
+                .add();
         CHANNEL.messageBuilder(SyncSkillLevelsS2CPacket.class, packetId++, NetworkDirection.PLAY_TO_CLIENT)
                 .encoder(SyncSkillLevelsS2CPacket::encode)
                 .decoder(SyncSkillLevelsS2CPacket::decode)
@@ -655,9 +667,9 @@ public final class ModNetwork
         CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new SyncSpNodesS2CPacket(nodeIds, quality));
     }
 
-    public static void sendSeLoadoutSync(ServerPlayer player, java.util.List<String> slots)
+    public static void sendSeLoadoutSync(ServerPlayer player, java.util.Map<String, com.darkness.jujutsukaisenzone.player.SeEquippedEntry> entries)
     {
-        CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new SyncSeLoadoutS2CPacket(slots));
+        CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new SyncSeLoadoutS2CPacket(entries));
     }
 
     public static void sendSkillLevelsSync(ServerPlayer player, java.util.Map<String, Integer> levelTags)
@@ -702,14 +714,37 @@ public final class ModNetwork
         CHANNEL.send(PacketDistributor.SERVER.noArg(), new ResetSpNodesC2SPacket());
     }
 
-    public static void sendEquipSeRequest(int slot, String seId)
+    public static void sendEquipSeRequest(String seId)
     {
-        CHANNEL.send(PacketDistributor.SERVER.noArg(), new EquipSeC2SPacket(slot, seId));
+        sendEquipSeRequest(seId, -1);
     }
 
-    public static void sendUnequipSeRequest(int slot)
+    public static void sendEquipSeRequest(String seId, int inventorySlot)
     {
-        CHANNEL.send(PacketDistributor.SERVER.noArg(), new UnequipSeC2SPacket(slot));
+        CHANNEL.send(PacketDistributor.SERVER.noArg(), new EquipSeC2SPacket(seId, inventorySlot));
+    }
+
+    public static void sendUnequipSeRequest(String seId)
+    {
+        CHANNEL.send(PacketDistributor.SERVER.noArg(), new UnequipSeC2SPacket(seId));
+    }
+
+    public static void sendCursedEnergyTraitSync(ServerPlayer player, String traitId)
+    {
+        CHANNEL.send(PacketDistributor.PLAYER.with(() -> player),
+                new SyncCursedEnergyTraitS2CPacket(traitId == null ? "" : traitId));
+    }
+
+    public static void syncStylizedDamageStylesRule(ServerPlayer player, boolean enabled)
+    {
+        CHANNEL.send(PacketDistributor.PLAYER.with(() -> player),
+                new SyncStylizedDamageStylesRuleS2CPacket(enabled));
+    }
+
+    public static void syncStylizedDamageStylesRuleToAll(boolean enabled)
+    {
+        CHANNEL.send(PacketDistributor.ALL.noArg(),
+                new SyncStylizedDamageStylesRuleS2CPacket(enabled));
     }
 
     public static void sendAerialMultiJumpRequest()

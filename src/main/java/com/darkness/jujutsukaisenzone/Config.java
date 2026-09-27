@@ -1,6 +1,12 @@
 package com.darkness.jujutsukaisenzone;
 
+import com.darkness.jujutsukaisenzone.entity.data.LimitlessBlueConfig;
+import com.darkness.jujutsukaisenzone.entity.data.LimitlessRedConfig;
+import com.darkness.jujutsukaisenzone.entity.data.LimitlessRemoteMurasakiConfig;
+import com.darkness.jujutsukaisenzone.entity.data.ShrineHachiConfig;
+import com.darkness.jujutsukaisenzone.entity.data.ShrineKaiConfig;
 import com.darkness.jujutsukaisenzone.technique.config.SkillCombatConfigRegistry;
+import com.darkness.jujutsukaisenzone.technique.scaling.ShrineDomainSkillGrowth;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
 import net.minecraftforge.common.ForgeConfigSpec;
@@ -173,8 +179,26 @@ public class Config
             .defineInRange("combatPower.reverseTechniqueBonus", 10.0D, 0.0D, 100000.0D);
 
     private static final ForgeConfigSpec.DoubleValue COMBAT_POWER_INTEL_PER_LEVEL = BUILDER
-            .comment("每点术式情报提供的术式强度")
-            .defineInRange("combatPower.intelPerLevel", 2.0D, 0.0D, 100000.0D);
+            .comment("每点术式情报提供的术式强度（线性段；过软顶后见 intelSoftScale）")
+            .defineInRange("combatPower.intelPerLevel", 0.5D, 0.0D, 100000.0D);
+
+    private static final ForgeConfigSpec.IntValue COMBAT_POWER_INTEL_SOFT_CAP = BUILDER
+            .comment("术式情报软顶：加情报前的术式强度达到本值后，继续用情报堆强度改为对数衰减。0=关闭软顶")
+            .defineInRange("combatPower.intelSoftCap", 2000, 0, 1000000);
+
+    private static final ForgeConfigSpec.DoubleValue COMBAT_POWER_INTEL_SOFT_SCALE = BUILDER
+            .comment("术式情报软顶曲率 S：过顶后 excessPower = rate*S*ln(1+excessIntel/S)；S越大越钝")
+            .defineInRange("combatPower.intelSoftScale", 200.0D, 0.001D, 1000000.0D);
+
+    // ======== SE 术式侵入（统一质量池） ========
+
+    private static final ForgeConfigSpec.IntValue SE_QUALITY_ALLOWANCE = BUILDER
+            .comment("质量宽限：占用超出上限后还允许多占多少。宽限内的超出不吃超载罚，超过宽限则拒绝装载")
+            .defineInRange("se.qualityAllowance", 2, 0, 64);
+
+    private static final ForgeConfigSpec.IntValue SE_OVERLOAD_POWER_PENALTY_PER_POINT = BUILDER
+            .comment("质量超载罚：每超出上限 1 点质量，体术强度与术式强度各扣多少点")
+            .defineInRange("se.overloadPowerPenaltyPerPoint", 2, 0, 1000);
 
     // ======== 防御面板（护甲 / 体术抗性 / 术式抗性） ========
 
@@ -331,72 +355,99 @@ public class Config
             .comment("技能数值成长基准咒术等级（1=四级，2=三级，依此类推）")
             .defineInRange("skillCombat.baselineGrade", 1, 1, 10);
 
+    /*
+     * ⛔ 这里的 default 一律引用 *Config / *SkillGrowth 上的常量，不要写数字字面量。
+     * 同一批数值原本在「常量类」「本文件 default」「SkillCombatConfigRegistry#buildCodeDefaults」
+     * 三处各写一遍，改一处不会报错也不会生效——现在只有常量类那一处手写，其余全是引用。
+     * 新增 skillCombat 项时同样先加常量、再回来引用。
+     */
+
     private static final ForgeConfigSpec.DoubleValue LIMITLESS_BLUE_DAMAGE_BASELINE = BUILDER
             .comment("苍：伤害基准值")
-            .defineInRange("skillCombat.limitlessBlue.damageBaseline", 8.0D, 0.0D, 10000.0D);
+            .defineInRange("skillCombat.limitlessBlue.damageBaseline",
+                    LimitlessBlueConfig.DAMAGE, 0.0D, 10000.0D);
     private static final ForgeConfigSpec.DoubleValue LIMITLESS_BLUE_DAMAGE_PER_RANK = BUILDER
             .comment("苍：伤害每升一级咒术等级的增量")
-            .defineInRange("skillCombat.limitlessBlue.damagePerRank", 2.0D, 0.0D, 10000.0D);
+            .defineInRange("skillCombat.limitlessBlue.damagePerRank",
+                    LimitlessBlueConfig.DAMAGE_PER_RANK, 0.0D, 10000.0D);
     private static final ForgeConfigSpec.DoubleValue LIMITLESS_BLUE_PULL_RADIUS_BASELINE = BUILDER
             .comment("苍：吸附半径基准值（格）")
-            .defineInRange("skillCombat.limitlessBlue.pullRadiusBaseline", 20.0D, 0.0D, 10000.0D);
+            .defineInRange("skillCombat.limitlessBlue.pullRadiusBaseline",
+                    LimitlessBlueConfig.PULL_RADIUS, 0.0D, 10000.0D);
     private static final ForgeConfigSpec.DoubleValue LIMITLESS_BLUE_PULL_RADIUS_PER_RANK = BUILDER
             .comment("苍：吸附半径每升一级咒术等级的增量")
-            .defineInRange("skillCombat.limitlessBlue.pullRadiusPerRank", 1.0D, 0.0D, 10000.0D);
+            .defineInRange("skillCombat.limitlessBlue.pullRadiusPerRank",
+                    LimitlessBlueConfig.PULL_RADIUS_PER_RANK, 0.0D, 10000.0D);
 
     private static final ForgeConfigSpec.DoubleValue LIMITLESS_RED_EXPLOSION_POWER_BASELINE = BUILDER
             .comment("赫：爆炸威力基准值")
-            .defineInRange("skillCombat.limitlessRed.explosionPowerBaseline", 14.0D, 0.0D, 10000.0D);
+            .defineInRange("skillCombat.limitlessRed.explosionPowerBaseline",
+                    LimitlessRedConfig.ARROW_EXPLOSION_POWER, 0.0D, 10000.0D);
     private static final ForgeConfigSpec.DoubleValue LIMITLESS_RED_EXPLOSION_POWER_PER_RANK = BUILDER
             .comment("赫：爆炸威力每升一级咒术等级的增量")
-            .defineInRange("skillCombat.limitlessRed.explosionPowerPerRank", 2.0D, 0.0D, 10000.0D);
+            .defineInRange("skillCombat.limitlessRed.explosionPowerPerRank",
+                    LimitlessRedConfig.EXPLOSION_POWER_PER_RANK, 0.0D, 10000.0D);
     private static final ForgeConfigSpec.DoubleValue LIMITLESS_RED_KNOCKBACK_RADIUS_BASELINE = BUILDER
             .comment("赫：击飞范围基准值（格）")
-            .defineInRange("skillCombat.limitlessRed.knockbackRadiusBaseline", 18.0D, 0.0D, 10000.0D);
+            .defineInRange("skillCombat.limitlessRed.knockbackRadiusBaseline",
+                    LimitlessRedConfig.ARROW_KNOCKBACK_RADIUS, 0.0D, 10000.0D);
     private static final ForgeConfigSpec.DoubleValue LIMITLESS_RED_KNOCKBACK_RADIUS_PER_RANK = BUILDER
             .comment("赫：击飞范围每升一级咒术等级的增量")
-            .defineInRange("skillCombat.limitlessRed.knockbackRadiusPerRank", 0.0D, 0.0D, 10000.0D);
+            .defineInRange("skillCombat.limitlessRed.knockbackRadiusPerRank",
+                    LimitlessRedConfig.KNOCKBACK_RADIUS_PER_RANK, 0.0D, 10000.0D);
 
     private static final ForgeConfigSpec.DoubleValue LIMITLESS_REMOTE_MURASAKI_MAX_FLIGHT_CHUNKS_BASELINE = BUILDER
             .comment("超远程虚式茈：最大飞行距离基准值（区块数）")
-            .defineInRange("skillCombat.limitlessRemoteMurasaki.maxFlightChunksBaseline", 64.0D, 1.0D, 10000.0D);
+            .defineInRange("skillCombat.limitlessRemoteMurasaki.maxFlightChunksBaseline",
+                    LimitlessRemoteMurasakiConfig.MAX_FLIGHT_CHUNK_COUNT, 1.0D, 10000.0D);
     private static final ForgeConfigSpec.DoubleValue LIMITLESS_REMOTE_MURASAKI_MAX_FLIGHT_CHUNKS_PER_RANK = BUILDER
             .comment("超远程虚式茈：最大飞行距离每升一级咒术等级的增量（区块数）")
-            .defineInRange("skillCombat.limitlessRemoteMurasaki.maxFlightChunksPerRank", 0.0D, 0.0D, 10000.0D);
+            .defineInRange("skillCombat.limitlessRemoteMurasaki.maxFlightChunksPerRank",
+                    LimitlessRemoteMurasakiConfig.MAX_FLIGHT_CHUNK_COUNT_PER_RANK, 0.0D, 10000.0D);
 
     private static final ForgeConfigSpec.DoubleValue SHRINE_KAI_DAMAGE_BASELINE = BUILDER
             .comment("解挥砍：伤害基准值")
-            .defineInRange("skillCombat.shrineKai.damageBaseline", 10.0D, 0.0D, 10000.0D);
+            .defineInRange("skillCombat.shrineKai.damageBaseline",
+                    ShrineKaiConfig.COLUMN_DAMAGE, 0.0D, 10000.0D);
     private static final ForgeConfigSpec.DoubleValue SHRINE_KAI_DAMAGE_PER_RANK = BUILDER
             .comment("解挥砍：伤害每升一级咒术等级的增量")
-            .defineInRange("skillCombat.shrineKai.damagePerRank", 2.0D, 0.0D, 10000.0D);
+            .defineInRange("skillCombat.shrineKai.damagePerRank",
+                    ShrineKaiConfig.COLUMN_DAMAGE_PER_RANK, 0.0D, 10000.0D);
 
     private static final ForgeConfigSpec.DoubleValue SHRINE_KAI_FLYOBJ_DAMAGE_BASELINE = BUILDER
             .comment("解切割：伤害基准值")
-            .defineInRange("skillCombat.shrineKaiFlyobj.damageBaseline", 10.0D, 0.0D, 10000.0D);
+            .defineInRange("skillCombat.shrineKaiFlyobj.damageBaseline",
+                    ShrineKaiConfig.COLUMN_DAMAGE, 0.0D, 10000.0D);
     private static final ForgeConfigSpec.DoubleValue SHRINE_KAI_FLYOBJ_DAMAGE_PER_RANK = BUILDER
             .comment("解切割：伤害每升一级咒术等级的增量")
-            .defineInRange("skillCombat.shrineKaiFlyobj.damagePerRank", 2.0D, 0.0D, 10000.0D);
+            .defineInRange("skillCombat.shrineKaiFlyobj.damagePerRank",
+                    ShrineKaiConfig.COLUMN_DAMAGE_PER_RANK, 0.0D, 10000.0D);
 
     private static final ForgeConfigSpec.DoubleValue SHRINE_HACHI_DAMAGE_BASELINE = BUILDER
             .comment("捌：伤害基准值")
-            .defineInRange("skillCombat.shrineHachi.damageBaseline", 5.0D, 0.0D, 10000.0D);
+            .defineInRange("skillCombat.shrineHachi.damageBaseline",
+                    ShrineHachiConfig.DAMAGE, 0.0D, 10000.0D);
     private static final ForgeConfigSpec.DoubleValue SHRINE_HACHI_DAMAGE_PER_RANK = BUILDER
             .comment("捌：伤害每升一级咒术等级的增量")
-            .defineInRange("skillCombat.shrineHachi.damagePerRank", 2.0D, 0.0D, 10000.0D);
+            .defineInRange("skillCombat.shrineHachi.damagePerRank",
+                    ShrineHachiConfig.DAMAGE_PER_RANK, 0.0D, 10000.0D);
 
     private static final ForgeConfigSpec.DoubleValue SHRINE_DOMAIN_SLASH_DAMAGE_BASELINE = BUILDER
             .comment("伏魔神龛：斩击伤害基准值")
-            .defineInRange("skillCombat.shrineDomain.slashDamageBaseline", 3.0D, 0.0D, 10000.0D);
+            .defineInRange("skillCombat.shrineDomain.slashDamageBaseline",
+                    ShrineDomainSkillGrowth.BASELINE_SLASH_DAMAGE, 0.0D, 10000.0D);
     private static final ForgeConfigSpec.DoubleValue SHRINE_DOMAIN_SLASH_DAMAGE_PER_RANK = BUILDER
             .comment("伏魔神龛：斩击伤害每升一级咒术等级的增量")
-            .defineInRange("skillCombat.shrineDomain.slashDamagePerRank", 5.0D, 0.0D, 10000.0D);
+            .defineInRange("skillCombat.shrineDomain.slashDamagePerRank",
+                    ShrineDomainSkillGrowth.BASELINE_SLASH_DAMAGE_PER_RANK, 0.0D, 10000.0D);
     private static final ForgeConfigSpec.DoubleValue SHRINE_DOMAIN_POWER_SLASH_DAMAGE_BASELINE = BUILDER
             .comment("伏魔神龛：强力斩击伤害基准值")
-            .defineInRange("skillCombat.shrineDomain.powerSlashDamageBaseline", 6.0D, 0.0D, 10000.0D);
+            .defineInRange("skillCombat.shrineDomain.powerSlashDamageBaseline",
+                    ShrineDomainSkillGrowth.BASELINE_POWER_SLASH_DAMAGE, 0.0D, 10000.0D);
     private static final ForgeConfigSpec.DoubleValue SHRINE_DOMAIN_POWER_SLASH_DAMAGE_PER_RANK = BUILDER
             .comment("伏魔神龛：强力斩击伤害每升一级咒术等级的增量")
-            .defineInRange("skillCombat.shrineDomain.powerSlashDamagePerRank", 10.0D, 0.0D, 10000.0D);
+            .defineInRange("skillCombat.shrineDomain.powerSlashDamagePerRank",
+                    ShrineDomainSkillGrowth.BASELINE_POWER_SLASH_DAMAGE_PER_RANK, 0.0D, 10000.0D);
 
     static final ForgeConfigSpec SPEC = BUILDER.build();
 
@@ -470,6 +521,16 @@ public class Config
     public static double combatPowerHeavenlyPhysicalMultiplier;
     public static double combatPowerReverseTechniqueBonus;
     public static double combatPowerIntelPerLevel;
+    /** 0 = 关闭软顶。 */
+    public static int combatPowerIntelSoftCap;
+    public static double combatPowerIntelSoftScale;
+
+    // ======== SE 术式侵入（统一质量池） ========
+
+    /** 质量宽限：占用超出上限后还允许多占多少（超出部分才吃超载罚）。 */
+    public static int seQualityAllowance;
+    /** 质量超载罚：每超上限 1 点质量，体术 / 术式强度各扣多少点。 */
+    public static int seOverloadPowerPenaltyPerPoint;
 
     // ======== 防御面板 ========
 
@@ -599,6 +660,12 @@ public class Config
         combatPowerHeavenlyPhysicalMultiplier = COMBAT_POWER_HEAVENLY_MULTIPLIER.get();
         combatPowerReverseTechniqueBonus = COMBAT_POWER_REVERSE_TECHNIQUE_BONUS.get();
         combatPowerIntelPerLevel = COMBAT_POWER_INTEL_PER_LEVEL.get();
+        combatPowerIntelSoftCap = COMBAT_POWER_INTEL_SOFT_CAP.get();
+        combatPowerIntelSoftScale = COMBAT_POWER_INTEL_SOFT_SCALE.get();
+
+        // SE 术式侵入：统一质量池
+        seQualityAllowance = SE_QUALITY_ALLOWANCE.get();
+        seOverloadPowerPenaltyPerPoint = SE_OVERLOAD_POWER_PENALTY_PER_POINT.get();
 
         // 防御面板配置加载
         combatDefenseEnabled = COMBAT_DEFENSE_ENABLED.get();

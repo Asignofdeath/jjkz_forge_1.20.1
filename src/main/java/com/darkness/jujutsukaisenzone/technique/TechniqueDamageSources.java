@@ -13,12 +13,15 @@ import net.minecraft.world.damagesource.DamageType;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.Level;
+import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.event.entity.living.LivingKnockBackEvent;
+import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.IdentityHashMap;
+import java.util.Map;
 import java.util.function.Supplier;
 
 /**
@@ -119,6 +122,26 @@ public final class TechniqueDamageSources
      */
     public static final ResourceKey<DamageType> TECHNIQUE_DAMAGE_TYPE =
             ResourceKey.create(Registries.DAMAGE_TYPE, new ResourceLocation(JuJutsuKaisenZone.MODID, "technique"));
+    public static final ResourceKey<DamageType> MARTIAL_DAMAGE_TYPE =
+            ResourceKey.create(Registries.DAMAGE_TYPE, new ResourceLocation(JuJutsuKaisenZone.MODID, "martial"));
+    public static final ResourceKey<DamageType> COMPOSITE_DAMAGE_TYPE =
+            ResourceKey.create(Registries.DAMAGE_TYPE, new ResourceLocation(JuJutsuKaisenZone.MODID, "composite"));
+    public static final ResourceKey<DamageType> BLACK_FLASH_DAMAGE_TYPE =
+            ResourceKey.create(Registries.DAMAGE_TYPE, new ResourceLocation(JuJutsuKaisenZone.MODID, "black_flash"));
+
+    /** StylizedDamage 等按 {@link DamageSource#getMsgId()} 匹配；须与数据包 message_id 一致。 */
+    public static final String MSG_TECHNIQUE = "jjkz.technique";
+    public static final String MSG_MARTIAL = "jjkz.martial";
+    public static final String MSG_COMPOSITE = "jjkz.composite";
+    public static final String MSG_BLACK_FLASH = "jjkz.black_flash";
+
+    /**
+     * EF / 原版近战等无法换成 {@link NarrativeDamageSource} 时，把叙事 message_id 挂在 source 身份上。
+     * {@code DamageSourceMixin} 读这里，避免反射改 {@code private final type}（Java 16+ 常失败）。
+     * 只在单次 {@code hurt} → {@link LivingHurtEvent} 栈内存活，LOWEST 清空。
+     */
+    private static final ThreadLocal<IdentityHashMap<DamageSource, String>> DISPLAY_MSG_OVERRIDE =
+            ThreadLocal.withInitial(IdentityHashMap::new);
 
     /** 术式伤害类型的 holder 缓存：{@link Level#registryAccess()} 变了就重取（换存档 / 跨维度）。服务端单线程，无并发问题。 */
     private static Holder<DamageType> cachedTechniqueType;
@@ -152,6 +175,117 @@ public final class TechniqueDamageSources
     public static DamageSource techniqueSource(Level level, @Nullable LivingEntity owner)
     {
         return new DamageSource(techniqueType(level), null, owner);
+    }
+
+    /**
+     * 构造一次带叙事分型 message_id 的伤害源。
+     * <p>
+     * 战斗标签仍用 {@link #TECHNIQUE_DAMAGE_TYPE}（与旧 {@link #techniqueSource} 一致：穿甲 / 无视盾），
+     * 仅覆盖 {@link DamageSource#getMsgId()}，供跳字模组区分体术 / 术式 / 复合。
+     */
+    public static DamageSource narrativeSource(Level level, @Nullable LivingEntity owner, SkillDamageType damageType)
+    {
+        return new NarrativeDamageSource(techniqueType(level), null, owner, msgIdFor(damageType));
+    }
+
+    public static String msgIdFor(SkillDamageType damageType)
+    {
+        if (damageType == null)
+        {
+            return MSG_TECHNIQUE;
+        }
+        return switch (damageType)
+        {
+            case MARTIAL -> MSG_MARTIAL;
+            case COMPOSITE -> MSG_COMPOSITE;
+            case TECHNIQUE -> MSG_TECHNIQUE;
+        };
+    }
+
+    /**
+     * 给已有 {@link DamageSource} 挂叙事 message_id（EF 近战 / 黑闪等无法重建 source 的通道）。
+     * 对象身份不变（{@code instanceof EpicFightDamageSource} 仍成立）；
+     * 实际改写的是 {@link #peekDisplayMsgId}，由 Mixin 注入 {@link DamageSource#getMsgId()}。
+     */
+    public static void projectDisplayType(DamageSource source, Level level, ResourceKey<DamageType> displayType)
+    {
+        if (!com.darkness.jujutsukaisenzone.gameplay.ModRules.StylizedDamageStyles.isEnabled())
+        {
+            return;
+        }
+        if (source == null || displayType == null)
+        {
+            return;
+        }
+        if (source instanceof NarrativeDamageSource)
+        {
+            return;
+        }
+        String msgId = messageIdOf(displayType);
+        if (msgId != null)
+        {
+            DISPLAY_MSG_OVERRIDE.get().put(source, msgId);
+        }
+    }
+
+    public static void projectDisplayType(DamageSource source, Level level, SkillDamageType damageType)
+    {
+        if (damageType == null)
+        {
+            return;
+        }
+        ResourceKey<DamageType> key = switch (damageType)
+        {
+            case MARTIAL -> MARTIAL_DAMAGE_TYPE;
+            case COMPOSITE -> COMPOSITE_DAMAGE_TYPE;
+            case TECHNIQUE -> TECHNIQUE_DAMAGE_TYPE;
+        };
+        projectDisplayType(source, level, key);
+    }
+
+    @Nullable
+    private static String messageIdOf(ResourceKey<DamageType> key)
+    {
+        if (MARTIAL_DAMAGE_TYPE.equals(key))
+        {
+            return MSG_MARTIAL;
+        }
+        if (TECHNIQUE_DAMAGE_TYPE.equals(key))
+        {
+            return MSG_TECHNIQUE;
+        }
+        if (COMPOSITE_DAMAGE_TYPE.equals(key))
+        {
+            return MSG_COMPOSITE;
+        }
+        if (BLACK_FLASH_DAMAGE_TYPE.equals(key))
+        {
+            return MSG_BLACK_FLASH;
+        }
+        return null;
+    }
+
+    /** Mixin 用：当前 source 若被 {@link #projectDisplayType} 投影过，返回叙事 message_id。 */
+    @Nullable
+    public static String peekDisplayMsgId(DamageSource source)
+    {
+        if (source == null)
+        {
+            return null;
+        }
+        Map<DamageSource, String> map = DISPLAY_MSG_OVERRIDE.get();
+        return map.isEmpty() ? null : map.get(source);
+    }
+
+    /** {@link LivingHurtEvent} 结束后清掉投影，避免 ThreadLocal 脏数据。 */
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public static void clearDisplayMsgOverride(LivingHurtEvent event)
+    {
+        IdentityHashMap<DamageSource, String> map = DISPLAY_MSG_OVERRIDE.get();
+        if (!map.isEmpty())
+        {
+            map.clear();
+        }
     }
 
     /**
@@ -190,8 +324,8 @@ public final class TechniqueDamageSources
     /**
      * 对目标造成一次指定分型的伤害。
      * <p>
-     * 分型只是「随伤害带出去的元数据」：不改伤害类型（依旧复用 {@code MAGIC} 的
-     * {@link DamageSource#typeHolder()}）、不改穿甲 / 抗性 / 盾牌语义，仅在结算期间写入
+     * 分型写入 {@link #ACTIVE_DAMAGE_TYPE} 供乘区管线使用；跳字侧通过 {@link NarrativeDamageSource}
+     * 投影 message_id。穿甲 / 盾牌语义仍用 {@link #TECHNIQUE_DAMAGE_TYPE}，仅在结算期间写入
      * {@link #ACTIVE_DAMAGE_TYPE}，供乘区管线（{@code TechniqueDamageZoneEvents}）按分型挑加成。
      * <p>
      * ⚠️ <b>强度面板换算在这里统一完成</b>：调用方一律传「四级基准点数」（就是原来写死的那个数，
@@ -215,7 +349,9 @@ public final class TechniqueDamageSources
         try
         {
             return callWithType(damageType, () -> {
-                DamageSource source = techniqueSource(target.level(), owner);
+                DamageSource source = com.darkness.jujutsukaisenzone.gameplay.ModRules.StylizedDamageStyles.isEnabled()
+                        ? narrativeSource(target.level(), owner, damageType)
+                        : techniqueSource(target.level(), owner);
                 if (owner == null)
                 {
                     return target.hurt(source, resolvedAmount);

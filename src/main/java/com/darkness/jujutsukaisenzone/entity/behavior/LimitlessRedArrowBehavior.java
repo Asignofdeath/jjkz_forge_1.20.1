@@ -31,6 +31,7 @@ public class LimitlessRedArrowBehavior extends EffectBehavior
     private boolean allowOwnerKnockback;
     private boolean exploded;
     private int postExplosionLifeTicks = -1;
+    // jjkz-config-default-ok: configure() / readFromNbt() 必定覆盖；这只是构造到二者之间的占位
     private float explosionPower = LimitlessRedConfig.ARROW_EXPLOSION_POWER;
     private Vec3 velocity = Vec3.ZERO;
 
@@ -203,9 +204,10 @@ public class LimitlessRedArrowBehavior extends EffectBehavior
         this.postExplosionLifeTicks = tag.contains("PostExplosionLife") ? tag.getInt("PostExplosionLife") : -1;
         this.velocity = new Vec3(tag.getDouble("VelX"), tag.getDouble("VelY"), tag.getDouble("VelZ"));
         this.allowOwnerKnockback = tag.getBoolean("AllowOwnerKnockback");
+        // 老存档缺 ExplosionPower 键时的兜底：此处拿不到 level/owner，无法走 LimitlessRedSkillGrowth 解析。
         this.explosionPower = tag.contains("ExplosionPower")
                 ? tag.getFloat("ExplosionPower")
-                : LimitlessRedConfig.ARROW_EXPLOSION_POWER;
+                : LimitlessRedConfig.ARROW_EXPLOSION_POWER; // jjkz-config-default-ok
         this.ownerUuid = tag.hasUUID("Owner") ? tag.getUUID("Owner") : null;
     }
 }

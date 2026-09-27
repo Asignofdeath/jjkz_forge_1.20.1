@@ -3,6 +3,7 @@ package com.darkness.jujutsukaisenzone.client.gui.technique;
 import com.darkness.jujutsukaisenzone.network.ModNetwork;
 import com.darkness.jujutsukaisenzone.player.PlayerSpData;
 import com.darkness.jujutsukaisenzone.player.PlayerSpNodeData;
+import com.darkness.jujutsukaisenzone.player.PlayerQualityPoolData;
 import com.darkness.jujutsukaisenzone.technique.development.SpNodeRegistry;
 import com.lowdragmc.lowdraglib.gui.widget.Widget;
 import com.lowdragmc.lowdraglib.utils.Position;
@@ -43,7 +44,10 @@ public final class SpNodePanelWidget extends Widget
     private static final int COLOR_RESET = 0xFF5A3A3A;
     private static final int COLOR_RESET_HOVER = 0xFF7A4A4A;
 
+    private static final String HELP_LANG_KEY = "gui.jujutsukaisenzone.sp_node.help";
+
     private final List<Hit> hits = new ArrayList<>();
+    private final List<PanelHelpIcon.Hit> helpHits = new ArrayList<>();
     private int resetLeft;
     private int resetTop;
     private int resetRight;
@@ -68,11 +72,13 @@ public final class SpNodePanelWidget extends Widget
     {
         super.drawInBackground(graphics, mouseX, mouseY, partialTicks);
         hits.clear();
+        helpHits.clear();
 
         Minecraft minecraft = Minecraft.getInstance();
         LocalPlayer player = minecraft.player;
         if (player == null)
         {
+            setHoverTooltips(List.of());
             return;
         }
 
@@ -97,15 +103,22 @@ public final class SpNodePanelWidget extends Widget
         int bottom = top + height - BOTTOM_HINT - PADDING;
 
         int available = PlayerSpData.getAvailable(player);
-        int unlocked = PlayerSpNodeData.unlockedCount(player);
-        int quality = PlayerSpNodeData.getQuality(player);
+        // 质量是权重和（Σ spCost），并且与 SE 共用同一个池 —— 显示占用 / 上限（+宽限）。
+        int qualityOccupied = PlayerQualityPoolData.occupied(player);
+        int qualityCap = PlayerQualityPoolData.cap(player);
+        int qualityAllowance = PlayerQualityPoolData.allowance();
         int phys = PlayerSpNodeData.sumPhysicalBonus(player);
         int tech = PlayerSpNodeData.sumTechniqueBonus(player);
 
-        graphics.drawString(font, tr("header.sp"), x, y, COLOR_LABEL, false);
-        graphics.drawString(font, Integer.toString(available), x + font.width(tr("header.sp")) + 6, y, COLOR_VALUE, false);
+        String spHeader = tr("header.sp");
+        graphics.drawString(font, spHeader, x, y, COLOR_LABEL, false);
+        PanelHelpIcon.drawAfterLabel(graphics, font, spHeader, x, y, mouseX, mouseY,
+                HELP_LANG_KEY, helpHits);
+        int spValueX = x + PanelHelpIcon.labelWithHelpWidth(font, spHeader, true) + 6;
+        graphics.drawString(font, Integer.toString(available), spValueX, y, COLOR_VALUE, false);
         y += LINE_HEIGHT;
-        graphics.drawString(font, tr("header.slots", unlocked, quality), x, y, COLOR_LABEL, false);
+        String qualityHeader = tr("header.quality", qualityOccupied, qualityCap, qualityAllowance);
+        graphics.drawString(font, qualityHeader, x, y, COLOR_LABEL, false);
         y += LINE_HEIGHT;
         graphics.drawString(font, tr("header.bonus", phys, tech), x, y, COLOR_SECTION, false);
         y += LINE_HEIGHT + 4;
@@ -153,6 +166,16 @@ public final class SpNodePanelWidget extends Widget
                 resetHover ? COLOR_RESET_HOVER : COLOR_RESET);
         graphics.drawString(font, resetLabel, resetLeft + 8, resetTop + 4, COLOR_VALUE, false);
         graphics.drawString(font, tr("hint"), left + PADDING, resetTop + 4, COLOR_HINT, false);
+
+        String hoverKey = PanelHelpIcon.findHoverKey(helpHits, mouseX, mouseY);
+        if (hoverKey != null)
+        {
+            setHoverTooltips(PanelHelpIcon.tooltipLines(hoverKey));
+        }
+        else
+        {
+            setHoverTooltips(List.of());
+        }
     }
 
     @Override

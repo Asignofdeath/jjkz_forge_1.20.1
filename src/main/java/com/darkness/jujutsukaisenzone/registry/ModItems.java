@@ -209,6 +209,12 @@ public final class ModItems
             () -> new CursedObjectItem(new Item.Properties().stacksTo(64), "裂痕累累的骨灰盒", CursedObjectGrade.SPECIAL)
     );
 
+    /** 咒物：欠けた俎板（御厨子专用 SE「收刀」载体） */
+    public static final RegistryObject<Item> CURSED_OBJECT_CHIPPED_CUTTING_BOARD = ITEMS.register(
+            "cursed_object_chipped_cutting_board",
+            () -> new CursedObjectItem(new Item.Properties().stacksTo(64), "缺口的俎板", CursedObjectGrade.RARE)
+    );
+
     /** 咒物：両面宿儺の指 */
     public static final RegistryObject<Item> CURSED_OBJECT_SUKUNA_FINGER = ITEMS.register(
             "cursed_object_sukuna_finger",

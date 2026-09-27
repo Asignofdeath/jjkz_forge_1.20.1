@@ -613,6 +613,17 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
         ACTIVE_DOMAINS.put(player.getUUID(), kept);
     }
 
+    /**
+     * 该玩家是否仍持有本实现下的活跃领域（含展开动画中）。
+     * <p>
+     * 领域主人在维持领域期间应停掉领域量表灌充；展开动画尚未完成时同样算「在领域中」。
+     */
+    public boolean hasActiveDomain(ServerPlayer owner)
+    {
+        Deque<BarrierInstance> queue = ACTIVE_DOMAINS.get(owner.getUUID());
+        return queue != null && !queue.isEmpty();
+    }
+
     @Override
     public boolean isPositionInBarrier(ServerLevel level, BlockPos pos)
     {

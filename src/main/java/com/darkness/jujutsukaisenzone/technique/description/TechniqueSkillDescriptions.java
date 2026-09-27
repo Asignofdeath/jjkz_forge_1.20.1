@@ -13,6 +13,7 @@ import com.darkness.jujutsukaisenzone.technique.SkillDamageResolver;
 import com.darkness.jujutsukaisenzone.technique.scaling.LimitlessBlueSkillGrowth;
 import com.darkness.jujutsukaisenzone.technique.scaling.LimitlessPurpleSkillGrowth;
 import com.darkness.jujutsukaisenzone.technique.scaling.LimitlessRedSkillGrowth;
+import com.darkness.jujutsukaisenzone.technique.scaling.ShrineSkillGrowth;
 import com.darkness.jujutsukaisenzone.player.JudgmentTrialTargetData;
 import com.darkness.jujutsukaisenzone.technique.skill.JudgmentAccuseSkillLogic;
 import com.darkness.jujutsukaisenzone.technique.skill.JudgmentTrialSkillLogic;
@@ -194,7 +195,7 @@ public final class TechniqueSkillDescriptions
                 (player, techniqueId, skill) -> new Object[] {
                         TechniqueSkillStatFormat.formatNumber(LimitlessBlueConfig.DAMAGE_RADIUS),
                         Integer.toString(LimitlessBlueConfig.DAMAGE_INTERVAL),
-                        SkillDamageResolver.ratioText(LimitlessBlueConfig.DAMAGE),
+                        SkillDamageResolver.ratioText(LimitlessBlueSkillGrowth.damage(player)),
                         TechniqueSkillStatFormat.formatNumber(LimitlessBlueSkillGrowth.pullRadius(player))
                 });
 
@@ -228,11 +229,16 @@ public final class TechniqueSkillDescriptions
 
     private static void registerShrineSkills()
     {
+        /*
+         * ⛔ 伤害文案一律走 *SkillGrowth（配置解析后的真值），不要读 *Config 上的常量：
+         * 常量只是 Forge 配置项的默认值，玩家改了 skillCombat 之后文案会与实际伤害对不上。
+         * 几何 / 时长一类不在配置里的参数才直接读常量。
+         */
         TechniqueSkillDescriptionRegistry.register(
                 ShrineTechniqueSkillSet.SKILL_KAI,
                 (player, techniqueId, skill) -> new Object[] {
                         TechniqueSkillStatFormat.formatNumber(ShrineKaiConfig.COLUMN_RADIUS),
-                        SkillDamageResolver.ratioText(ShrineKaiConfig.COLUMN_DAMAGE)
+                        SkillDamageResolver.ratioText(ShrineSkillGrowth.kaiColumnDamage(player))
                 });
 
         TechniqueSkillDescriptionRegistry.register(
@@ -240,7 +246,7 @@ public final class TechniqueSkillDescriptions
                 (player, techniqueId, skill) -> new Object[] {
                         TechniqueSkillStatFormat.formatNumber(ShrineKaiConfig.FLYOBJ_MAX_RANGE),
                         TechniqueSkillStatFormat.formatNumber(ShrineKaiConfig.COLUMN_RADIUS),
-                        SkillDamageResolver.ratioText(ShrineKaiConfig.COLUMN_DAMAGE)
+                        SkillDamageResolver.ratioText(ShrineSkillGrowth.kaiFlyobjColumnDamage(player))
                 });
 
         TechniqueSkillDescriptionRegistry.register(
@@ -248,7 +254,7 @@ public final class TechniqueSkillDescriptions
                 (player, techniqueId, skill) -> new Object[] {
                         TechniqueSkillStatFormat.formatNumber(2.0D),
                         Integer.toString(ShrineHachiConfig.DAMAGE_INTERVAL),
-                        SkillDamageResolver.ratioText(ShrineHachiConfig.DAMAGE)
+                        SkillDamageResolver.ratioText(ShrineSkillGrowth.hachiDamage(player))
                 });
 
         TechniqueSkillDescriptionRegistry.register(

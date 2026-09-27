@@ -91,7 +91,27 @@ public final class MobCombatStatsReloadListener extends SimpleJsonResourceReload
                 readPoint(json, "physical_resistance"),
                 readPoint(json, "technique_resistance"),
                 readPoint(json, "physical_penetration"),
-                readPoint(json, "technique_penetration"));
+                readPoint(json, "technique_penetration"),
+                parsePoise(json));
+    }
+
+    /**
+     * 解析可选的 {@code poise} 块。返回 {@code null} 表示<b>没写</b>——
+     * 与「写了 value: 0」（显式关闭）是两回事，调用方靠 {@link MobCombatStats#hasPoiseBlock()} 区分。
+     */
+    private static PoiseStats parsePoise(JsonObject json)
+    {
+        if (!json.has("poise") || !json.get("poise").isJsonObject())
+        {
+            return null;
+        }
+        JsonObject block = json.getAsJsonObject("poise");
+        return new PoiseStats(
+                readDouble(block, "value", 0.0D),
+                readDouble(block, "regen", PoiseStats.DEFAULT_REGEN),
+                readDouble(block, "damage_reduction", PoiseStats.REDUCTION_DERIVED),
+                readBool(block, "specialized", true),
+                readDouble(block, "resistance", PoiseStats.DEFAULT_POISE_RESISTANCE));
     }
 
     private static double readPoint(JsonObject json, String key)
@@ -101,5 +121,23 @@ public final class MobCombatStatsReloadListener extends SimpleJsonResourceReload
             return 0.0D;
         }
         return GsonHelper.getAsDouble(json, key);
+    }
+
+    private static double readDouble(JsonObject json, String key, double fallback)
+    {
+        if (!json.has(key) || !json.get(key).isJsonPrimitive())
+        {
+            return fallback;
+        }
+        return GsonHelper.getAsDouble(json, key, fallback);
+    }
+
+    private static boolean readBool(JsonObject json, String key, boolean fallback)
+    {
+        if (!json.has(key) || !json.get(key).isJsonPrimitive())
+        {
+            return fallback;
+        }
+        return GsonHelper.getAsBoolean(json, key, fallback);
     }
 }

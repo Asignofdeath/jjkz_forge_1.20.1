@@ -25,6 +25,9 @@ import com.darkness.jujutsukaisenzone.player.PlayerTechniqueIntelData;
 import com.darkness.jujutsukaisenzone.player.PlayerSpData;
 import com.darkness.jujutsukaisenzone.player.PlayerSpNodeData;
 import com.darkness.jujutsukaisenzone.player.PlayerSeLoadoutData;
+import com.darkness.jujutsukaisenzone.player.CursedEnergyTrait;
+import com.darkness.jujutsukaisenzone.player.PlayerCursedEnergyTraitData;
+import com.darkness.jujutsukaisenzone.player.PlayerQualityPoolData;
 import com.darkness.jujutsukaisenzone.technique.development.SpNodeRegistry;
 import com.darkness.jujutsukaisenzone.technique.se.SeEffectRegistry;
 import com.darkness.jujutsukaisenzone.player.BarrierTechniqueLevel;
@@ -36,6 +39,7 @@ import com.darkness.jujutsukaisenzone.player.StrengthenTechniqueLevel;
 import com.darkness.jujutsukaisenzone.technique.DomainExpansionServerLogic;
 import com.darkness.jujutsukaisenzone.technique.domain.JudgmentDomainTrialLogic;
 import com.darkness.jujutsukaisenzone.network.ModNetwork;
+import com.darkness.jujutsukaisenzone.compat.StylizedDamageIntegrationRegistrar;
 import com.darkness.jujutsukaisenzone.registry.ModEntities;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
@@ -150,6 +154,7 @@ public final class JjkzCommands
                         .then(buildSpCheatBranch())
                         .then(buildSpNodeCheatBranch())
                         .then(buildSeCheatBranch())
+                        .then(buildTraitCheatBranch())
                         .then(buildBarrierTechniqueCheatBranch())
                         .then(buildSeanceTechniqueCheatBranch())
                         .then(buildStrengthenTechniqueCheatBranch())
@@ -407,8 +412,9 @@ public final class JjkzCommands
                                     String nodeId = StringArgumentType.getString(ctx, "nodeId");
                                     var result = PlayerSpNodeData.tryUnlock(player, nodeId);
                                     player.sendSystemMessage(Component.literal("SP节点解锁结果: " + result
-                                            + "（已点 " + PlayerSpNodeData.unlockedCount(player)
-                                            + "/" + PlayerSpNodeData.getQuality(player) + "）"));
+                                            + "（质量 " + PlayerQualityPoolData.occupied(player)
+                                            + "/" + PlayerQualityPoolData.cap(player)
+                                            + "，宽限 +" + PlayerQualityPoolData.allowance() + "）"));
                                     return result == PlayerSpNodeData.SpNodeUnlockResult.SUCCESS ? 1 : 0;
                                 })))
                 .then(Commands.literal("reset")
@@ -427,7 +433,8 @@ public final class JjkzCommands
                                     ServerPlayer player = ctx.getSource().getPlayerOrException();
                                     int value = IntegerArgumentType.getInteger(ctx, "value");
                                     PlayerSpNodeData.setQuality(player, value);
-                                    player.sendSystemMessage(Component.literal("SP 节点质量上限设为 " + value));
+                                    player.sendSystemMessage(Component.literal("质量上限设为 " + value
+                                            + "（SP 节点与 SE 共用这个池，宽限 +" + PlayerQualityPoolData.allowance() + "）"));
                                     return 1;
                                 })))
                 .then(Commands.literal("list")
@@ -451,41 +458,101 @@ public final class JjkzCommands
         return Commands.literal("se")
                 .requires(source -> source.hasPermission(2))
                 .then(Commands.literal("equip")
-                        .then(Commands.argument("slot", IntegerArgumentType.integer(0, PlayerSeLoadoutData.SLOT_COUNT - 1))
-                                .then(Commands.argument("seId", StringArgumentType.word())
-                                        .executes(ctx ->
-                                        {
-                                            ServerPlayer player = ctx.getSource().getPlayerOrException();
-                                            int slot = IntegerArgumentType.getInteger(ctx, "slot");
-                                            String seId = StringArgumentType.getString(ctx, "seId");
-                                            var result = PlayerSeLoadoutData.tryEquip(player, slot, seId);
-                                            player.sendSystemMessage(Component.literal(
-                                                    "SE 装备结果: " + result + " 槽位=" + PlayerSeLoadoutData.getSlots(player)));
-                                            return result == PlayerSeLoadoutData.SeEquipResult.SUCCESS ? 1 : 0;
-                                        }))))
-                .then(Commands.literal("unequip")
-                        .then(Commands.argument("slot", IntegerArgumentType.integer(0, PlayerSeLoadoutData.SLOT_COUNT - 1))
+                        .then(Commands.argument("seId", StringArgumentType.word())
                                 .executes(ctx ->
                                 {
                                     ServerPlayer player = ctx.getSource().getPlayerOrException();
-                                    int slot = IntegerArgumentType.getInteger(ctx, "slot");
-                                    var result = PlayerSeLoadoutData.tryUnequip(player, slot);
+                                    String seId = StringArgumentType.getString(ctx, "seId");
+                                    var result = PlayerSeLoadoutData.tryEquip(player, seId);
                                     player.sendSystemMessage(Component.literal(
-                                            "SE 卸下结果: " + result + " 槽位=" + PlayerSeLoadoutData.getSlots(player)));
+                                            "SE 装载结果: " + result
+                                                    + " 已装载=" + PlayerSeLoadoutData.getEquippedIds(player)
+                                                    + " 质量=" + PlayerQualityPoolData.occupied(player)
+                                                    + "/" + PlayerQualityPoolData.cap(player)
+                                                    + "（宽限 +" + PlayerQualityPoolData.allowance() + "）"));
+                                    return result == PlayerSeLoadoutData.SeEquipResult.SUCCESS ? 1 : 0;
+                                })))
+                .then(Commands.literal("unequip")
+                        .then(Commands.argument("seId", StringArgumentType.word())
+                                .executes(ctx ->
+                                {
+                                    ServerPlayer player = ctx.getSource().getPlayerOrException();
+                                    String seId = StringArgumentType.getString(ctx, "seId");
+                                    var result = PlayerSeLoadoutData.tryUnequip(player, seId);
+                                    player.sendSystemMessage(Component.literal(
+                                            "SE 卸下结果: " + result
+                                                    + " 已装载=" + PlayerSeLoadoutData.getEquippedIds(player)));
                                     return result == PlayerSeLoadoutData.SeEquipResult.SUCCESS ? 1 : 0;
                                 })))
                 .then(Commands.literal("list")
                         .executes(ctx ->
                         {
                             ServerPlayer player = ctx.getSource().getPlayerOrException();
-                            player.sendSystemMessage(Component.literal("当前 SE 槽: " + PlayerSeLoadoutData.getSlots(player)));
+                            player.sendSystemMessage(Component.literal(
+                                    "当前已装载 SE: " + PlayerSeLoadoutData.getEquippedIds(player)));
+                            player.sendSystemMessage(Component.literal("质量占用 "
+                                    + PlayerQualityPoolData.occupied(player) + "/" + PlayerQualityPoolData.cap(player)
+                                    + "（宽限 +" + PlayerQualityPoolData.allowance()
+                                    + "，超载 " + PlayerQualityPoolData.overload(player) + "）"));
+                            player.sendSystemMessage(Component.literal(
+                                    "当前咒力特质: " + PlayerCursedEnergyTraitData.getTrait(player).id()));
                             for (var def : SeEffectRegistry.all())
                             {
                                 player.sendSystemMessage(Component.literal(
                                         "  " + def.seId() + " item=" + def.item()
                                                 + " trigger=" + def.trigger()
-                                                + " chance=" + def.procChance()));
+                                                + " quality=" + def.quality()
+                                                + " scope=" + def.scope()));
                             }
+                            for (var e : PlayerSeLoadoutData.getEquippedMap(player).entrySet())
+                            {
+                                var p = e.getValue().penalty;
+                                player.sendSystemMessage(Component.literal(
+                                        "  equipped " + e.getKey()
+                                                + " trait=" + e.getValue().traitId
+                                                + " penalty=" + p.stat().id()
+                                                + " -" + p.amount()));
+                            }
+                            return 1;
+                        }));
+    }
+
+    /**
+     * 咒力特质调试分支。
+     * <p>
+     * 特质是 SE 装载门卡（咒物实例随机特质须与玩家吻合）。
+     * 产生规则（觉醒随机 / 可洗）留给后续设计，这里只提供「直接指定」便于测装载链。
+     */
+    private static LiteralArgumentBuilder<CommandSourceStack> buildTraitCheatBranch()
+    {
+        return Commands.literal("trait")
+                .requires(source -> source.hasPermission(2))
+                .then(Commands.literal("set")
+                        .then(Commands.argument("trait", StringArgumentType.word())
+                                .suggests((ctx, builder) ->
+                                {
+                                    for (CursedEnergyTrait trait : CursedEnergyTrait.values())
+                                    {
+                                        builder.suggest(trait.id());
+                                    }
+                                    return builder.buildFuture();
+                                })
+                                .executes(ctx ->
+                                {
+                                    ServerPlayer player = ctx.getSource().getPlayerOrException();
+                                    String raw = StringArgumentType.getString(ctx, "trait");
+                                    CursedEnergyTrait trait = CursedEnergyTrait.byId(raw);
+                                    PlayerCursedEnergyTraitData.setTrait(player, trait);
+                                    player.sendSystemMessage(Component.literal(
+                                            "咒力特质设为 " + trait.id() + "（输入 " + raw + "）"));
+                                    return 1;
+                                })))
+                .then(Commands.literal("get")
+                        .executes(ctx ->
+                        {
+                            ServerPlayer player = ctx.getSource().getPlayerOrException();
+                            player.sendSystemMessage(Component.literal(
+                                    "当前咒力特质: " + PlayerCursedEnergyTraitData.getTrait(player).id()));
                             return 1;
                         }));
     }
@@ -1124,6 +1191,7 @@ public final class JjkzCommands
      *   <li>{@code aerialCombat} — 空战开关与模组检测</li>
      *   <li>{@code skillNoCooldown} / {@code 技能无冷却} — 术式技能无冷却</li>
      *   <li>{@code hungerConsumption} / {@code 饱食度} — 全局饱食度消耗倍率</li>
+     *   <li>{@code stylizedDamage} / {@code 跳字联动} — StylizedDamage 样式联动</li>
      * </ul>
      */
     private static LiteralArgumentBuilder<CommandSourceStack> buildModRulesBranch()
@@ -1140,6 +1208,9 @@ public final class JjkzCommands
                             "术式技能无冷却：" + (ModRules.SkillNoCooldown.isEnabled() ? "已开启" : "已关闭")), false);
                     source.sendSuccess(() -> Component.literal(
                             "饱食度消耗倍率：" + ModRules.HungerConsumption.getMode().zhLabel()), false);
+                    source.sendSuccess(() -> Component.literal(
+                            "StylizedDamage 跳字联动：" + (ModRules.StylizedDamageStyles.isEnabled() ? "已开启" : "已关闭")), false);
+                    source.sendSuccess(() -> Component.literal(ModRules.StylizedDamageStyles.serverStatusLine()), false);
                     return 1;
                 });
         root.then(buildModRulesAerialCombatBranch("aerialCombat"));
@@ -1148,6 +1219,8 @@ public final class JjkzCommands
         root.then(buildModRulesSkillNoCooldownBranch("技能无冷却"));
         root.then(buildModRulesHungerConsumptionBranch("hungerConsumption"));
         root.then(buildModRulesHungerConsumptionBranch("饱食度"));
+        root.then(buildModRulesStylizedDamageBranch("stylizedDamage"));
+        root.then(buildModRulesStylizedDamageBranch("跳字联动"));
         return root;
     }
 
@@ -1273,6 +1346,73 @@ public final class JjkzCommands
                     "饱食度消耗倍率（全服）：" + mode.zhLabel()), true);
             return 1;
         });
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> buildModRulesStylizedDamageBranch(String literal)
+    {
+        LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal(literal)
+                .requires(source -> source.hasPermission(Commands.LEVEL_GAMEMASTERS));
+        root.then(buildModRulesStylizedDamageSetBranch());
+        root.then(Commands.literal("check")
+                .executes(ctx -> executeModRulesStylizedDamageCheck(ctx.getSource().getPlayerOrException())));
+        root.executes(ctx -> executeModRulesStylizedDamageGet(ctx.getSource().getPlayerOrException()));
+        return root;
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> buildModRulesStylizedDamageSetBranch()
+    {
+        LiteralArgumentBuilder<CommandSourceStack> set = Commands.literal("set");
+        set.then(modRulesStylizedDamageLiteral("on", true));
+        set.then(modRulesStylizedDamageLiteral("off", false));
+        set.then(modRulesStylizedDamageLiteral("开启", true));
+        set.then(modRulesStylizedDamageLiteral("关闭", false));
+        return set;
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> modRulesStylizedDamageLiteral(String literal, boolean enabled)
+    {
+        return Commands.literal(literal).executes(ctx -> executeModRulesStylizedDamageSet(ctx.getSource(), enabled));
+    }
+
+    private static int executeModRulesStylizedDamageSet(CommandSourceStack source, boolean enabled)
+    {
+        String failure = ModRules.StylizedDamageStyles.trySetEnabled(enabled);
+        if (failure != null)
+        {
+            source.sendFailure(Component.literal(failure));
+            return 0;
+        }
+        StylizedDamageIntegrationRegistrar.registerStylesIfPresent();
+        ModNetwork.syncStylizedDamageStylesRuleToAll(enabled);
+        source.sendSuccess(() -> Component.literal("StylizedDamage 跳字联动：" + (enabled ? "已开启" : "已关闭")), true);
+        if (!enabled)
+        {
+            source.sendSuccess(() -> Component.literal("提示：关闭后停止投影叙事 ID；样式仍保留。对方 /stylizeddamage reload 后需再开一次或重进服以重建选择器。"), false);
+        }
+        return 1;
+    }
+
+    private static int executeModRulesStylizedDamageGet(ServerPlayer player)
+    {
+        player.sendSystemMessage(Component.literal(
+                "StylizedDamage 跳字联动：" + (ModRules.StylizedDamageStyles.isEnabled() ? "已开启" : "已关闭")));
+        player.sendSystemMessage(Component.literal(ModRules.StylizedDamageStyles.serverStatusLine()));
+        player.sendSystemMessage(Component.literal(ModRules.StylizedDamageStyles.playerStatusLine(player)));
+        if (ModRules.StylizedDamageStyles.isEnabled() && !ModRules.StylizedDamageStyles.hasPlayerMod(player))
+        {
+            player.sendSystemMessage(Component.literal("提示：联动已开启，但你的客户端未安装 StylizedDamage，无法看到定制跳字。"));
+        }
+        return 1;
+    }
+
+    private static int executeModRulesStylizedDamageCheck(ServerPlayer player)
+    {
+        player.sendSystemMessage(Component.literal("========== StylizedDamage 模组检测 =========="));
+        player.sendSystemMessage(Component.literal(ModRules.StylizedDamageStyles.serverStatusLine()));
+        player.sendSystemMessage(Component.literal(ModRules.StylizedDamageStyles.playerStatusLine(player)));
+        boolean ready = ModRules.StylizedDamageStyles.isServerReady() && ModRules.StylizedDamageStyles.hasPlayerMod(player);
+        player.sendSystemMessage(Component.literal("跳字联动可用：" + (ready ? "是" : "否")));
+        return 1;
     }
 
     /** 作弊获取 Rush Into The ZONE 最高潮：{@code /jjkz rushIntoTheZoneClimax} */

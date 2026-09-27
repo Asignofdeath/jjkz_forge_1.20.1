@@ -19,6 +19,9 @@ import com.darkness.jujutsukaisenzone.technique.development.SkillTreeNodeDef;
 import com.darkness.jujutsukaisenzone.technique.development.SkillTreeReferenceKind;
 import com.darkness.jujutsukaisenzone.technique.development.TechniqueSkillTree;
 import com.darkness.jujutsukaisenzone.technique.development.UnlockCondition;
+import com.darkness.jujutsukaisenzone.technique.se.SeMechanicRegistry;
+import com.darkness.jujutsukaisenzone.technique.se.ShrineFinishCutMarks;
+import com.darkness.jujutsukaisenzone.technique.se.ShrineFinishCutSeMechanic;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
@@ -28,7 +31,12 @@ import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.projectile.ProjectileUtil;
+import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.EntityHitResult;
+import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 
@@ -46,6 +54,7 @@ import java.util.UUID;
  * 「解」切割：固定射程 50，特效实体沿视线飞出并挂 Photon，横斩柱形清场。
  * <p>
  * 捌（槽位3）：施法者前方 2 格内有生物时可发动，对目标挂 slash_hachi Photon 并持续 3 秒周期伤害。
+ * 装载 SE「收刀」时，还可对带开刀印的准星目标远程收刀（见 {@link ShrineFinishCutSeMechanic}）。
  */
 public final class ShrineTechniqueSkillSet extends AbstractInnateTechniqueSkillSet
 {
@@ -685,13 +694,16 @@ public final class ShrineTechniqueSkillSet extends AbstractInnateTechniqueSkillS
         return String.format(java.util.Locale.ROOT, "%.1f", sec);
     }
 
-    /** 捌：前方 {@link #HACHI_CAST_RANGE} 格内最近的可攻击生物；无目标时返回 null。 */
+    /** 捌：前方近战目标，或（装「收刀」时）准星上带开刀印的远程目标。 */
     private void castHachi(ServerPlayer player)
     {
         LivingEntity target = findHachiTarget(player);
         if (target == null)
         {
-            player.sendSystemMessage(Component.literal("前方没有可斩击的目标。"));
+            boolean finishCut = SeMechanicRegistry.findEquipped(player, ShrineFinishCutSeMechanic.class).isPresent();
+            player.sendSystemMessage(Component.literal(finishCut
+                    ? "没有可收刀的目标（前方或开刀印）。"
+                    : "前方没有可斩击的目标。"));
             return;
         }
 
@@ -719,10 +731,23 @@ public final class ShrineTechniqueSkillSet extends AbstractInnateTechniqueSkillS
         fx.moveTo(target.getX(), target.getY(), target.getZ(), 0.0F, 0.0F);
         fx.configureShrineHachi(player, target);
         level.addFreshEntity(fx);
+        ShrineFinishCutMarks.consume(player, target);
     }
 
     @Nullable
     private LivingEntity findHachiTarget(ServerPlayer player)
+    {
+        LivingEntity melee = findHachiMeleeTarget(player);
+        if (melee != null)
+        {
+            return melee;
+        }
+        return findHachiFinishCutTarget(player);
+    }
+
+    /** 默认捌：前方 {@link #HACHI_CAST_RANGE} 格内最近的可攻击生物。 */
+    @Nullable
+    private LivingEntity findHachiMeleeTarget(ServerPlayer player)
     {
         double maxDistSqr = HACHI_CAST_RANGE * HACHI_CAST_RANGE;
         Vec3 lookHoriz = horizontalLookDirection(player);
@@ -754,6 +779,71 @@ public final class ShrineTechniqueSkillSet extends AbstractInnateTechniqueSkillS
             }
         }
         return closest;
+    }
+
+    /**
+     * SE「收刀」旁路：准星指向、视线可达、距离内、且带有本玩家开刀印的目标。
+     * 未装备该 SE 时恒为 null，不改默认捌规则。
+     */
+    @Nullable
+    private LivingEntity findHachiFinishCutTarget(ServerPlayer player)
+    {
+        Optional<ShrineFinishCutSeMechanic> mechanic =
+                SeMechanicRegistry.findEquipped(player, ShrineFinishCutSeMechanic.class);
+        if (mechanic.isEmpty())
+        {
+            return null;
+        }
+        double range = Math.max(1.0D, mechanic.get().remoteCastRange());
+        LivingEntity look = pickLivingAlongLook(player, range);
+        if (look == null || !ShrineFinishCutMarks.hasMark(player, look))
+        {
+            return null;
+        }
+        if (!hasLineOfSight(player, look))
+        {
+            return null;
+        }
+        return look;
+    }
+
+    @Nullable
+    private static LivingEntity pickLivingAlongLook(ServerPlayer player, double maxDistance)
+    {
+        Vec3 eye = player.getEyePosition();
+        Vec3 look = player.getLookAngle();
+        Vec3 end = eye.add(look.scale(maxDistance));
+        AABB searchBox = player.getBoundingBox().expandTowards(look.scale(maxDistance)).inflate(1.0D);
+        EntityHitResult hit = ProjectileUtil.getEntityHitResult(
+                player,
+                eye,
+                end,
+                searchBox,
+                entity -> entity instanceof LivingEntity living
+                        && living.isAlive()
+                        && living.isAttackable()
+                        && living != player
+                        && !living.isSpectator()
+                        && entity.isPickable(),
+                maxDistance * maxDistance);
+        if (hit != null && hit.getEntity() instanceof LivingEntity living)
+        {
+            return living;
+        }
+        return null;
+    }
+
+    private static boolean hasLineOfSight(ServerPlayer player, LivingEntity target)
+    {
+        Vec3 eye = player.getEyePosition();
+        Vec3 aim = target.getEyePosition();
+        BlockHitResult block = player.level().clip(new ClipContext(
+                eye, aim, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, player));
+        if (block.getType() == HitResult.Type.MISS)
+        {
+            return true;
+        }
+        return block.getLocation().distanceToSqr(eye) >= aim.distanceToSqr(eye) - 1.0E-3D;
     }
 
     /** 施法者水平朝向，用于判定目标是否在「前方」。 */

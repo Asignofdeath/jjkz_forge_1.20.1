@@ -9,28 +9,29 @@ import net.minecraftforge.network.NetworkEvent;
 import java.util.function.Supplier;
 
 /**
- * 客户端 → 服务端：把 SE 装备到指定槽。
+ * 客户端 → 服务端：装载指定 SE，并从指定背包槽扣除已探查咒物。
  */
 public final class EquipSeC2SPacket
 {
-    private final int slot;
     private final String seId;
+    /** 背包槽；&lt; 0 表示服务端自动选第一件吻合件。 */
+    private final int inventorySlot;
 
-    public EquipSeC2SPacket(int slot, String seId)
+    public EquipSeC2SPacket(String seId, int inventorySlot)
     {
-        this.slot = slot;
         this.seId = seId == null ? "" : seId;
+        this.inventorySlot = inventorySlot;
     }
 
     public static void encode(EquipSeC2SPacket packet, FriendlyByteBuf buffer)
     {
-        buffer.writeVarInt(packet.slot);
         buffer.writeUtf(packet.seId);
+        buffer.writeVarInt(packet.inventorySlot);
     }
 
     public static EquipSeC2SPacket decode(FriendlyByteBuf buffer)
     {
-        return new EquipSeC2SPacket(buffer.readVarInt(), buffer.readUtf());
+        return new EquipSeC2SPacket(buffer.readUtf(), buffer.readVarInt());
     }
 
     public static void handle(EquipSeC2SPacket packet, Supplier<NetworkEvent.Context> contextSupplier)
@@ -44,7 +45,7 @@ public final class EquipSeC2SPacket
                 return;
             }
             PlayerSeLoadoutData.SeEquipResult result =
-                    PlayerSeLoadoutData.tryEquip(player, packet.slot, packet.seId);
+                    PlayerSeLoadoutData.tryEquip(player, packet.seId, packet.inventorySlot);
             if (result != PlayerSeLoadoutData.SeEquipResult.SUCCESS)
             {
                 player.sendSystemMessage(Component.translatable(

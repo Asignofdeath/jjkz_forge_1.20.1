@@ -89,6 +89,12 @@ public final class JjkzPlayerDataDisplay
                 "穿甲: %.1f%%　术式穿透: %.1f%%",
                 physicalPenetration == null ? 0.0D : physicalPenetration.getValue(),
                 techniquePenetration == null ? 0.0D : techniquePenetration.getValue())));
+        // 破韧效力 + 咒力特质：两者共同决定怪物韧性条的破韧速度（特质对付特攻怪）。
+        var breakPotency = subject.getAttribute(ModAttributes.BREAK_POTENCY.get());
+        viewer.sendSystemMessage(Component.literal(String.format(
+                "破韧效力: %.1f%%　咒力特质: %s",
+                breakPotency == null ? 0.0D : breakPotency.getValue(),
+                PlayerCursedEnergyTraitData.getTrait(subject).id())));
         DomainExpansionServerLogic domainLogic = DomainExpansionServerLogic.getInstance();
         boolean hasDomain = domainLogic.hasLearnedDomainExpansion(subject);
         String domainName = domainLogic.getDomainName();
@@ -97,11 +103,11 @@ public final class JjkzPlayerDataDisplay
         int brain = PlayerBrainDamageData.getBrainDamage(subject);
         int expands = PlayerBrainDamageData.getExpandsToday(subject);
         int free = PlayerBrainDamageData.getFreeDailyQuota();
-        int maxBrain = Config.domainBrainMax > 0 ? Config.domainBrainMax : 100;
+        int maxBrain = PlayerBrainDamageData.getBrainMax(subject);
         viewer.sendSystemMessage(Component.literal("脑损: " + brain + "/" + maxBrain
                 + "　今日领域: " + expands + "（免费额度 " + free + "）"));
         viewer.sendSystemMessage(Component.literal("领域量表: " + PlayerDomainGaugeData.getGauge(subject)
-                + "/" + PlayerDomainGaugeData.getMax()
+                + "/" + PlayerDomainGaugeData.getMax(subject)
                 + String.format("（充能效率 %.0f%%）",
                 subject.getAttribute(ModAttributes.DOMAIN_GAUGE_CHARGE_EFFICIENCY.get()) == null
                         ? 100.0D
