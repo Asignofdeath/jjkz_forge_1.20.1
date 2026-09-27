@@ -1,19 +1,19 @@
 package com.darkness.jujutsukaisenzone.player;
 
 import com.darkness.jujutsukaisenzone.JuJutsuKaisenZone;
+import com.darkness.jujutsukaisenzone.technique.development.SpNodeInstance;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.StringTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.saveddata.SavedData;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -130,8 +130,13 @@ public final class JjkzPlayerDataStorage extends SavedData
         private static final String TAG_TECHNIQUE_INTEL = "techniqueIntel";
         private static final String TAG_SP_POINTS = "spPoints";
         private static final String TAG_SP_SPENT_LIBERATION = "spSpentLiberation";
+        private static final String TAG_SP_SPENT_REFRESH = "spSpentRefresh";
         private static final String TAG_SP_NODE_QUALITY = "spNodeQuality";
-        private static final String TAG_SP_UNLOCKED_NODES = "spUnlockedNodes";
+        private static final String TAG_SP_LIT_NODES = "spLitNodes";
+        private static final String TAG_SP_OFFERS = "spOffers";
+        private static final String TAG_SP_LAST_GRANTED_TIER = "spLastGrantedTier";
+        /** 旧固定节点 id 列表，仅读入后丢弃（不做迁移）。 */
+        private static final String TAG_SP_UNLOCKED_NODES_LEGACY = "spUnlockedNodes";
         private static final String TAG_CURSED_ENERGY_TRAIT = "cursedEnergyTrait";
         private static final String TAG_SE_EQUIPPED = "seEquipped";
         private static final String TAG_PHYSICAL_POWER_BONUS = "physicalPowerBonus";
@@ -172,9 +177,13 @@ public final class JjkzPlayerDataStorage extends SavedData
         final Map<String, Integer> techniqueIntel = new LinkedHashMap<>();
         int spPoints;
         int spSpentLiberation;
-        /** 质量上限（SP 节点与 SE 共用的占位账，见 {@code PlayerQualityPoolData}）。 */
+        /** SP 货架付费刷新永久消耗（不退）。 */
+        int spSpentRefresh;
+        /** 质量上限缓存（权威由咒术经验派生，见 {@code SpNodeShelfRules}）。 */
         int spNodeQuality = PlayerSpNodeData.DEFAULT_QUALITY;
-        final Set<String> spUnlockedNodes = new LinkedHashSet<>();
+        final List<SpNodeInstance> spLitNodes = new ArrayList<>();
+        final List<SpNodeInstance> spOffers = new ArrayList<>();
+        int spLastGrantedTier;
         String cursedEnergyTrait = CursedEnergyTrait.NORMAL.id();
         /** 已装载 SE：seId → 装载时咒物实例的特质 + 代价（卸下按此退回）。 */
         final Map<String, SeEquippedEntry> seEquipped = new LinkedHashMap<>();
@@ -231,18 +240,15 @@ public final class JjkzPlayerDataStorage extends SavedData
             }
             entry.spPoints = Math.max(0, tag.getInt(TAG_SP_POINTS));
             entry.spSpentLiberation = Math.max(0, tag.getInt(TAG_SP_SPENT_LIBERATION));
+            entry.spSpentRefresh = Math.max(0, tag.getInt(TAG_SP_SPENT_REFRESH));
             entry.spNodeQuality = tag.contains(TAG_SP_NODE_QUALITY)
                     ? Math.max(1, tag.getInt(TAG_SP_NODE_QUALITY))
                     : PlayerSpNodeData.DEFAULT_QUALITY;
-            ListTag nodeList = tag.getList(TAG_SP_UNLOCKED_NODES, Tag.TAG_STRING);
-            for (int i = 0; i < nodeList.size(); i++)
-            {
-                String nodeId = nodeList.getString(i);
-                if (nodeId != null && !nodeId.isBlank())
-                {
-                    entry.spUnlockedNodes.add(nodeId);
-                }
-            }
+            entry.spLastGrantedTier = Math.max(0, tag.getInt(TAG_SP_LAST_GRANTED_TIER));
+            loadSpNodeList(tag.getList(TAG_SP_LIT_NODES, Tag.TAG_COMPOUND), entry.spLitNodes);
+            loadSpNodeList(tag.getList(TAG_SP_OFFERS, Tag.TAG_COMPOUND), entry.spOffers);
+            // 旧档字符串节点表直接丢弃（货架改为实例制，不做迁移）。
+            tag.getList(TAG_SP_UNLOCKED_NODES_LEGACY, Tag.TAG_STRING);
             entry.cursedEnergyTrait = tag.contains(TAG_CURSED_ENERGY_TRAIT)
                     ? CursedEnergyTrait.byId(tag.getString(TAG_CURSED_ENERGY_TRAIT)).id()
                     : CursedEnergyTrait.NORMAL.id();
@@ -326,16 +332,11 @@ public final class JjkzPlayerDataStorage extends SavedData
             tag.put(TAG_TECHNIQUE_INTEL, intelTag);
             tag.putInt(TAG_SP_POINTS, Math.max(0, spPoints));
             tag.putInt(TAG_SP_SPENT_LIBERATION, Math.max(0, spSpentLiberation));
+            tag.putInt(TAG_SP_SPENT_REFRESH, Math.max(0, spSpentRefresh));
             tag.putInt(TAG_SP_NODE_QUALITY, Math.max(1, spNodeQuality));
-            ListTag nodeList = new ListTag();
-            for (String nodeId : spUnlockedNodes)
-            {
-                if (nodeId != null && !nodeId.isBlank())
-                {
-                    nodeList.add(StringTag.valueOf(nodeId));
-                }
-            }
-            tag.put(TAG_SP_UNLOCKED_NODES, nodeList);
+            tag.putInt(TAG_SP_LAST_GRANTED_TIER, Math.max(0, spLastGrantedTier));
+            tag.put(TAG_SP_LIT_NODES, saveSpNodeList(spLitNodes));
+            tag.put(TAG_SP_OFFERS, saveSpNodeList(spOffers));
             tag.putString(TAG_CURSED_ENERGY_TRAIT,
                     cursedEnergyTrait == null ? CursedEnergyTrait.NORMAL.id() : cursedEnergyTrait);
             ListTag seList = new ListTag();
@@ -359,6 +360,32 @@ public final class JjkzPlayerDataStorage extends SavedData
             tag.putLong(TAG_MELTDOWN_REPAIR_COUNT_DAY, meltdownRepairCountDay);
             tag.putBoolean(TAG_MELTDOWN_REPAIR_LEARNED, meltdownRepairLearned);
             return tag;
+        }
+
+        private static void loadSpNodeList(ListTag list, List<SpNodeInstance> target)
+        {
+            target.clear();
+            for (int i = 0; i < list.size(); i++)
+            {
+                SpNodeInstance node = SpNodeInstance.load(list.getCompound(i));
+                if (node != null)
+                {
+                    target.add(node);
+                }
+            }
+        }
+
+        private static ListTag saveSpNodeList(List<SpNodeInstance> nodes)
+        {
+            ListTag list = new ListTag();
+            for (SpNodeInstance node : nodes)
+            {
+                if (node != null)
+                {
+                    list.add(node.save());
+                }
+            }
+            return list;
         }
 
         private static int clampUpgradeChance(int value)

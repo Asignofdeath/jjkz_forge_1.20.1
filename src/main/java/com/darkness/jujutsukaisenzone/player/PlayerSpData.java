@@ -1,7 +1,7 @@
 package com.darkness.jujutsukaisenzone.player;
 
 import com.darkness.jujutsukaisenzone.network.ModNetwork;
-import com.darkness.jujutsukaisenzone.technique.development.SpNodeRegistry;
+import com.darkness.jujutsukaisenzone.technique.development.SpNodeInstance;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
 
@@ -10,9 +10,10 @@ import net.minecraft.world.entity.player.Player;
  * <ul>
  *   <li>{@code spTotal}：生涯获得</li>
  *   <li>{@code spSpentLiberation}：机制解放永久消耗（不退）</li>
+ *   <li>{@code spSpentRefresh}：货架付费刷新永久消耗（不退）</li>
  *   <li>节点占用：由已点亮 SP 节点费用动态求和（重置即退回可分配池）</li>
  * </ul>
- * {@link #getAvailable} = total − liberation − 节点占用。
+ * {@link #getAvailable} = total − liberation − refresh − 节点占用。
  */
 public final class PlayerSpData
 {
@@ -25,7 +26,7 @@ public final class PlayerSpData
     {
     }
 
-    /** 可花在解放 / 节点上的余额。 */
+    /** 可花在解放 / 节点 / 刷新上的余额。 */
     public static int getAvailable(Player player)
     {
         if (player instanceof ServerPlayer serverPlayer)
@@ -112,15 +113,19 @@ public final class PlayerSpData
 
     static int computeAvailable(JjkzPlayerDataStorage.PlayerDataEntry data)
     {
-        return Math.max(0, Math.max(0, data.spPoints) - Math.max(0, data.spSpentLiberation) - allocatedNodeCost(data));
+        return Math.max(0,
+                Math.max(0, data.spPoints)
+                        - Math.max(0, data.spSpentLiberation)
+                        - Math.max(0, data.spSpentRefresh)
+                        - allocatedNodeCost(data));
     }
 
     static int allocatedNodeCost(JjkzPlayerDataStorage.PlayerDataEntry data)
     {
         int sum = 0;
-        for (String nodeId : data.spUnlockedNodes)
+        for (SpNodeInstance node : data.spLitNodes)
         {
-            sum += SpNodeRegistry.find(nodeId).map(SpNodeRegistry.SpNodeDef::spCost).orElse(0);
+            sum += node.spCost();
         }
         return Math.max(0, sum);
     }

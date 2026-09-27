@@ -200,7 +200,7 @@ public final class SeLoadoutPanelWidget extends Widget
         y += LINE_HEIGHT + 6;
 
         int cap = PlayerQualityPoolData.cap(player);
-        int allowance = PlayerQualityPoolData.allowance();
+        int allowance = PlayerQualityPoolData.allowance(player);
         int occupied = PlayerQualityPoolData.occupied(player);
         int overload = PlayerQualityPoolData.overload(player);
         graphics.drawString(font, tr("quality.value",

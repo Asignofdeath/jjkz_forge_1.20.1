@@ -1,7 +1,7 @@
 package com.darkness.jujutsukaisenzone.player;
 
 import com.darkness.jujutsukaisenzone.Config;
-import com.darkness.jujutsukaisenzone.technique.development.SpNodeRegistry;
+import com.darkness.jujutsukaisenzone.technique.development.SpNodeInstance;
 import net.minecraft.world.entity.player.Player;
 
 /**
@@ -12,11 +12,10 @@ import net.minecraft.world.entity.player.Player;
  * 三档行为：
  * <ul>
  *   <li>占用 ≤ 上限：正常。</li>
- *   <li>上限 &lt; 占用 ≤ 上限 + 宽限：允许装载，但按超出量吃「质量超载」罚
- *       （见 {@code PlayerCombatPowerData} 与 {@link com.darkness.jujutsukaisenzone.technique.se.SePenalty}）。</li>
- *   <li>占用 &gt; 上限 + 宽限：拒绝装载（{@code SeEquipResult.QUALITY_EXCEEDED} / {@code SpNodeUnlockResult.QUALITY_LIMIT}）。</li>
+ *   <li>上限 &lt; 占用 ≤ 上限 + 宽限：允许装载，但按超出量吃「质量超载」罚。</li>
+ *   <li>占用 &gt; 上限 + 宽限：拒绝装载。</li>
  * </ul>
- * ⚠️ 质量上限存在玩家数据里（{@code spNodeQuality}，默认 6），宽限与超载罚在 {@link Config}。
+ * ⚠️ 质量上限与宽限由咒术经验派生（{@code SpNodeShelfRules}）；超载罚在 {@link Config}。
  * ⚠️ SP 点数（购买力，可退）与质量（占位）是<b>两套账</b>：SE 不花 SP，只靠背包里的咒物占位。
  */
 public final class PlayerQualityPoolData
@@ -25,13 +24,23 @@ public final class PlayerQualityPoolData
     {
     }
 
-    /** 质量上限（玩家数据里的 {@code spNodeQuality}，命令 {@code /jjkz spnode quality} 可调）。 */
+    /** 质量上限（由咒术经验派生）。 */
     public static int cap(Player player)
     {
         return PlayerSpNodeData.getQuality(player);
     }
 
-    /** 宽限：上限之外还允许多占多少（超出部分才吃超载罚）。 */
+    /**
+     * 宽限：上限之外还允许多占多少（超出部分才吃超载罚）。
+     * 由咒术经验派生；{@link Config#seQualityAllowance} 仅作旧配置兜底，不再单独使用。
+     */
+    public static int allowance(Player player)
+    {
+        return PlayerSpNodeData.getAllowance(player);
+    }
+
+    /** @deprecated 用 {@link #allowance(Player)}。 */
+    @Deprecated
     public static int allowance()
     {
         return Math.max(0, Config.seQualityAllowance);
@@ -46,9 +55,9 @@ public final class PlayerQualityPoolData
     public static int occupiedBySpNodes(Player player)
     {
         int sum = 0;
-        for (String nodeId : PlayerSpNodeData.getUnlocked(player))
+        for (SpNodeInstance node : PlayerSpNodeData.getLit(player))
         {
-            sum += SpNodeRegistry.find(nodeId).map(SpNodeRegistry.SpNodeDef::spCost).orElse(0);
+            sum += node.spCost();
         }
         return Math.max(0, sum);
     }
@@ -77,8 +86,6 @@ public final class PlayerQualityPoolData
 
     /**
      * 再装入 {@code additional} 点质量，是否越过「上限 + 宽限」的硬顶。
-     * <p>
-     * 装载校验用的就是这一个判据（SP 节点与 SE 共用）。
      */
     public static boolean wouldExceedHardLimit(Player player, int additional)
     {
@@ -86,6 +93,6 @@ public final class PlayerQualityPoolData
         {
             return false;
         }
-        return occupied(player) + additional > cap(player) + allowance();
+        return occupied(player) + additional > cap(player) + allowance(player);
     }
 }

@@ -89,6 +89,8 @@ import com.darkness.jujutsukaisenzone.network.packet.UnlockSkillC2SPacket;
 import com.darkness.jujutsukaisenzone.network.packet.UnlockSkillS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.UnlockSpNodeC2SPacket;
 import com.darkness.jujutsukaisenzone.network.packet.ResetSpNodesC2SPacket;
+import com.darkness.jujutsukaisenzone.network.packet.RefreshSpOffersC2SPacket;
+import com.darkness.jujutsukaisenzone.technique.development.SpNodeInstance;
 import com.darkness.jujutsukaisenzone.network.packet.EquipSeC2SPacket;
 import com.darkness.jujutsukaisenzone.network.packet.UnequipSeC2SPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncMimicryS2CPacket;
@@ -502,6 +504,11 @@ public final class ModNetwork
                 .decoder(ResetSpNodesC2SPacket::decode)
                 .consumerMainThread(ResetSpNodesC2SPacket::handle)
                 .add();
+        CHANNEL.messageBuilder(RefreshSpOffersC2SPacket.class, packetId++, NetworkDirection.PLAY_TO_SERVER)
+                .encoder(RefreshSpOffersC2SPacket::encode)
+                .decoder(RefreshSpOffersC2SPacket::decode)
+                .consumerMainThread(RefreshSpOffersC2SPacket::handle)
+                .add();
         CHANNEL.messageBuilder(EquipSeC2SPacket.class, packetId++, NetworkDirection.PLAY_TO_SERVER)
                 .encoder(EquipSeC2SPacket::encode)
                 .decoder(EquipSeC2SPacket::decode)
@@ -673,9 +680,17 @@ public final class ModNetwork
                 new SyncSpS2CPacket(available, total, liberation, allocated));
     }
 
-    public static void sendSpNodesSync(ServerPlayer player, java.util.Set<String> nodeIds, int quality)
+    public static void sendSpNodesSync(
+            ServerPlayer player,
+            java.util.List<SpNodeInstance> lit,
+            java.util.List<SpNodeInstance> offers,
+            int quality,
+            int allowance,
+            int tier,
+            int xp)
     {
-        CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new SyncSpNodesS2CPacket(nodeIds, quality));
+        CHANNEL.send(PacketDistributor.PLAYER.with(() -> player),
+                new SyncSpNodesS2CPacket(lit, offers, quality, allowance, tier, xp));
     }
 
     public static void sendSeLoadoutSync(ServerPlayer player, java.util.Map<String, com.darkness.jujutsukaisenzone.player.SeEquippedEntry> entries)
@@ -723,6 +738,11 @@ public final class ModNetwork
     public static void sendResetSpNodesRequest()
     {
         CHANNEL.send(PacketDistributor.SERVER.noArg(), new ResetSpNodesC2SPacket());
+    }
+
+    public static void sendRefreshSpOffersRequest()
+    {
+        CHANNEL.send(PacketDistributor.SERVER.noArg(), new RefreshSpOffersC2SPacket());
     }
 
     public static void sendEquipSeRequest(String seId)

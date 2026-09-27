@@ -1,27 +1,32 @@
 package com.darkness.jujutsukaisenzone.player;
 
 import com.darkness.jujutsukaisenzone.network.ModNetwork;
-import com.darkness.jujutsukaisenzone.technique.development.SpNodeRegistry;
+import com.darkness.jujutsukaisenzone.technique.development.SpNodeInstance;
+import com.darkness.jujutsukaisenzone.technique.development.SpNodeShelfRules;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.StringTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
 
+import java.util.ArrayList;
 import java.util.Collections;
-import java.util.LinkedHashSet;
-import java.util.Set;
+import java.util.List;
 
 /**
- * SP 节点运行时：点亮 / 重置 / 质量槽位。
+ * SP 节点运行时：货架在售 / 已点亮 / 质量派生。
  */
 public final class PlayerSpNodeData
 {
-    /** 质量<b>上限</b>的默认值。语义是权重和（Σ spCost），不再是「可点节点个数」。 */
-    public static final int DEFAULT_QUALITY = 6;
-    private static final String CLIENT_TAG_NODES = "jujutsukaisenzone_sp_nodes";
-    private static final String CLIENT_TAG_QUALITY = "jujutsukaisenzone_sp_node_quality";
+    public static final int DEFAULT_QUALITY = SpNodeShelfRules.BASE_QUALITY;
+
+    private static final String CLIENT_TAG_ROOT = "jujutsukaisenzone_sp_shelf";
+    private static final String CLIENT_TAG_LIT = "lit";
+    private static final String CLIENT_TAG_OFFERS = "offers";
+    private static final String CLIENT_TAG_QUALITY = "quality";
+    private static final String CLIENT_TAG_ALLOWANCE = "allowance";
+    private static final String CLIENT_TAG_TIER = "tier";
+    private static final String CLIENT_TAG_XP = "xp";
 
     private PlayerSpNodeData()
     {
@@ -31,53 +36,84 @@ public final class PlayerSpNodeData
     {
         if (player instanceof ServerPlayer serverPlayer)
         {
-            return Math.max(1, JjkzPlayerDataStorage.get(serverPlayer).getOrCreate(serverPlayer).spNodeQuality);
+            int xp = PlayerCursedGradeData.getExperience(serverPlayer);
+            return SpNodeShelfRules.qualityCap(xp);
         }
-        return Math.max(1, player.getPersistentData().getInt(CLIENT_TAG_QUALITY));
+        return Math.max(1, player.getPersistentData().getCompound(CLIENT_TAG_ROOT).getInt(CLIENT_TAG_QUALITY));
     }
 
+    public static int getAllowance(Player player)
+    {
+        if (player instanceof ServerPlayer serverPlayer)
+        {
+            return SpNodeShelfRules.allowance(PlayerCursedGradeData.getExperience(serverPlayer));
+        }
+        return Math.max(0, player.getPersistentData().getCompound(CLIENT_TAG_ROOT).getInt(CLIENT_TAG_ALLOWANCE));
+    }
+
+    public static int getTier(Player player)
+    {
+        if (player instanceof ServerPlayer serverPlayer)
+        {
+            return SpNodeShelfRules.tier(PlayerCursedGradeData.getExperience(serverPlayer));
+        }
+        return Math.max(0, player.getPersistentData().getCompound(CLIENT_TAG_ROOT).getInt(CLIENT_TAG_TIER));
+    }
+
+    /** @deprecated 质量由经验派生；保留空操作以免旧命令编译失败。 */
+    @Deprecated
     public static void setQuality(ServerPlayer player, int quality)
     {
         JjkzPlayerDataStorage.PlayerDataEntry data = JjkzPlayerDataStorage.get(player).getOrCreate(player);
-        data.spNodeQuality = Math.max(1, quality);
+        data.spNodeQuality = SpNodeShelfRules.qualityCap(data.curseGradeExperience);
         JjkzPlayerDataStorage.get(player).setDirty();
         syncToClient(player);
         PlayerCombatPowerData.syncToClient(player);
     }
 
-    public static Set<String> getUnlocked(Player player)
+    public static List<SpNodeInstance> getLit(Player player)
     {
         if (player instanceof ServerPlayer serverPlayer)
         {
-            return Collections.unmodifiableSet(new LinkedHashSet<>(
-                    JjkzPlayerDataStorage.get(serverPlayer).getOrCreate(serverPlayer).spUnlockedNodes));
+            return Collections.unmodifiableList(new ArrayList<>(
+                    JjkzPlayerDataStorage.get(serverPlayer).getOrCreate(serverPlayer).spLitNodes));
         }
-        CompoundTag root = player.getPersistentData().getCompound(CLIENT_TAG_NODES);
-        Set<String> result = new LinkedHashSet<>();
-        ListTag list = root.getList("ids", Tag.TAG_STRING);
-        for (int i = 0; i < list.size(); i++)
-        {
-            result.add(list.getString(i));
-        }
-        return result;
+        return readClientList(player, CLIENT_TAG_LIT);
     }
 
-    public static boolean isUnlocked(Player player, String nodeId)
+    public static List<SpNodeInstance> getOffers(Player player)
     {
-        return getUnlocked(player).contains(nodeId);
+        if (player instanceof ServerPlayer serverPlayer)
+        {
+            return Collections.unmodifiableList(new ArrayList<>(
+                    JjkzPlayerDataStorage.get(serverPlayer).getOrCreate(serverPlayer).spOffers));
+        }
+        return readClientList(player, CLIENT_TAG_OFFERS);
+    }
+
+    public static boolean isLit(Player player, String instanceId)
+    {
+        for (SpNodeInstance node : getLit(player))
+        {
+            if (node.instanceId().equals(instanceId))
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static int unlockedCount(Player player)
     {
-        return getUnlocked(player).size();
+        return getLit(player).size();
     }
 
     public static int sumPhysicalBonus(Player player)
     {
         int sum = 0;
-        for (String id : getUnlocked(player))
+        for (SpNodeInstance node : getLit(player))
         {
-            sum += SpNodeRegistry.find(id).map(SpNodeRegistry.SpNodeDef::physicalBonus).orElse(0);
+            sum += node.physicalBonus();
         }
         return sum;
     }
@@ -85,37 +121,54 @@ public final class PlayerSpNodeData
     public static int sumTechniqueBonus(Player player)
     {
         int sum = 0;
-        for (String id : getUnlocked(player))
+        for (SpNodeInstance node : getLit(player))
         {
-            sum += SpNodeRegistry.find(id).map(SpNodeRegistry.SpNodeDef::techniqueBonus).orElse(0);
+            sum += node.techniqueBonus();
         }
         return sum;
     }
 
-    public static SpNodeUnlockResult tryUnlock(ServerPlayer player, String nodeId)
+    public static SpNodeUnlockResult tryUnlock(ServerPlayer player, String instanceId)
     {
-        OptionalDef def = resolve(nodeId);
-        if (def.missing())
+        if (instanceId == null || instanceId.isBlank())
         {
             return SpNodeUnlockResult.UNKNOWN_NODE;
         }
         JjkzPlayerDataStorage.PlayerDataEntry data = JjkzPlayerDataStorage.get(player).getOrCreate(player);
-        if (data.spUnlockedNodes.contains(nodeId))
+        SpNodeInstance offer = null;
+        for (SpNodeInstance node : data.spOffers)
         {
-            return SpNodeUnlockResult.ALREADY_UNLOCKED;
+            if (node.instanceId().equals(instanceId))
+            {
+                offer = node;
+                break;
+            }
         }
-        // 质量是「权重和」：SP 节点与 SE 共用一个池，这里问池子是否还放得下这个节点的 spCost。
-        if (PlayerQualityPoolData.wouldExceedHardLimit(player, def.cost()))
+        if (offer == null)
+        {
+            return SpNodeUnlockResult.UNKNOWN_NODE;
+        }
+        for (SpNodeInstance lit : data.spLitNodes)
+        {
+            if (lit.instanceId().equals(instanceId))
+            {
+                return SpNodeUnlockResult.ALREADY_UNLOCKED;
+            }
+        }
+        if (PlayerQualityPoolData.wouldExceedHardLimit(player, offer.spCost()))
         {
             return SpNodeUnlockResult.QUALITY_LIMIT;
         }
-        if (PlayerSpData.computeAvailable(data) < def.cost())
+        if (PlayerSpData.computeAvailable(data) < offer.spCost())
         {
             return SpNodeUnlockResult.INSUFFICIENT_SP;
         }
-        data.spUnlockedNodes.add(nodeId);
+        data.spOffers.remove(offer);
+        data.spLitNodes.add(offer);
+        data.spNodeQuality = SpNodeShelfRules.qualityCap(data.curseGradeExperience);
         JjkzPlayerDataStorage.get(player).setDirty();
         PlayerSpData.syncToClient(player);
+        PlayerSpNodeAttributeApplier.recompute(player);
         syncToClient(player);
         PlayerCombatPowerData.syncToClient(player);
         return SpNodeUnlockResult.SUCCESS;
@@ -124,43 +177,79 @@ public final class PlayerSpNodeData
     public static void resetAll(ServerPlayer player)
     {
         JjkzPlayerDataStorage.PlayerDataEntry data = JjkzPlayerDataStorage.get(player).getOrCreate(player);
-        data.spUnlockedNodes.clear();
+        List<SpNodeInstance> previous = new ArrayList<>(data.spLitNodes);
+        data.spLitNodes.clear();
         JjkzPlayerDataStorage.get(player).setDirty();
+        PlayerSpNodeAttributeApplier.clearInstances(player, previous);
         PlayerSpData.syncToClient(player);
         syncToClient(player);
         PlayerCombatPowerData.syncToClient(player);
     }
 
-    public static void applyClientSnapshot(Player player, Set<String> nodeIds, int quality)
+    public static void applyClientSnapshot(
+            Player player,
+            List<SpNodeInstance> lit,
+            List<SpNodeInstance> offers,
+            int quality,
+            int allowance,
+            int tier,
+            int xp)
     {
         CompoundTag root = new CompoundTag();
-        ListTag list = new ListTag();
-        for (String id : nodeIds)
-        {
-            if (id != null && !id.isBlank())
-            {
-                list.add(StringTag.valueOf(id));
-            }
-        }
-        root.put("ids", list);
-        player.getPersistentData().put(CLIENT_TAG_NODES, root);
-        player.getPersistentData().putInt(CLIENT_TAG_QUALITY, Math.max(1, quality));
+        root.put(CLIENT_TAG_LIT, writeList(lit));
+        root.put(CLIENT_TAG_OFFERS, writeList(offers));
+        root.putInt(CLIENT_TAG_QUALITY, Math.max(1, quality));
+        root.putInt(CLIENT_TAG_ALLOWANCE, Math.max(0, allowance));
+        root.putInt(CLIENT_TAG_TIER, Math.max(0, tier));
+        root.putInt(CLIENT_TAG_XP, Math.max(0, xp));
+        player.getPersistentData().put(CLIENT_TAG_ROOT, root);
     }
 
     public static void syncToClient(ServerPlayer player)
     {
-        ModNetwork.sendSpNodesSync(player, getUnlocked(player), getQuality(player));
+        JjkzPlayerDataStorage.PlayerDataEntry data = JjkzPlayerDataStorage.get(player).getOrCreate(player);
+        int xp = Math.max(0, data.curseGradeExperience);
+        ModNetwork.sendSpNodesSync(
+                player,
+                List.copyOf(data.spLitNodes),
+                List.copyOf(data.spOffers),
+                SpNodeShelfRules.qualityCap(xp),
+                SpNodeShelfRules.allowance(xp),
+                SpNodeShelfRules.tier(xp),
+                xp);
     }
 
-    private static OptionalDef resolve(String nodeId)
+    private static ListTag writeList(List<SpNodeInstance> nodes)
     {
-        return SpNodeRegistry.find(nodeId)
-                .map(d -> new OptionalDef(false, d.spCost()))
-                .orElse(new OptionalDef(true, 0));
+        ListTag list = new ListTag();
+        if (nodes == null)
+        {
+            return list;
+        }
+        for (SpNodeInstance node : nodes)
+        {
+            if (node != null)
+            {
+                list.add(node.save());
+            }
+        }
+        return list;
     }
 
-    private record OptionalDef(boolean missing, int cost)
+    private static List<SpNodeInstance> readClientList(Player player, String key)
     {
+        CompoundTag root = player.getPersistentData().getCompound(CLIENT_TAG_ROOT);
+        ListTag list = root.getList(key, Tag.TAG_COMPOUND);
+        List<SpNodeInstance> result = new ArrayList<>();
+        for (int i = 0; i < list.size(); i++)
+        {
+            SpNodeInstance node = SpNodeInstance.load(list.getCompound(i));
+            if (node != null)
+            {
+                result.add(node);
+            }
+        }
+        return result;
     }
 
     public enum SpNodeUnlockResult

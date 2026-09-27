@@ -30,7 +30,6 @@ import com.darkness.jujutsukaisenzone.player.PlayerSeLoadoutData;
 import com.darkness.jujutsukaisenzone.player.CursedEnergyTrait;
 import com.darkness.jujutsukaisenzone.player.PlayerCursedEnergyTraitData;
 import com.darkness.jujutsukaisenzone.player.PlayerQualityPoolData;
-import com.darkness.jujutsukaisenzone.technique.development.SpNodeRegistry;
 import com.darkness.jujutsukaisenzone.technique.se.SeEffectRegistry;
 import com.darkness.jujutsukaisenzone.player.BarrierTechniqueLevel;
 import com.darkness.jujutsukaisenzone.player.PlayerBarrierTechniqueData;
@@ -450,16 +449,16 @@ public final class JjkzCommands
         return Commands.literal("spNode")
                 .requires(source -> source.hasPermission(2))
                 .then(Commands.literal("unlock")
-                        .then(Commands.argument("nodeId", StringArgumentType.word())
+                        .then(Commands.argument("instanceId", StringArgumentType.string())
                                 .executes(ctx ->
                                 {
                                     ServerPlayer player = ctx.getSource().getPlayerOrException();
-                                    String nodeId = StringArgumentType.getString(ctx, "nodeId");
-                                    var result = PlayerSpNodeData.tryUnlock(player, nodeId);
+                                    String instanceId = StringArgumentType.getString(ctx, "instanceId");
+                                    var result = PlayerSpNodeData.tryUnlock(player, instanceId);
                                     player.sendSystemMessage(Component.literal("SP节点解锁结果: " + result
                                             + "（质量 " + PlayerQualityPoolData.occupied(player)
                                             + "/" + PlayerQualityPoolData.cap(player)
-                                            + "，宽限 +" + PlayerQualityPoolData.allowance() + "）"));
+                                            + "，宽限 +" + PlayerQualityPoolData.allowance(player) + "）"));
                                     return result == PlayerSpNodeData.SpNodeUnlockResult.SUCCESS ? 1 : 0;
                                 })))
                 .then(Commands.literal("reset")
@@ -471,28 +470,60 @@ public final class JjkzCommands
                                     "已重置 SP 节点，SP 已退回（可用 " + PlayerSpData.getAvailable(player) + "）"));
                             return 1;
                         }))
-                .then(Commands.literal("quality")
-                        .then(Commands.argument("value", IntegerArgumentType.integer(1, 32))
-                                .executes(ctx ->
-                                {
-                                    ServerPlayer player = ctx.getSource().getPlayerOrException();
-                                    int value = IntegerArgumentType.getInteger(ctx, "value");
-                                    PlayerSpNodeData.setQuality(player, value);
-                                    player.sendSystemMessage(Component.literal("质量上限设为 " + value
-                                            + "（SP 节点与 SE 共用这个池，宽限 +" + PlayerQualityPoolData.allowance() + "）"));
-                                    return 1;
-                                })))
+                .then(Commands.literal("refresh")
+                        .executes(ctx ->
+                        {
+                            ServerPlayer player = ctx.getSource().getPlayerOrException();
+                            var result = com.darkness.jujutsukaisenzone.player.SpNodeShelfLogic
+                                    .tryPaidRefresh(player);
+                            player.sendSystemMessage(Component.literal("SP货架刷新: " + result));
+                            return result == com.darkness.jujutsukaisenzone.player
+                                    .SpNodeShelfLogic.RefreshResult.SUCCESS ? 1 : 0;
+                        }))
+                .then(Commands.literal("resync")
+                        .executes(ctx ->
+                        {
+                            ServerPlayer player = ctx.getSource().getPlayerOrException();
+                            com.darkness.jujutsukaisenzone.player.SpNodeShelfLogic
+                                    .syncWithExperience(player);
+                            player.sendSystemMessage(Component.literal(
+                                    "已按经验同步货架：tier=" + PlayerSpNodeData.getTier(player)
+                                            + " 质量=" + PlayerQualityPoolData.cap(player)
+                                            + " 宽限=" + PlayerQualityPoolData.allowance(player)
+                                            + " 在售=" + PlayerSpNodeData.getOffers(player).size()
+                                            + " 已点=" + PlayerSpNodeData.getLit(player).size()));
+                            return 1;
+                        }))
                 .then(Commands.literal("list")
                         .executes(ctx ->
                         {
                             ServerPlayer player = ctx.getSource().getPlayerOrException();
-                            player.sendSystemMessage(Component.literal("已点: " + PlayerSpNodeData.getUnlocked(player)));
-                            for (var def : SpNodeRegistry.all())
+                            player.sendSystemMessage(Component.literal(
+                                    "tier=" + PlayerSpNodeData.getTier(player)
+                                            + " 质量 " + PlayerQualityPoolData.occupied(player)
+                                            + "/" + PlayerQualityPoolData.cap(player)
+                                            + "（宽限 +" + PlayerQualityPoolData.allowance(player) + "）"));
+                            player.sendSystemMessage(Component.literal("已点亮:"));
+                            for (var node : PlayerSpNodeData.getLit(player))
                             {
                                 player.sendSystemMessage(Component.literal(
-                                        "  " + def.nodeId() + " cost=" + def.spCost()
-                                                + " phys+" + def.physicalBonus()
-                                                + " tech+" + def.techniqueBonus()));
+                                        "  " + node.instanceId().substring(0, 8)
+                                                + " " + node.family().id()
+                                                + " cost=" + node.spCost()
+                                                + " phys+" + node.physicalBonus()
+                                                + " tech+" + node.techniqueBonus()
+                                                + " attr+" + node.attributeBonus()));
+                            }
+                            player.sendSystemMessage(Component.literal("在售:"));
+                            for (var node : PlayerSpNodeData.getOffers(player))
+                            {
+                                player.sendSystemMessage(Component.literal(
+                                        "  " + node.instanceId()
+                                                + " " + node.family().id()
+                                                + " cost=" + node.spCost()
+                                                + " phys+" + node.physicalBonus()
+                                                + " tech+" + node.techniqueBonus()
+                                                + " attr+" + node.attributeBonus()));
                             }
                             return 1;
                         }));
@@ -514,7 +545,7 @@ public final class JjkzCommands
                                                     + " 已装载=" + PlayerSeLoadoutData.getEquippedIds(player)
                                                     + " 质量=" + PlayerQualityPoolData.occupied(player)
                                                     + "/" + PlayerQualityPoolData.cap(player)
-                                                    + "（宽限 +" + PlayerQualityPoolData.allowance() + "）"));
+                                                    + "（宽限 +" + PlayerQualityPoolData.allowance(player) + "）"));
                                     return result == PlayerSeLoadoutData.SeEquipResult.SUCCESS ? 1 : 0;
                                 })))
                 .then(Commands.literal("unequip")
@@ -537,7 +568,7 @@ public final class JjkzCommands
                                     "当前已装载 SE: " + PlayerSeLoadoutData.getEquippedIds(player)));
                             player.sendSystemMessage(Component.literal("质量占用 "
                                     + PlayerQualityPoolData.occupied(player) + "/" + PlayerQualityPoolData.cap(player)
-                                    + "（宽限 +" + PlayerQualityPoolData.allowance()
+                                    + "（宽限 +" + PlayerQualityPoolData.allowance(player)
                                     + "，超载 " + PlayerQualityPoolData.overload(player) + "）"));
                             player.sendSystemMessage(Component.literal(
                                     "当前咒力特质: " + PlayerCursedEnergyTraitData.getTrait(player).id()));

@@ -67,6 +67,7 @@ public final class TechniqueDailyUpgradeLogic
         resolveSeanceDayEnd(player);
         resolveStrengthenDayEnd(player);
         PlayerBrainDamageData.recoverForDaysPassed(player, currentDay - lastDay);
+        com.darkness.jujutsukaisenzone.player.SpNodeShelfLogic.onDayEnd(player);
         PlayerBarrierTechniqueData.setLastProcessedGameDay(player, currentDay);
     }
 

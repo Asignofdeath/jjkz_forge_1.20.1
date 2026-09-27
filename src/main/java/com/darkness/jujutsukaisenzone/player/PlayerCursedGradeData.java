@@ -55,6 +55,7 @@ public final class PlayerCursedGradeData
             PlayerCursedEnergyData.recalculateAfterGradeChange(serverPlayer);
             PlayerHealthData.syncFromEntity(serverPlayer);
             StrengthenTechniqueLearnLogic.tryUnlockForGrade(serverPlayer);
+            com.darkness.jujutsukaisenzone.player.SpNodeShelfLogic.syncWithExperience(serverPlayer);
             return;
         }
         player.getPersistentData().putInt(TAG_EXPERIENCE, clamped);
