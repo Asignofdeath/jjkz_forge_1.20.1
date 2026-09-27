@@ -19,7 +19,9 @@ import com.darkness.jujutsukaisenzone.player.PlayerCursedEnergyData;
 import com.darkness.jujutsukaisenzone.player.PlayerCursedGradeData;
 import com.darkness.jujutsukaisenzone.player.PlayerFactionData;
 import com.darkness.jujutsukaisenzone.player.PlayerHealthData;
+import com.darkness.jujutsukaisenzone.player.PlayerMeltdownRepairData;
 import com.darkness.jujutsukaisenzone.player.PlayerReverseTechniqueData;
+import com.darkness.jujutsukaisenzone.technique.MeltdownRepairLearnLogic;
 import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
 import com.darkness.jujutsukaisenzone.player.PlayerTechniqueIntelData;
 import com.darkness.jujutsukaisenzone.player.PlayerSpData;
@@ -148,6 +150,7 @@ public final class JjkzCommands
                         .then(buildFactionCheatBranch())
                         .then(buildCurseLevelCheatBranch())
                         .then(buildReverseTechniqueCheatBranch())
+                        .then(buildMeltdownRepairCheatBranch())
                         .then(buildCursedEnergyCheatBranch())
                         .then(buildTechniqueIntelCheatBranch())
                         .then(buildCombatPowerBranch())
@@ -281,6 +284,48 @@ public final class JjkzCommands
                             ServerPlayer player = ctx.getSource().getPlayerOrException();
                             PlayerReverseTechniqueData.setLearned(player, true);
                             player.sendSystemMessage(Component.literal("已习得反转术式（当前为作弊获取）。"));
+                            return 1;
+                        }));
+    }
+
+    /**
+     * 作弊解锁/撤销修复术式熔断：{@code /jjkz meltdownRepair grant|revoke}
+     * <p>
+     * 习得前置：须已学反转术式（与领域展开须先学结界术同型）。
+     */
+    private static LiteralArgumentBuilder<CommandSourceStack> buildMeltdownRepairCheatBranch()
+    {
+        return Commands.literal("meltdownRepair")
+                .requires(source -> source.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                .then(Commands.literal("grant")
+                        .executes(ctx ->
+                        {
+                            ServerPlayer player = ctx.getSource().getPlayerOrException();
+                            if (PlayerMeltdownRepairData.hasLearned(player))
+                            {
+                                player.sendSystemMessage(Component.literal("你已经习得了修复术式熔断。"));
+                                return 0;
+                            }
+                            if (!MeltdownRepairLearnLogic.meetsPrerequisite(player))
+                            {
+                                player.sendSystemMessage(Component.literal("需要先习得反转术式才能解锁修复术式熔断。"));
+                                return 0;
+                            }
+                            PlayerMeltdownRepairData.setLearned(player, true);
+                            player.sendSystemMessage(Component.literal("已习得修复术式熔断（当前为作弊获取）。"));
+                            return 1;
+                        }))
+                .then(Commands.literal("revoke")
+                        .executes(ctx ->
+                        {
+                            ServerPlayer player = ctx.getSource().getPlayerOrException();
+                            if (!PlayerMeltdownRepairData.hasLearned(player))
+                            {
+                                player.sendSystemMessage(Component.literal("你尚未习得修复术式熔断。"));
+                                return 0;
+                            }
+                            PlayerMeltdownRepairData.setLearned(player, false);
+                            player.sendSystemMessage(Component.literal("已撤销修复术式熔断。"));
                             return 1;
                         }));
     }

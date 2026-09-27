@@ -2,6 +2,10 @@ package com.darkness.jujutsukaisenzone.player;
 
 import com.darkness.jujutsukaisenzone.effect.ConfiscationEffect;
 import com.darkness.jujutsukaisenzone.network.ModNetwork;
+import com.darkness.jujutsukaisenzone.technique.se.SeMechanicRegistry;
+import com.darkness.jujutsukaisenzone.technique.se.WorkEfficiencySeMechanic;
+import net.minecraft.ChatFormatting;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.player.Player;
@@ -150,7 +154,28 @@ public final class PlayerCursedEnergyData
         }
         setCurrent(player, cur - amount);
         ModNetwork.sendCursedEnergySync(player, getCurrent(player), getMax(player));
+        maybeTriggerWorkEfficiencySe(player, amount);
         return true;
+    }
+
+    /**
+     * 装载「工作效率」SE 时：单次消耗达阈值则开启 / 刷新与无可谅解相同的效率窗口。
+     */
+    private static void maybeTriggerWorkEfficiencySe(ServerPlayer player, int amount)
+    {
+        SeMechanicRegistry.findEquipped(player, WorkEfficiencySeMechanic.class).ifPresent(mechanic ->
+        {
+            if (amount < mechanic.triggerConsumeThreshold())
+            {
+                return;
+            }
+            boolean wasActive = PlayerRatioOvertimeData.isEfficiencyActive(player);
+            PlayerRatioOvertimeData.startEfficiency(player);
+            player.displayClientMessage(
+                    Component.literal(wasActive ? "工作效率已刷新" : "工作效率")
+                            .withStyle(ChatFormatting.GOLD),
+                    true);
+        });
     }
 
     private static JjkzPlayerDataStorage.PlayerDataEntry getServerData(ServerPlayer player)

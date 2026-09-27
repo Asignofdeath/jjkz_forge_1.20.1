@@ -7,6 +7,8 @@ import com.darkness.jujutsukaisenzone.player.StarMarkType;
 import com.darkness.jujutsukaisenzone.technique.BarrierTechniqueServerLogic;
 import com.darkness.jujutsukaisenzone.technique.TechniqueDamageSources;
 import com.darkness.jujutsukaisenzone.technique.development.SkillUnlockLogic;
+import com.darkness.jujutsukaisenzone.technique.se.SeMechanicRegistry;
+import com.darkness.jujutsukaisenzone.technique.se.ZenoWallSeMechanic;
 import com.darkness.jujutsukaisenzone.technique.skillset.LoveRendezvousTechniqueSkillSet;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
@@ -1354,6 +1356,13 @@ public final class StarMarkRules
             double radius = gateRadius(owner);
             double gateRadiusSqr = radius * radius;
             /*
+             * SE「掉钻的星形耳环」：本 tick 施术者有没有装载「芝诺墙改写」。
+             * 判据是施术者装载与否，不是被推那一方——芝诺墙是<b>星域</b>的属性，不是被推者的属性，
+             * 所以这一对的两侧一起换。提到配对循环外，避免每对每 tick 重复查询。
+             */
+            ZenoWallSeMechanic zenoPush =
+                    SeMechanicRegistry.findEquipped(owner, ZenoWallSeMechanic.class).orElse(null);
+            /*
              * 本轮通行证快照：先从玩家数据一次性读出「到期表」，循环里只动内存，结束后统一写回。
              * 键是标记本身，因此同一 tick 内一条标记接触多个目标时可以连续累加。
              */
@@ -1446,13 +1455,33 @@ public final class StarMarkRules
                      * 否则跨序只表现为「对方被挡住、自己纹丝不动」，测不出排斥是否成立。
                      * dir 由 A 减 B 得到，所以各自拿到的都是「远离对方」的外向向量。
                      */
-                    if (pushA)
+                    if (zenoPush != null)
                     {
-                        zenoWall(a.entity(), dir, distance, now);
+                        /*
+                         * 换域：不再钳位移，改成沿同一条外向向量施加冲量（速度域）。
+                         * ⚠️ 代价见 push 的注释：速度域「比谁力气大」，对位置由客户端权威的玩家
+                         * 可能推不动——这正是「换成力」要承担的后果，实测再定。
+                         */
+                        double strength = zenoPush.outwardImpulse();
+                        if (pushA)
+                        {
+                            push(a.entity(), dir.scale(strength), owner, zenoPush.pushesOwner());
+                        }
+                        if (pushB)
+                        {
+                            push(b.entity(), dir.scale(-strength), owner, zenoPush.pushesOwner());
+                        }
                     }
-                    if (pushB)
+                    else
                     {
-                        zenoWall(b.entity(), dir.scale(-1.0D), distance, now);
+                        if (pushA)
+                        {
+                            zenoWall(a.entity(), dir, distance, now);
+                        }
+                        if (pushB)
+                        {
+                            zenoWall(b.entity(), dir.scale(-1.0D), distance, now);
+                        }
                     }
                 }
             }

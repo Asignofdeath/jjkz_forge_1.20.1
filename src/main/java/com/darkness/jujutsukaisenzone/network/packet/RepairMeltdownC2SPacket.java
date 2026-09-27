@@ -7,7 +7,7 @@ import net.minecraftforge.network.NetworkEvent;
 
 import java.util.function.Supplier;
 
-/** 客户端请求：用反转术式修复术式熔断（Shift+G）。 */
+/** 客户端请求：修复术式熔断（Shift+G；需已习得该通用技能）。 */
 public class RepairMeltdownC2SPacket
 {
     public RepairMeltdownC2SPacket()

@@ -9,6 +9,7 @@ import com.darkness.jujutsukaisenzone.player.PlayerCursedGradeData;
 import com.darkness.jujutsukaisenzone.player.PlayerBrainDamageData;
 import com.darkness.jujutsukaisenzone.player.PlayerDomainGaugeData;
 import com.darkness.jujutsukaisenzone.player.PlayerDomainExpansionData;
+import com.darkness.jujutsukaisenzone.player.PlayerMeltdownRepairData;
 import com.darkness.jujutsukaisenzone.Config;
 import com.darkness.jujutsukaisenzone.player.PlayerFactionData;
 import com.darkness.jujutsukaisenzone.player.PlayerHealthData;
@@ -304,6 +305,7 @@ public final class PlayerDataPanelWidget extends Widget
                 formatPercent(reverseEfficiency == null ? 100.0D : reverseEfficiency.getValue()),
                 helpKey("reverse_technique_efficiency")));
         lines.add(Line.row(tr("domain_expansion"), learnedText(PlayerDomainExpansionData.hasLearned(player))));
+        lines.add(Line.row(tr("meltdown_repair"), learnedText(PlayerMeltdownRepairData.hasLearned(player))));
         int gauge = PlayerDomainGaugeData.getGauge(player);
         int gaugeMax = PlayerDomainGaugeData.getMax(player);
         lines.add(Line.rowHelp(tr("domain_gauge"), gauge + " / " + gaugeMax, helpKey("domain_gauge")));

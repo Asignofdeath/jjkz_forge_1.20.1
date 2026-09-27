@@ -71,6 +71,7 @@ import com.darkness.jujutsukaisenzone.network.packet.SyncBarrierRulesC2SPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncBarrierRulesS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncBarrierTechniqueLearnedS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncDomainExpansionLearnedS2CPacket;
+import com.darkness.jujutsukaisenzone.network.packet.SyncMeltdownRepairLearnedS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncBrainDamageS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncTenShadowsModeS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncTenShadowsContractS2CPacket;
@@ -215,6 +216,11 @@ public final class ModNetwork
                 .encoder(SyncDomainExpansionLearnedS2CPacket::encode)
                 .decoder(SyncDomainExpansionLearnedS2CPacket::decode)
                 .consumerMainThread(SyncDomainExpansionLearnedS2CPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(SyncMeltdownRepairLearnedS2CPacket.class, packetId++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(SyncMeltdownRepairLearnedS2CPacket::encode)
+                .decoder(SyncMeltdownRepairLearnedS2CPacket::decode)
+                .consumerMainThread(SyncMeltdownRepairLearnedS2CPacket::handle)
                 .add();
         CHANNEL.messageBuilder(SyncBrainDamageS2CPacket.class, packetId++, NetworkDirection.PLAY_TO_CLIENT)
                 .encoder(SyncBrainDamageS2CPacket::encode)
@@ -623,6 +629,11 @@ public final class ModNetwork
     public static void sendDomainExpansionLearnedSync(ServerPlayer player, boolean learned)
     {
         CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new SyncDomainExpansionLearnedS2CPacket(learned));
+    }
+
+    public static void sendMeltdownRepairLearnedSync(ServerPlayer player, boolean learned)
+    {
+        CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new SyncMeltdownRepairLearnedS2CPacket(learned));
     }
 
     public static void sendBrainDamageSync(ServerPlayer player, int brainDamage, int expandsToday)

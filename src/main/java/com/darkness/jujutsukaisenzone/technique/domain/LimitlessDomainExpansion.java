@@ -11,6 +11,8 @@ import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
 import com.darkness.jujutsukaisenzone.registry.ModEntities;
 import com.darkness.jujutsukaisenzone.registry.ModSounds;
 import com.darkness.jujutsukaisenzone.technique.scaling.LimitlessDomainSkillGrowth;
+import com.darkness.jujutsukaisenzone.technique.se.LimitlessNearCasterExemptSeMechanic;
+import com.darkness.jujutsukaisenzone.technique.se.SeMechanicRegistry;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.BlockPos;
 import net.minecraft.ChatFormatting;
@@ -798,13 +800,19 @@ public final class LimitlessDomainExpansion extends AbstractTechniqueDomain
 
     /**
      * 领域完成瞬间：根据施法者当前位置，将 {@link #EXCLUDE_CASTER_RADIUS} 格内存活生物（除施法者、特效实体）记入本会话白名单。
+     * <p>
+     * 装载了「移除身旁豁免」SE 时跳过：身旁单位不再幸免。
      */
     private void populateLimitlessSessionMobWhitelist(ServerPlayer caster)
     {
-        ServerLevel level = caster.serverLevel();
-        double excludeRadiusSqr = EXCLUDE_CASTER_RADIUS * EXCLUDE_CASTER_RADIUS;
         Set<UUID> set = limitlessSessionMobWhitelist.computeIfAbsent(caster.getUUID(), k -> ConcurrentHashMap.newKeySet());
         set.clear();
+        if (removesNearCasterExempt(caster))
+        {
+            return;
+        }
+        ServerLevel level = caster.serverLevel();
+        double excludeRadiusSqr = EXCLUDE_CASTER_RADIUS * EXCLUDE_CASTER_RADIUS;
         AABB queryBox = caster.getBoundingBox().inflate(EXCLUDE_CASTER_RADIUS, EXCLUDE_CASTER_RADIUS, EXCLUDE_CASTER_RADIUS);
         List<LivingEntity> nearby = level.getEntitiesOfClass(LivingEntity.class, queryBox, entity ->
         {
@@ -836,9 +844,15 @@ public final class LimitlessDomainExpansion extends AbstractTechniqueDomain
 
     /**
      * 是否不得登记为无量空处领域锁定（转移）目标：快照白名单内；或本会话尚未写入白名单键时按施法者身边距离临时保护。
+     * <p>
+     * 装载了「移除身旁豁免」SE 时恒为 false。
      */
     private boolean isExcludedFromBeingLimitlessDomainMobTarget(ServerPlayer caster, UUID casterUuid, LivingEntity entity)
     {
+        if (removesNearCasterExempt(caster))
+        {
+            return false;
+        }
         if (isLimitlessSessionWhitelisted(casterUuid, entity.getUUID()))
         {
             return true;
@@ -848,6 +862,14 @@ public final class LimitlessDomainExpansion extends AbstractTechniqueDomain
             return entity.distanceToSqr(caster) <= EXCLUDE_CASTER_RADIUS * EXCLUDE_CASTER_RADIUS;
         }
         return false;
+    }
+
+    /** 是否因 SE 关掉身旁豁免（只认装载了对应窄口的施法者）。 */
+    private static boolean removesNearCasterExempt(ServerPlayer caster)
+    {
+        return SeMechanicRegistry.findEquipped(caster, LimitlessNearCasterExemptSeMechanic.class)
+                .map(LimitlessNearCasterExemptSeMechanic::removesNearCasterExempt)
+                .orElse(false);
     }
 
     /**

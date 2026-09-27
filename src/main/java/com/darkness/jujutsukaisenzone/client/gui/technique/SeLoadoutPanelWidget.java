@@ -10,6 +10,7 @@ import com.darkness.jujutsukaisenzone.player.PlayerSeLoadoutData;
 import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
 import com.darkness.jujutsukaisenzone.player.SeEquippedEntry;
 import com.darkness.jujutsukaisenzone.technique.se.PanelStat;
+import com.darkness.jujutsukaisenzone.technique.se.SeCatalogTag;
 import com.darkness.jujutsukaisenzone.technique.se.SeEffectDef;
 import com.darkness.jujutsukaisenzone.technique.se.SeEffectRegistry;
 import com.darkness.jujutsukaisenzone.technique.se.SeMechanicRegistry;
@@ -25,6 +26,7 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.util.Mth;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.api.distmarker.Dist;
@@ -32,12 +34,14 @@ import net.minecraftforge.api.distmarker.OnlyIn;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * SE（术式侵入）面板。
@@ -70,6 +74,19 @@ public final class SeLoadoutPanelWidget extends Widget
     private static final int COLOR_BAR_NORMAL = 0xFF3A6A9A;
     private static final int COLOR_BAR_ALLOWANCE = 0xFFC8A048;
     private static final int COLOR_BAR_OVERLOAD = 0xFFC04848;
+    private static final int COLOR_SCROLL_THUMB = 0xFF5A7AAA;
+    private static final int COLOR_CHIP_IDLE = 0xFF243044;
+    private static final int COLOR_CHIP_ACTIVE = 0xFF2E5A7A;
+    private static final int COLOR_CHIP_TEXT_IDLE = 0xFF9AA4B0;
+    private static final int COLOR_CHIP_TEXT_ACTIVE = 0xFF7FE3FF;
+
+    private static final int CATALOG_ROW_HEIGHT = LINE_HEIGHT * 4 + ROW_PAD * 2;
+    private static final int CATALOG_ROW_GAP = 2;
+    private static final int SCROLLBAR_WIDTH = 5;
+    private static final int SCROLLBAR_GAP = 3;
+    private static final int FILTER_CHIP_PAD_X = 5;
+    private static final int FILTER_CHIP_GAP = 4;
+    private static final int FILTER_CHIP_HEIGHT = LINE_HEIGHT + 4;
 
     private static final String HELP_LANG_KEY = "gui.jujutsukaisenzone.se.help";
 
@@ -79,6 +96,23 @@ public final class SeLoadoutPanelWidget extends Widget
     private final Map<String, Integer> selectedSlotBySeId = new HashMap<>();
     @Nullable
     private HoverTarget hoverTarget;
+
+    /** 右栏目录：内容相对视口顶部的像素偏移。 */
+    private int catalogScrollPx;
+    private int catalogListLeft;
+    private int catalogListRight;
+    private int catalogListTop;
+    private int catalogListBottom;
+    private int catalogMaxScroll;
+    private int catalogScrollBarX;
+    private int catalogScrollBarTop;
+    private int catalogScrollBarHeight;
+    private int catalogThumbTop;
+    private int catalogThumbHeight;
+    private boolean catalogThumbDragging;
+    private int catalogThumbGrabOffset;
+    /** 目录多选筛选：空 = 不过滤。 */
+    private final EnumSet<SeCatalogTag> catalogFilter = EnumSet.noneOf(SeCatalogTag.class);
 
     public SeLoadoutPanelWidget()
     {
@@ -250,70 +284,239 @@ public final class SeLoadoutPanelWidget extends Widget
     {
         int y = top;
         graphics.drawString(font, tr("section.catalog"), x, y, COLOR_SECTION, false);
-        y += LINE_HEIGHT + 4;
+        y += LINE_HEIGHT + 2;
+        y = drawCatalogFilterChips(graphics, font, x, contentW, y, mouseX, mouseY);
+        y += 4;
+
+        List<SeEffectDef> catalog = SeEffectRegistry.all().stream()
+                .filter(def -> def.matchesCatalogFilter(catalogFilter))
+                .collect(Collectors.toCollection(ArrayList::new));
+        int entryCount = catalog.size();
+        int contentHeight = entryCount <= 0
+                ? LINE_HEIGHT
+                : entryCount * CATALOG_ROW_HEIGHT + Math.max(0, entryCount - 1) * CATALOG_ROW_GAP;
+        int viewportH = Math.max(0, bottom - y);
+        boolean needScroll = contentHeight > viewportH;
+        int listW = needScroll ? Math.max(40, contentW - SCROLLBAR_WIDTH - SCROLLBAR_GAP) : contentW;
+        catalogMaxScroll = Math.max(0, contentHeight - viewportH);
+        catalogScrollPx = Mth.clamp(catalogScrollPx, 0, catalogMaxScroll);
+
+        catalogListLeft = x;
+        catalogListRight = x + contentW;
+        catalogListTop = y;
+        catalogListBottom = bottom;
+        catalogScrollBarX = x + contentW - SCROLLBAR_WIDTH;
+        catalogScrollBarTop = y;
+        catalogScrollBarHeight = viewportH;
+        updateCatalogThumbGeometry();
 
         Set<String> ownedTechniques = Set.of(PlayerTechniqueData.getInnateTechnique(player));
-        for (SeEffectDef def : SeEffectRegistry.all())
+        graphics.enableScissor(x, catalogListTop, x + listW, catalogListBottom);
+        if (entryCount == 0)
         {
-            int rowHeight = LINE_HEIGHT * 4 + ROW_PAD * 2;
-            if (y + rowHeight > bottom)
+            graphics.drawString(font, tr("filter.empty"), x + 4, catalogListTop + 2, COLOR_HINT, false);
+        }
+        else
+        {
+            int rowY = catalogListTop - catalogScrollPx;
+            for (SeEffectDef def : catalog)
             {
-                graphics.drawString(font, "…", x, y, COLOR_HINT, false);
-                break;
+                int rowBottom = rowY + CATALOG_ROW_HEIGHT;
+                boolean visible = rowBottom > catalogListTop && rowY < catalogListBottom;
+                if (visible)
+                {
+                    drawCatalogRow(graphics, font, player, def, ownedTechniques,
+                            x, listW, rowY, mouseX, mouseY);
+                }
+                rowY = rowBottom + CATALOG_ROW_GAP;
             }
-            List<Integer> probedSlots = PlayerSeLoadoutData.listProbedSlots(player, def.item());
-            int selectedSlot = resolveSelectedSlot(player, def, probedSlots);
-            boolean active = PlayerSeLoadoutData.isSeEquipped(player, def.seId());
-            boolean hasItem = hasItem(player, def.item());
-            boolean hasProbed = !probedSlots.isEmpty();
-            boolean slotOk = PlayerSeLoadoutData.isValidEquipSlot(player, def.item(), selectedSlot);
-            boolean scopeOk = def.scope().matches(ownedTechniques);
-            boolean narrowOk = !SeMechanicRegistry.hasNarrowInterfaceConflict(
-                    PlayerSeLoadoutData.getEquippedIds(player), def.seId());
-            boolean qualityOk = !PlayerQualityPoolData.wouldExceedHardLimit(player, def.quality());
-            boolean loadable = !active && slotOk && scopeOk && narrowOk && qualityOk;
+        }
+        graphics.disableScissor();
 
-            boolean hover = mouseX >= x && mouseX < x + contentW && mouseY >= y && mouseY < y + rowHeight;
-            graphics.fill(x, y, x + contentW, y + rowHeight, hover ? COLOR_ROW_HOVER : COLOR_ROW_IDLE);
+        if (needScroll)
+        {
+            drawCatalogScrollbar(graphics, mouseX, mouseY);
+        }
+        else
+        {
+            catalogThumbHeight = 0;
+        }
+    }
 
-            int nameColor = active ? COLOR_ACTIVE : (loadable ? COLOR_VALUE : COLOR_MISSING);
-            String name = def.item().getDescription().getString();
-            graphics.drawString(font, name, x + 4, y + ROW_PAD, nameColor, false);
+    /** @return 芯片行结束后的 y */
+    private int drawCatalogFilterChips(GuiGraphics graphics, Font font,
+                                       int x, int contentW, int top, int mouseX, int mouseY)
+    {
+        int chipX = x;
+        int chipY = top;
+        int rowBottom = top + FILTER_CHIP_HEIGHT;
+        for (SeCatalogTag tag : SeCatalogTag.values())
+        {
+            String label = tag.displayName().getString();
+            int chipW = font.width(label) + FILTER_CHIP_PAD_X * 2;
+            if (chipX > x && chipX + chipW > x + contentW)
+            {
+                chipX = x;
+                chipY = rowBottom + FILTER_CHIP_GAP;
+                rowBottom = chipY + FILTER_CHIP_HEIGHT;
+            }
+            boolean active = catalogFilter.contains(tag);
+            boolean hover = mouseX >= chipX && mouseX < chipX + chipW
+                    && mouseY >= chipY && mouseY < chipY + FILTER_CHIP_HEIGHT;
+            int bg = active ? COLOR_CHIP_ACTIVE : (hover ? COLOR_ROW_HOVER : COLOR_CHIP_IDLE);
+            int fg = active ? COLOR_CHIP_TEXT_ACTIVE : COLOR_CHIP_TEXT_IDLE;
+            graphics.fill(chipX, chipY, chipX + chipW, chipY + FILTER_CHIP_HEIGHT, bg);
+            graphics.drawString(font, label, chipX + FILTER_CHIP_PAD_X,
+                    chipY + (FILTER_CHIP_HEIGHT - LINE_HEIGHT) / 2, fg, false);
+            hits.add(new Hit(chipX, chipY, chipX + chipW, chipY + FILTER_CHIP_HEIGHT,
+                    HitKind.FILTER_TOGGLE, tag.id(), -1));
+            chipX += chipW + FILTER_CHIP_GAP;
+        }
+        return rowBottom;
+    }
 
-            String status = statusText(active, narrowOk, slotOk, scopeOk, hasItem, hasProbed, qualityOk);
-            graphics.drawString(font, status, x + contentW - font.width(status) - 4, y + ROW_PAD,
-                    loadable ? COLOR_ACTIVE : COLOR_HINT, false);
+    private void drawCatalogRow(GuiGraphics graphics, Font font, LocalPlayer player, SeEffectDef def,
+                                Set<String> ownedTechniques, int x, int listW, int y,
+                                int mouseX, int mouseY)
+    {
+        List<Integer> probedSlots = PlayerSeLoadoutData.listProbedSlots(player, def.item());
+        int selectedSlot = resolveSelectedSlot(player, def, probedSlots);
+        boolean active = PlayerSeLoadoutData.isSeEquipped(player, def.seId());
+        boolean hasItem = hasItem(player, def.item());
+        boolean hasProbed = !probedSlots.isEmpty();
+        boolean slotOk = PlayerSeLoadoutData.isValidEquipSlot(player, def.item(), selectedSlot);
+        boolean scopeOk = def.scope().matches(ownedTechniques);
+        boolean narrowOk = !SeMechanicRegistry.hasNarrowInterfaceConflict(
+                PlayerSeLoadoutData.getEquippedIds(player), def.seId());
+        boolean qualityOk = !PlayerQualityPoolData.wouldExceedHardLimit(player, def.quality());
+        boolean loadable = !active && slotOk && scopeOk && narrowOk && qualityOk;
 
-            String effect = SeMechanicRegistry.find(def.seId())
-                    .map(m -> m.effectDescription().getString())
-                    .orElseGet(() -> tr("effect.fallback", def.seId()));
-            graphics.drawString(font, effect, x + 4, y + ROW_PAD + LINE_HEIGHT, COLOR_HINT, false);
+        int hitTop = Math.max(y, catalogListTop);
+        int hitBottom = Math.min(y + CATALOG_ROW_HEIGHT, catalogListBottom);
+        boolean hover = mouseX >= x && mouseX < x + listW
+                && mouseY >= hitTop && mouseY < hitBottom
+                && mouseY >= catalogListTop && mouseY < catalogListBottom;
+        graphics.fill(x, y, x + listW, y + CATALOG_ROW_HEIGHT, hover ? COLOR_ROW_HOVER : COLOR_ROW_IDLE);
 
-            String requirement = tr("requirement", traitText(),
-                    scopeText(def), def.quality());
-            graphics.drawString(font, requirement, x + 4, y + ROW_PAD + LINE_HEIGHT * 2, COLOR_HINT, false);
+        int nameColor = active ? COLOR_ACTIVE : (loadable ? COLOR_VALUE : COLOR_MISSING);
+        String name = def.item().getDescription().getString();
+        graphics.drawString(font, name, x + 4, y + ROW_PAD, nameColor, false);
 
-            int selY = y + ROW_PAD + LINE_HEIGHT * 3;
-            int btnW = 14;
-            String selLabel = formatSelectionLabel(player, selectedSlot, probedSlots.size());
-            graphics.drawString(font, "<", x + 4, selY, COLOR_VALUE, false);
-            graphics.drawString(font, selLabel, x + 4 + btnW, selY, COLOR_HINT, false);
-            graphics.drawString(font, ">", x + contentW - 4 - font.width(">"), selY, COLOR_VALUE, false);
+        String status = statusText(active, narrowOk, slotOk, scopeOk, hasItem, hasProbed, qualityOk);
+        graphics.drawString(font, status, x + listW - font.width(status) - 4, y + ROW_PAD,
+                loadable ? COLOR_ACTIVE : COLOR_HINT, false);
 
-            hits.add(new Hit(x + 4, selY, x + 4 + btnW, selY + LINE_HEIGHT,
-                    HitKind.CYCLE_PREV, def.seId(), -1));
-            hits.add(new Hit(x + contentW - 4 - btnW, selY, x + contentW - 4, selY + LINE_HEIGHT,
-                    HitKind.CYCLE_NEXT, def.seId(), -1));
+        String effect = SeMechanicRegistry.find(def.seId())
+                .map(m -> m.effectDescription().getString())
+                .orElseGet(() -> tr("effect.fallback", def.seId()));
+        graphics.drawString(font, effect, x + 4, y + ROW_PAD + LINE_HEIGHT, COLOR_HINT, false);
+
+        String requirement = tr("requirement", traitText(),
+                scopeText(def), def.quality()) + " · " + formatModeTags(def);
+        graphics.drawString(font, requirement, x + 4, y + ROW_PAD + LINE_HEIGHT * 2, COLOR_HINT, false);
+
+        int selY = y + ROW_PAD + LINE_HEIGHT * 3;
+        int btnW = 14;
+        String selLabel = formatSelectionLabel(player, selectedSlot, probedSlots.size());
+        graphics.drawString(font, "<", x + 4, selY, COLOR_VALUE, false);
+        graphics.drawString(font, selLabel, x + 4 + btnW, selY, COLOR_HINT, false);
+        graphics.drawString(font, ">", x + listW - 4 - font.width(">"), selY, COLOR_VALUE, false);
+
+        if (hitBottom > hitTop)
+        {
+            addClippedHit(x + 4, selY, x + 4 + btnW, selY + LINE_HEIGHT,
+                    HitKind.CYCLE_PREV, def.seId(), -1);
+            addClippedHit(x + listW - 4 - btnW, selY, x + listW - 4, selY + LINE_HEIGHT,
+                    HitKind.CYCLE_NEXT, def.seId(), -1);
             if (loadable)
             {
-                hits.add(new Hit(x, y, x + contentW, selY, HitKind.EQUIP, def.seId(), selectedSlot));
+                addClippedHit(x, y, x + listW, selY, HitKind.EQUIP, def.seId(), selectedSlot);
             }
-            if (hover)
-            {
-                hoverTarget = new HoverTarget(def.seId(), false);
-            }
-            y += rowHeight + 2;
         }
+        if (hover)
+        {
+            hoverTarget = new HoverTarget(def.seId(), false);
+        }
+    }
+
+    /** 只登记与目录视口相交的点击区，避免滚出视野仍可点。 */
+    private void addClippedHit(int left, int top, int right, int bottom,
+                               HitKind kind, String seId, int inventorySlot)
+    {
+        int clipTop = Math.max(top, catalogListTop);
+        int clipBottom = Math.min(bottom, catalogListBottom);
+        if (clipBottom <= clipTop || right <= left)
+        {
+            return;
+        }
+        hits.add(new Hit(left, clipTop, right, clipBottom, kind, seId, inventorySlot));
+    }
+
+    private void updateCatalogThumbGeometry()
+    {
+        if (catalogMaxScroll <= 0 || catalogScrollBarHeight <= 0)
+        {
+            catalogThumbTop = catalogScrollBarTop;
+            catalogThumbHeight = 0;
+            return;
+        }
+        int track = catalogScrollBarHeight;
+        catalogThumbHeight = Math.max(16, track * track / (track + catalogMaxScroll));
+        int travel = Math.max(1, track - catalogThumbHeight);
+        catalogThumbTop = catalogScrollBarTop
+                + (int) Math.round((double) catalogScrollPx / catalogMaxScroll * travel);
+    }
+
+    private void drawCatalogScrollbar(GuiGraphics graphics, int mouseX, int mouseY)
+    {
+        int x1 = catalogScrollBarX;
+        int y1 = catalogScrollBarTop;
+        int x2 = x1 + SCROLLBAR_WIDTH;
+        int y2 = y1 + catalogScrollBarHeight;
+        graphics.fill(x1, y1, x2, y2, COLOR_BAR_TRACK);
+        boolean thumbHover = mouseX >= x1 && mouseX < x2
+                && mouseY >= catalogThumbTop && mouseY < catalogThumbTop + catalogThumbHeight;
+        int thumbColor = (thumbHover || catalogThumbDragging) ? COLOR_SCROLL_THUMB : COLOR_BAR_NORMAL;
+        graphics.fill(x1, catalogThumbTop, x2, catalogThumbTop + catalogThumbHeight, thumbColor);
+    }
+
+    private boolean isOverCatalogList(double mouseX, double mouseY)
+    {
+        return mouseX >= catalogListLeft && mouseX < catalogListRight
+                && mouseY >= catalogListTop && mouseY < catalogListBottom;
+    }
+
+    private boolean isOverCatalogScrollbar(double mouseX, double mouseY)
+    {
+        return catalogMaxScroll > 0
+                && mouseX >= catalogScrollBarX && mouseX < catalogScrollBarX + SCROLLBAR_WIDTH
+                && mouseY >= catalogScrollBarTop
+                && mouseY < catalogScrollBarTop + catalogScrollBarHeight;
+    }
+
+    private void setCatalogScrollFromThumbCenter(double mouseY)
+    {
+        if (catalogMaxScroll <= 0)
+        {
+            catalogScrollPx = 0;
+            return;
+        }
+        int travel = Math.max(1, catalogScrollBarHeight - catalogThumbHeight);
+        double rel = mouseY - catalogScrollBarTop - catalogThumbHeight / 2.0D;
+        catalogScrollPx = Mth.clamp((int) Math.round(rel / travel * catalogMaxScroll), 0, catalogMaxScroll);
+        updateCatalogThumbGeometry();
+    }
+
+    private void setCatalogScrollFromDrag(double mouseY)
+    {
+        if (catalogMaxScroll <= 0)
+        {
+            return;
+        }
+        int travel = Math.max(1, catalogScrollBarHeight - catalogThumbHeight);
+        double rel = mouseY - catalogScrollBarTop - catalogThumbGrabOffset;
+        catalogScrollPx = Mth.clamp((int) Math.round(rel / travel * catalogMaxScroll), 0, catalogMaxScroll);
+        updateCatalogThumbGeometry();
     }
 
     private int resolveSelectedSlot(LocalPlayer player, SeEffectDef def, List<Integer> probedSlots)
@@ -399,6 +602,8 @@ public final class SeLoadoutPanelWidget extends Widget
         lines.add(Component.translatable("gui.jujutsukaisenzone.se.tooltip.quality", def.quality())
                 .withStyle(ChatFormatting.GRAY));
         lines.add(Component.translatable("gui.jujutsukaisenzone.se.tooltip.scope", scopeText(def))
+                .withStyle(ChatFormatting.GRAY));
+        lines.add(Component.translatable("gui.jujutsukaisenzone.se.tooltip.tags", formatCatalogTags(def))
                 .withStyle(ChatFormatting.GRAY));
 
         if (target.equipped())
@@ -565,6 +770,35 @@ public final class SeLoadoutPanelWidget extends Widget
         return tr("scope.generic");
     }
 
+    private static String formatCatalogTags(SeEffectDef def)
+    {
+        return def.catalogTags().stream()
+                .map(tag -> tag.displayName().getString())
+                .collect(Collectors.joining(" · "));
+    }
+
+    /** 行内只补 mode 轴（scope 已在 requirement 中）。 */
+    private static String formatModeTags(SeEffectDef def)
+    {
+        return def.catalogTags().stream()
+                .filter(SeCatalogTag::isModeAxis)
+                .map(tag -> tag.displayName().getString())
+                .collect(Collectors.joining(" · "));
+    }
+
+    private void toggleCatalogFilter(SeCatalogTag tag)
+    {
+        if (tag == null)
+        {
+            return;
+        }
+        if (!catalogFilter.add(tag))
+        {
+            catalogFilter.remove(tag);
+        }
+        catalogScrollPx = 0;
+    }
+
     private static String formatAmount(double amount)
     {
         if (Math.abs(amount - Math.rint(amount)) < 1.0E-6)
@@ -579,6 +813,20 @@ public final class SeLoadoutPanelWidget extends Widget
     {
         if (button == 0)
         {
+            if (isOverCatalogScrollbar(mouseX, mouseY))
+            {
+                if (mouseY >= catalogThumbTop && mouseY < catalogThumbTop + catalogThumbHeight)
+                {
+                    catalogThumbDragging = true;
+                    catalogThumbGrabOffset = (int) mouseY - catalogThumbTop;
+                }
+                else
+                {
+                    setCatalogScrollFromThumbCenter(mouseY);
+                }
+                return true;
+            }
+
             LocalPlayer player = Minecraft.getInstance().player;
             for (Hit hit : hits)
             {
@@ -602,12 +850,51 @@ public final class SeLoadoutPanelWidget extends Widget
                                 cycleSelection(player, hit.seId, 1);
                             }
                         }
+                        case FILTER_TOGGLE -> toggleCatalogFilter(SeCatalogTag.find(hit.seId));
                     }
                     return true;
                 }
             }
         }
         return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    @Override
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY)
+    {
+        if (catalogThumbDragging && button == 0)
+        {
+            setCatalogScrollFromDrag(mouseY);
+            return true;
+        }
+        return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
+    }
+
+    @Override
+    public boolean mouseReleased(double mouseX, double mouseY, int button)
+    {
+        if (button == 0 && catalogThumbDragging)
+        {
+            catalogThumbDragging = false;
+            return true;
+        }
+        return super.mouseReleased(mouseX, mouseY, button);
+    }
+
+    @Override
+    public boolean mouseWheelMove(double mouseX, double mouseY, double wheelDelta)
+    {
+        if (catalogMaxScroll > 0 && isOverCatalogList(mouseX, mouseY))
+        {
+            int step = Math.max(CATALOG_ROW_HEIGHT / 2, LINE_HEIGHT * 2);
+            catalogScrollPx = Mth.clamp(
+                    catalogScrollPx - (int) Math.signum(wheelDelta) * step,
+                    0,
+                    catalogMaxScroll);
+            updateCatalogThumbGeometry();
+            return true;
+        }
+        return super.mouseWheelMove(mouseX, mouseY, wheelDelta);
     }
 
     private static boolean hasItem(LocalPlayer player, Item item)
@@ -642,7 +929,8 @@ public final class SeLoadoutPanelWidget extends Widget
         EQUIP,
         UNEQUIP,
         CYCLE_PREV,
-        CYCLE_NEXT
+        CYCLE_NEXT,
+        FILTER_TOGGLE
     }
 
     private record Hit(int left, int top, int right, int bottom, HitKind kind, String seId, int inventorySlot)

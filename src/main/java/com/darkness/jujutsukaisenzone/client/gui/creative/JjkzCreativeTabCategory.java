@@ -38,6 +38,8 @@ public enum JjkzCreativeTabCategory
                     ModItems.CURSED_OBJECT_TORN_FAN,
                     ModItems.CURSED_OBJECT_OLD_PIPE,
                     ModItems.CURSED_OBJECT_CRACKED_ABACUS,
+                    ModItems.CURSED_OBJECT_MELTED_ICE_PACK,
+                    ModItems.CURSED_OBJECT_LOOSE_EARPLUGS,
                     ModItems.CURSED_OBJECT_WARPED_MIRROR,
                     ModItems.CURSED_OBJECT_WORN_DOLL,
                     ModItems.CURSED_OBJECT_CRACKED_PHONE,
@@ -50,6 +52,9 @@ public enum JjkzCreativeTabCategory
                     ModItems.CURSED_OBJECT_TORN_STUDENT_ID,
                     ModItems.CURSED_OBJECT_CRACKED_URN,
                     ModItems.CURSED_OBJECT_CHIPPED_CUTTING_BOARD,
+                    ModItems.CURSED_OBJECT_PROOF_OF_THE_STRONGEST,
+                    ModItems.CURSED_OBJECT_FILLED_TIMESHEET,
+                    ModItems.CURSED_OBJECT_DAMAGED_LEATHER_WATCH,
                     ModItems.CURSED_OBJECT_SUKUNA_FINGER
             ));
 

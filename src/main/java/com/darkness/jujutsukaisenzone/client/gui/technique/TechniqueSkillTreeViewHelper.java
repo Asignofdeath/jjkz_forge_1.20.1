@@ -6,6 +6,7 @@ import com.darkness.jujutsukaisenzone.player.PlayerSeanceTechniqueData;
 import com.darkness.jujutsukaisenzone.player.PlayerShrineBlackFlashMilestoneData;
 import com.darkness.jujutsukaisenzone.player.PlayerTechniqueIntelData;
 import com.darkness.jujutsukaisenzone.player.SeanceTechniqueLevel;
+import com.darkness.jujutsukaisenzone.technique.MeltdownRepairLearnLogic;
 import com.darkness.jujutsukaisenzone.technique.commonskill.ReverseTechniqueCommonKeySkill;
 import com.darkness.jujutsukaisenzone.technique.development.SkillTreeNodeDef;
 import com.darkness.jujutsukaisenzone.technique.development.SkillTreeReferenceKind;
@@ -119,6 +120,11 @@ public final class TechniqueSkillTreeViewHelper
                     && ReverseTechniqueCommonKeySkill.INSTANCE.skillId().equals(node.referenceId()))
             {
                 return Component.translatable("key.jujutsukaisenzone.reverse_technique");
+            }
+            if (node.referenceKind() == SkillTreeReferenceKind.COMMON_SKILL
+                    && MeltdownRepairLearnLogic.SKILL_ID.equals(node.referenceId()))
+            {
+                return Component.translatable("gui.jujutsukaisenzone.player_data.meltdown_repair");
             }
             if (node.referenceKind() == SkillTreeReferenceKind.BLACK_FLASH_COUNT)
             {

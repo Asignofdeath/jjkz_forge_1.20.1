@@ -1,9 +1,15 @@
 package com.darkness.jujutsukaisenzone.technique.se;
 
 import com.darkness.jujutsukaisenzone.player.PlayerSeLoadoutData;
+import com.darkness.jujutsukaisenzone.technique.se.mechanic.BrainChargeDullMechanic;
+import com.darkness.jujutsukaisenzone.technique.se.mechanic.DamagedLeatherWatchMechanic;
+import com.darkness.jujutsukaisenzone.technique.se.mechanic.FilledTimesheetMechanic;
 import com.darkness.jujutsukaisenzone.technique.se.mechanic.MartialCritIgniteMechanic;
 import com.darkness.jujutsukaisenzone.technique.se.mechanic.MartialDomainSiphonMechanic;
+import com.darkness.jujutsukaisenzone.technique.se.mechanic.MeltdownSoftResetMechanic;
 import com.darkness.jujutsukaisenzone.technique.se.mechanic.ShrineFinishCutMechanic;
+import com.darkness.jujutsukaisenzone.technique.se.mechanic.StarEarringZenoPushMechanic;
+import com.darkness.jujutsukaisenzone.technique.se.mechanic.StrongestProofMechanic;
 import net.minecraft.world.entity.player.Player;
 import org.jetbrains.annotations.Nullable;
 
@@ -31,7 +37,13 @@ public final class SeMechanicRegistry
     private static final List<Class<? extends SeMechanic>> NARROW_INTERFACES = List.of(
             MartialCritSeMechanic.class,
             DomainGaugeSeMechanic.class,
-            ShrineFinishCutSeMechanic.class);
+            DomainChargeCurveSeMechanic.class,
+            MeltdownRepairSeMechanic.class,
+            ShrineFinishCutSeMechanic.class,
+            ZenoWallSeMechanic.class,
+            LimitlessNearCasterExemptSeMechanic.class,
+            WorkEfficiencySeMechanic.class,
+            CritPowerStackSeMechanic.class);
 
     private SeMechanicRegistry()
     {
@@ -42,7 +54,13 @@ public final class SeMechanicRegistry
         BY_ID.clear();
         register(new MartialCritIgniteMechanic());
         register(new MartialDomainSiphonMechanic());
+        register(new MeltdownSoftResetMechanic());
+        register(new BrainChargeDullMechanic());
         register(new ShrineFinishCutMechanic());
+        register(new StarEarringZenoPushMechanic());
+        register(new StrongestProofMechanic());
+        register(new FilledTimesheetMechanic());
+        register(new DamagedLeatherWatchMechanic());
     }
 
     private static void register(SeMechanic mechanic)

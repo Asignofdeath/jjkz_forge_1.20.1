@@ -352,6 +352,7 @@ public final class PlayerSeLoadoutData
         PlayerSePenaltyApplier.recompute(player);
         PlayerHealthData.scaleHealthAfterMaxChange(player, oldMaxHp, oldHp);
         PlayerCursedEnergyData.recalculateAfterGradeChange(player);
+        PlayerCritPowerStackData.clearIfNoMechanic(player);
         PlayerCombatPowerData.syncToClient(player);
         PlayerDomainGaugeData.syncToClient(player);
     }

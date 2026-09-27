@@ -318,7 +318,7 @@ public class Config
 
     // ======== 修复术式熔断（第3期） ========
     private static final ForgeConfigSpec.BooleanValue DOMAIN_MELTDOWN_REPAIR_ENABLED = BUILDER
-            .comment("Allow Shift+G reverse technique to clear Technique Meltdown at the cost of cursed energy + brain damage.")
+            .comment("Allow Shift+G (requires unlocked meltdown-repair common skill) to clear Technique Meltdown at the cost of cursed energy + brain damage.")
             .define("domainMeltdownRepair.enabled", true);
 
     private static final ForgeConfigSpec.IntValue DOMAIN_MELTDOWN_REPAIR_COST = BUILDER

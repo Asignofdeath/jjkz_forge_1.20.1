@@ -142,6 +142,7 @@ public final class JjkzPlayerDataStorage extends SavedData
         private static final String TAG_DOMAIN_GAUGE = "domainGauge";
         private static final String TAG_MELTDOWN_REPAIRS_TODAY = "meltdownRepairsToday";
         private static final String TAG_MELTDOWN_REPAIR_COUNT_DAY = "meltdownRepairCountDay";
+        private static final String TAG_MELTDOWN_REPAIR_LEARNED = "meltdownRepairLearned";
 
         boolean cursedEnergyInitialized;
         int cursedEnergyBaseMax;
@@ -185,6 +186,7 @@ public final class JjkzPlayerDataStorage extends SavedData
         int domainGauge;
         int meltdownRepairsToday;
         long meltdownRepairCountDay = -1L;
+        boolean meltdownRepairLearned;
 
         private static PlayerDataEntry load(CompoundTag tag)
         {
@@ -282,6 +284,7 @@ public final class JjkzPlayerDataStorage extends SavedData
             entry.meltdownRepairCountDay = tag.contains(TAG_MELTDOWN_REPAIR_COUNT_DAY)
                     ? tag.getLong(TAG_MELTDOWN_REPAIR_COUNT_DAY)
                     : -1L;
+            entry.meltdownRepairLearned = tag.getBoolean(TAG_MELTDOWN_REPAIR_LEARNED);
             return entry;
         }
 
@@ -354,6 +357,7 @@ public final class JjkzPlayerDataStorage extends SavedData
             tag.putInt(TAG_DOMAIN_GAUGE, Math.max(0, domainGauge));
             tag.putInt(TAG_MELTDOWN_REPAIRS_TODAY, Math.max(0, meltdownRepairsToday));
             tag.putLong(TAG_MELTDOWN_REPAIR_COUNT_DAY, meltdownRepairCountDay);
+            tag.putBoolean(TAG_MELTDOWN_REPAIR_LEARNED, meltdownRepairLearned);
             return tag;
         }
 

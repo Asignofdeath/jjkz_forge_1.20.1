@@ -2,9 +2,15 @@ package com.darkness.jujutsukaisenzone.technique.se;
 
 import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
 import com.darkness.jujutsukaisenzone.registry.ModItems;
+import com.darkness.jujutsukaisenzone.technique.se.mechanic.BrainChargeDullMechanic;
+import com.darkness.jujutsukaisenzone.technique.se.mechanic.DamagedLeatherWatchMechanic;
+import com.darkness.jujutsukaisenzone.technique.se.mechanic.FilledTimesheetMechanic;
 import com.darkness.jujutsukaisenzone.technique.se.mechanic.MartialCritIgniteMechanic;
 import com.darkness.jujutsukaisenzone.technique.se.mechanic.MartialDomainSiphonMechanic;
+import com.darkness.jujutsukaisenzone.technique.se.mechanic.MeltdownSoftResetMechanic;
 import com.darkness.jujutsukaisenzone.technique.se.mechanic.ShrineFinishCutMechanic;
+import com.darkness.jujutsukaisenzone.technique.se.mechanic.StarEarringZenoPushMechanic;
+import com.darkness.jujutsukaisenzone.technique.se.mechanic.StrongestProofMechanic;
 import com.darkness.jujutsukaisenzone.technique.skillset.TechniqueSkillSetRegistry;
 import net.minecraft.world.item.Item;
 
@@ -35,30 +41,87 @@ public final class SeEffectRegistry
     {
         BY_ID.clear();
         BY_ITEM.clear();
-        // 旧烟管：体术暴击点燃（效果在 MartialCritIgniteMechanic）
+        // 旧烟管：体术暴击点燃（增量）
         register(SeEffectDef.of(
                 MartialCritIgniteMechanic.SE_ID,
                 ModItems.CURSED_OBJECT_OLD_PIPE,
                 SeTrigger.ON_MARTIAL_CRIT,
                 "fire",
                 1,
-                SeScope.generic()));
-        // 裂纹算盘：体术命中灌领域量表（效果在 MartialDomainSiphonMechanic）
+                SeScope.generic(),
+                SeCatalogTag.GENERIC, SeCatalogTag.ADDITIVE));
+        // 裂纹算盘：体术命中灌领域量表（增量：多一条灌充来源）
         register(SeEffectDef.of(
                 MartialDomainSiphonMechanic.SE_ID,
                 ModItems.CURSED_OBJECT_CRACKED_ABACUS,
                 SeTrigger.PASSIVE,
                 "domain",
                 2,
-                SeScope.generic()));
-        // 缺口的俎板：御厨子专用「收刀」（效果在 ShrineFinishCutMechanic）
+                SeScope.generic(),
+                SeCatalogTag.GENERIC, SeCatalogTag.ADDITIVE));
+        // 半融的冰袋：修熔断更省（修改兑换比）
+        register(SeEffectDef.of(
+                MeltdownSoftResetMechanic.SE_ID,
+                ModItems.CURSED_OBJECT_MELTED_ICE_PACK,
+                SeTrigger.PASSIVE,
+                "",
+                2,
+                SeScope.generic(),
+                SeCatalogTag.GENERIC, SeCatalogTag.MODIFY));
+        // 填料脱落的耳塞：中度脑损充能惩罚减半（修改曲线）
+        register(SeEffectDef.of(
+                BrainChargeDullMechanic.SE_ID,
+                ModItems.CURSED_OBJECT_LOOSE_EARPLUGS,
+                SeTrigger.PASSIVE,
+                "",
+                2,
+                SeScope.generic(),
+                SeCatalogTag.GENERIC, SeCatalogTag.MODIFY));
+        // 缺口的俎板：御厨子专用「收刀」（专用 + 增量）
         register(SeEffectDef.of(
                 ShrineFinishCutMechanic.SE_ID,
                 ModItems.CURSED_OBJECT_CHIPPED_CUTTING_BOARD,
                 SeTrigger.PASSIVE,
                 "signature",
                 2,
-                SeScope.technique(PlayerTechniqueData.TECHNIQUE_SHRINE)));
+                SeScope.technique(PlayerTechniqueData.TECHNIQUE_SHRINE),
+                SeCatalogTag.SPECIALIZED, SeCatalogTag.ADDITIVE));
+        // 掉钻的星形耳环：爱与幽会专用「推着走」（专用 + 修改芝诺墙）
+        register(SeEffectDef.of(
+                StarEarringZenoPushMechanic.SE_ID,
+                ModItems.CURSED_OBJECT_STAR_EARRING,
+                SeTrigger.PASSIVE,
+                "",
+                2,
+                SeScope.technique(PlayerTechniqueData.TECHNIQUE_LOVE_RENDEZVOUS),
+                SeCatalogTag.SPECIALIZED, SeCatalogTag.MODIFY));
+        // 最强的证明：无下限专用「移除身旁豁免」（专用 + 移除）
+        register(SeEffectDef.of(
+                StrongestProofMechanic.SE_ID,
+                ModItems.CURSED_OBJECT_PROOF_OF_THE_STRONGEST,
+                SeTrigger.PASSIVE,
+                "",
+                2,
+                SeScope.technique(PlayerTechniqueData.TECHNIQUE_LIMITLESS),
+                SeCatalogTag.SPECIALIZED, SeCatalogTag.REMOVE));
+        // 填满的工时单：通用「工作效率」触发（通用 + 增量）
+        register(SeEffectDef.of(
+                FilledTimesheetMechanic.SE_ID,
+                ModItems.CURSED_OBJECT_FILLED_TIMESHEET,
+                SeTrigger.PASSIVE,
+                "",
+                2,
+                SeScope.generic(),
+                SeCatalogTag.GENERIC, SeCatalogTag.ADDITIVE));
+        // 损坏的皮质手表：通用「暴击叠层抬强度」（通用 + 增量）
+        register(SeEffectDef.of(
+                DamagedLeatherWatchMechanic.SE_ID,
+                ModItems.CURSED_OBJECT_DAMAGED_LEATHER_WATCH,
+                SeTrigger.PASSIVE,
+                "",
+                2,
+                SeScope.generic(),
+                SeCatalogTag.GENERIC, SeCatalogTag.ADDITIVE));
     }
 
     private static void register(SeEffectDef def)
@@ -102,8 +165,35 @@ public final class SeEffectRegistry
                         + technique.techniqueId()
                         + "——拼错了，或术式改名后这里没跟着改（后果是这个 SE 永远装载不上）");
             }
+            validateCatalogTags(def);
         }
         SeMechanicRegistry.validatePairedWithEffects();
+    }
+
+    private static void validateCatalogTags(SeEffectDef def)
+    {
+        Set<SeCatalogTag> tags = def.catalogTags();
+        boolean generic = tags.contains(SeCatalogTag.GENERIC);
+        boolean specialized = tags.contains(SeCatalogTag.SPECIALIZED);
+        if (generic == specialized)
+        {
+            throw new IllegalStateException("SE「" + def.seId() + "」目录标签须且仅含一个 scope 轴"
+                    + "（GENERIC 或 SPECIALIZED），当前：" + tags);
+        }
+        boolean genericScope = def.scope() instanceof SeScope.Generic;
+        if (generic != genericScope)
+        {
+            throw new IllegalStateException("SE「" + def.seId() + "」目录标签与 SeScope 不一致："
+                    + "scope=" + def.scope().getClass().getSimpleName() + " tags=" + tags);
+        }
+        boolean modify = tags.contains(SeCatalogTag.MODIFY);
+        boolean additive = tags.contains(SeCatalogTag.ADDITIVE);
+        boolean remove = tags.contains(SeCatalogTag.REMOVE);
+        if (!modify && !additive && !remove)
+        {
+            throw new IllegalStateException("SE「" + def.seId() + "」目录标签至少要有一个 mode 轴"
+                    + "（MODIFY / ADDITIVE / REMOVE），当前：" + tags);
+        }
     }
 
     public static Optional<SeEffectDef> find(String seId)

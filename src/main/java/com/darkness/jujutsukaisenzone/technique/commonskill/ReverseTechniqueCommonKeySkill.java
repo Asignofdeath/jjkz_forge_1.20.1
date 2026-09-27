@@ -2,6 +2,7 @@ package com.darkness.jujutsukaisenzone.technique.commonskill;
 
 import com.darkness.jujutsukaisenzone.compat.EpicFightCompat;
 import com.darkness.jujutsukaisenzone.network.ModNetwork;
+import com.darkness.jujutsukaisenzone.player.PlayerMeltdownRepairData;
 import com.darkness.jujutsukaisenzone.player.PlayerReverseTechniqueData;
 import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.Minecraft;
@@ -14,7 +15,8 @@ import org.lwjgl.glfw.GLFW;
  * 反转术式独立按键技能（默认 G）。
  * <p>
  * 业务意图：该技能不隶属于任何生得术式，独立于术式槽位系统。
- * 按住 G 触发反转术式；按住 Ctrl+G 触发结界修补；Shift+G 边沿触发修复术式熔断。
+ * 按住 G 触发反转术式；按住 Ctrl+G 触发结界修补；
+ * Shift+G 边沿触发修复术式熔断（需单独习得该通用技能）。
  */
 public final class ReverseTechniqueCommonKeySkill implements ICommonKeySkill
 {
@@ -61,10 +63,10 @@ public final class ReverseTechniqueCommonKeySkill implements ICommonKeySkill
         boolean shift = isShiftPressed();
         boolean ctrl = isCtrlPressed();
 
-        // Shift+G：修复熔断（优先于 Ctrl / 回血）；边沿触发一次
+        // Shift+G：修复熔断（独立通用技能解锁；优先于 Ctrl / 回血）；边沿触发一次
         if (shift && !ctrl)
         {
-            if (canTriggerClient(player) && !meltdownRepairLatched)
+            if (canTriggerMeltdownRepairClient(player) && !meltdownRepairLatched)
             {
                 meltdownRepairLatched = true;
                 ModNetwork.sendRepairMeltdownToServer();
@@ -87,6 +89,14 @@ public final class ReverseTechniqueCommonKeySkill implements ICommonKeySkill
     public void onKeyReleaseClientTick(Minecraft minecraft, LocalPlayer player)
     {
         meltdownRepairLatched = false;
+    }
+
+    /** Shift+G 修复熔断：与回血分离，只检查「修复术式熔断」习得。 */
+    private static boolean canTriggerMeltdownRepairClient(LocalPlayer player)
+    {
+        return player.isAlive()
+                && EpicFightCompat.isBattleMode(player)
+                && PlayerMeltdownRepairData.hasLearned(player);
     }
 
     private static boolean isCtrlPressed()

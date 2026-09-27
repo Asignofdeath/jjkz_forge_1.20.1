@@ -100,6 +100,8 @@ public final class JjkzPlayerDataDisplay
         String domainName = domainLogic.getDomainName();
         viewer.sendSystemMessage(Component.literal("领域展开: " + (hasDomain ? "已习得" : "未习得")
                 + (domainName.isEmpty() ? "" : "（" + domainName + "）")));
+        viewer.sendSystemMessage(Component.literal("修复术式熔断: "
+                + (PlayerMeltdownRepairData.hasLearned(subject) ? "已习得" : "未习得")));
         int brain = PlayerBrainDamageData.getBrainDamage(subject);
         int expands = PlayerBrainDamageData.getExpandsToday(subject);
         int free = PlayerBrainDamageData.getFreeDailyQuota();

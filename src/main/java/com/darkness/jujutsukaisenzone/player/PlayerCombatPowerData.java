@@ -3,8 +3,10 @@ package com.darkness.jujutsukaisenzone.player;
 import com.darkness.jujutsukaisenzone.Config;
 import com.darkness.jujutsukaisenzone.network.ModNetwork;
 import com.darkness.jujutsukaisenzone.player.CombatPowerStats.Contribution;
+import com.darkness.jujutsukaisenzone.technique.se.CritPowerStackSeMechanic;
 import com.darkness.jujutsukaisenzone.technique.se.PanelStat;
 import com.darkness.jujutsukaisenzone.technique.se.SeEffectRegistry;
+import com.darkness.jujutsukaisenzone.technique.se.SeMechanicRegistry;
 import com.darkness.jujutsukaisenzone.technique.se.SePenalty;
 import com.darkness.jujutsukaisenzone.technique.skill.tenshadows.TenShadowsPresenceBonuses;
 import net.minecraft.server.level.ServerPlayer;
@@ -189,6 +191,27 @@ public final class PlayerCombatPowerData
             technique.add(new Contribution(label, -overloadPenalty));
             physicalTotal -= overloadPenalty;
             techniqueTotal -= overloadPenalty;
+        }
+
+        // 暴击叠层 SE（皮质手表）：按当前合计乘比例；须在惩罚/超载之后，吃净面板。
+        var critStackMechanic = SeMechanicRegistry.findEquipped(player, CritPowerStackSeMechanic.class);
+        int critStacks = critStackMechanic.isPresent() ? PlayerCritPowerStackData.getStacks(player) : 0;
+        if (critStacks > 0 && critStackMechanic.isPresent())
+        {
+            double ratio = critStackMechanic.get().bonusPerStack() * critStacks;
+            int physBoost = (int) Math.round(physicalTotal * ratio);
+            int techBoost = (int) Math.round(techniqueTotal * ratio);
+            String label = "SE·暴击叠层 x" + critStacks;
+            if (physBoost != 0)
+            {
+                physical.add(new Contribution(label, physBoost));
+                physicalTotal += physBoost;
+            }
+            if (techBoost != 0)
+            {
+                technique.add(new Contribution(label, techBoost));
+                techniqueTotal += techBoost;
+            }
         }
 
         return new CombatPowerStats(

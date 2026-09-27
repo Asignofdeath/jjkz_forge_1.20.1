@@ -27,6 +27,11 @@ public record UnlockCondition(UnlockConditionType type, String arg)
         return new UnlockCondition(UnlockConditionType.HAS_DOMAIN_EXPANSION, "");
     }
 
+    public static UnlockCondition hasMeltdownRepair()
+    {
+        return new UnlockCondition(UnlockConditionType.HAS_MELTDOWN_REPAIR, "");
+    }
+
     public static UnlockCondition alwaysVisible()
     {
         return new UnlockCondition(UnlockConditionType.ALWAYS_VISIBLE, "");

@@ -67,14 +67,12 @@ public final class RatioOvertimeEvents
         {
             return;
         }
-        if (!PlayerTechniqueData.isRatio(player))
-        {
-            clearEfficiencyModifier(player);
-            return;
-        }
-
+        // 工作效率与术式解耦：工时单 SE / 无可谅解共用同一套状态，非十划也要 tick。
         tickEfficiency(player);
-        maybeAnnounceSchedule(player);
+        if (PlayerTechniqueData.isRatio(player))
+        {
+            maybeAnnounceSchedule(player);
+        }
     }
 
     private static void tickEfficiency(ServerPlayer player)

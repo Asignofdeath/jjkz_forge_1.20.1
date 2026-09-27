@@ -10,6 +10,7 @@ import com.darkness.jujutsukaisenzone.player.PlayerTechniqueIntelData;
 import com.darkness.jujutsukaisenzone.player.SeanceTechniqueLevel;
 import com.darkness.jujutsukaisenzone.technique.aerial.AerialCombatSkillRegistry;
 import com.darkness.jujutsukaisenzone.technique.aerial.AerialCombatSkills;
+import com.darkness.jujutsukaisenzone.technique.MeltdownRepairLearnLogic;
 import com.darkness.jujutsukaisenzone.technique.commonskill.CommonTechniqueSkillRegistry;
 import com.darkness.jujutsukaisenzone.technique.commonskill.ReverseTechniqueCommonKeySkill;
 import com.darkness.jujutsukaisenzone.technique.skillset.IInnateTechniqueSkillSet;
@@ -108,6 +109,11 @@ public final class SkillUnlockLogic
                 && ReverseTechniqueCommonKeySkill.INSTANCE.skillId().equals(node.referenceId()))
         {
             return UnlockConditionEvaluator.evaluate(player, UnlockCondition.hasReverseTechnique());
+        }
+        if (node.referenceKind() == SkillTreeReferenceKind.COMMON_SKILL
+                && MeltdownRepairLearnLogic.SKILL_ID.equals(node.referenceId()))
+        {
+            return UnlockConditionEvaluator.evaluate(player, UnlockCondition.hasMeltdownRepair());
         }
         if (node.referenceKind() == SkillTreeReferenceKind.BLACK_FLASH_COUNT)
         {

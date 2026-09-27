@@ -4,6 +4,7 @@ import com.darkness.jujutsukaisenzone.Config;
 import com.darkness.jujutsukaisenzone.network.ModNetwork;
 import com.darkness.jujutsukaisenzone.registry.ModAttributes;
 import com.darkness.jujutsukaisenzone.technique.domain.DomainExpansionRouter;
+import com.darkness.jujutsukaisenzone.technique.se.DomainChargeCurveSeMechanic;
 import com.darkness.jujutsukaisenzone.technique.se.DomainGaugeSeMechanic;
 import com.darkness.jujutsukaisenzone.technique.se.SeMechanicRegistry;
 import net.minecraft.ChatFormatting;
@@ -188,23 +189,34 @@ public final class PlayerDomainGaugeData
         return brain * panel;
     }
 
-    /** 仅脑损带来的充能系数（不含属性面板）。 */
+    /** 仅脑损带来的充能系数（不含属性面板）。可被 {@link DomainChargeCurveSeMechanic} 改写中档。 */
     public static double brainDamageEfficiency(Player player)
     {
         int damage = PlayerBrainDamageData.getBrainDamage(player);
+        double base;
         if (damage >= 75)
         {
-            return Config.domainGaugeEfficiency75;
+            base = Config.domainGaugeEfficiency75;
         }
-        if (damage >= 50)
+        else if (damage >= 50)
         {
-            return Config.domainGaugeEfficiency50;
+            base = Config.domainGaugeEfficiency50;
         }
-        if (damage >= 25)
+        else if (damage >= 25)
         {
-            return Config.domainGaugeEfficiency25;
+            base = Config.domainGaugeEfficiency25;
         }
-        return 1.0D;
+        else
+        {
+            return 1.0D;
+        }
+        Optional<DomainChargeCurveSeMechanic> curve =
+                SeMechanicRegistry.findEquipped(player, DomainChargeCurveSeMechanic.class);
+        if (curve.isEmpty())
+        {
+            return base;
+        }
+        return curve.get().adjustBrainTierEfficiency(damage, base);
     }
 
     public static void setGauge(ServerPlayer player, int value)

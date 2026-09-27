@@ -209,10 +209,46 @@ public final class ModItems
             () -> new CursedObjectItem(new Item.Properties().stacksTo(64), "裂痕累累的骨灰盒", CursedObjectGrade.SPECIAL)
     );
 
+    /** 咒物：溶けかけの氷嚢（通用 SE「温和复位」载体） */
+    public static final RegistryObject<Item> CURSED_OBJECT_MELTED_ICE_PACK = ITEMS.register(
+            "cursed_object_melted_ice_pack",
+            () -> new CursedObjectItem(new Item.Properties().stacksTo(64), "半融的冰袋", CursedObjectGrade.COMMON)
+    );
+
+    /** 咒物：詰め物の抜けた耳栓（通用 SE「钝感皮层」载体） */
+    public static final RegistryObject<Item> CURSED_OBJECT_LOOSE_EARPLUGS = ITEMS.register(
+            "cursed_object_loose_earplugs",
+            () -> new CursedObjectItem(new Item.Properties().stacksTo(64), "填料脱落的耳塞", CursedObjectGrade.COMMON)
+    );
+
     /** 咒物：欠けた俎板（御厨子专用 SE「收刀」载体） */
     public static final RegistryObject<Item> CURSED_OBJECT_CHIPPED_CUTTING_BOARD = ITEMS.register(
             "cursed_object_chipped_cutting_board",
             () -> new CursedObjectItem(new Item.Properties().stacksTo(64), "缺口的俎板", CursedObjectGrade.RARE)
+    );
+
+    /** 咒物：石の落ちた星形ピアス（爱与幽会专用 SE「推着走」载体） */
+    public static final RegistryObject<Item> CURSED_OBJECT_STAR_EARRING = ITEMS.register(
+            "cursed_object_star_earring",
+            () -> new CursedObjectItem(new Item.Properties().stacksTo(64), "掉钻的星形耳环", CursedObjectGrade.RARE)
+    );
+
+    /** 咒物：最強の証明（无下限专用 SE「移除身旁豁免」载体） */
+    public static final RegistryObject<Item> CURSED_OBJECT_PROOF_OF_THE_STRONGEST = ITEMS.register(
+            "cursed_object_proof_of_the_strongest",
+            () -> new CursedObjectItem(new Item.Properties().stacksTo(64), "最强的证明", CursedObjectGrade.SPECIAL)
+    );
+
+    /** 咒物：埋まった出勤簿（通用 SE「工作效率」载体） */
+    public static final RegistryObject<Item> CURSED_OBJECT_FILLED_TIMESHEET = ITEMS.register(
+            "cursed_object_filled_timesheet",
+            () -> new CursedObjectItem(new Item.Properties().stacksTo(64), "填满的工时单", CursedObjectGrade.COMMON)
+    );
+
+    /** 咒物：壊れた革の腕時計（通用 SE「暴击叠层」载体） */
+    public static final RegistryObject<Item> CURSED_OBJECT_DAMAGED_LEATHER_WATCH = ITEMS.register(
+            "cursed_object_damaged_leather_watch",
+            () -> new CursedObjectItem(new Item.Properties().stacksTo(64), "损坏的皮质手表", CursedObjectGrade.COMMON)
     );
 
     /** 咒物：両面宿儺の指 */

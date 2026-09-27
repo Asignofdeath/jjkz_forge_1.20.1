@@ -1,6 +1,7 @@
 package com.darkness.jujutsukaisenzone.effect;
 
 import com.darkness.jujutsukaisenzone.registry.ModEffects;
+import com.darkness.jujutsukaisenzone.technique.MeltdownRepairLearnLogic;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
@@ -47,6 +48,7 @@ public class TechniqueMeltdownEffect extends MobEffect
                         .withStyle(ChatFormatting.DARK_RED),
                 true
         );
+        MeltdownRepairLearnLogic.tryLearnOnMeltdownApplied(player);
     }
 
     /** 清除术式熔断（反转修复等）。 */

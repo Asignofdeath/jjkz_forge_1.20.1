@@ -2,6 +2,8 @@ package com.darkness.jujutsukaisenzone.player;
 
 import com.darkness.jujutsukaisenzone.Config;
 import com.darkness.jujutsukaisenzone.effect.TechniqueMeltdownEffect;
+import com.darkness.jujutsukaisenzone.technique.se.MeltdownRepairSeMechanic;
+import com.darkness.jujutsukaisenzone.technique.se.SeMechanicRegistry;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
@@ -9,12 +11,13 @@ import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Player;
 
+import java.util.Optional;
 import java.util.UUID;
 
 /**
  * 领域相关「脑损」：今日免费展开额度内不增加；超额递增；跨游戏日回复；满值禁止开域。
  * <p>
- * 第 3 期：反转术式修复术式熔断也会增加脑损（按今日修复次数递增）。
+ * 第 3 期：通用技能「修复术式熔断」也会增加脑损（按今日修复次数递增）。
  */
 public final class PlayerBrainDamageData
 {
@@ -138,8 +141,8 @@ public final class PlayerBrainDamageData
     }
 
     /**
-     * 反转术式修复术式熔断：扣咒力、清除熔断、按今日第几次修复加脑损。
-     * 满脑损禁止修复；无熔断 / 未学反转 / 咒力不足则失败且不扣脑损。
+     * 修复术式熔断：扣咒力、清除熔断、按今日第几次修复加脑损。
+     * 满脑损禁止修复；无熔断 / 未习得该通用技能 / 咒力不足则失败且不扣脑损。
      */
     public static boolean tryRepairMeltdown(ServerPlayer player)
     {
@@ -151,10 +154,10 @@ public final class PlayerBrainDamageData
                     true);
             return false;
         }
-        if (!PlayerReverseTechniqueData.hasReverseTechnique(player))
+        if (!PlayerMeltdownRepairData.hasLearned(player))
         {
             player.displayClientMessage(
-                    Component.literal("需要反转术式才能修复熔断")
+                    Component.literal("尚未习得修复术式熔断")
                             .withStyle(ChatFormatting.RED),
                     true);
             return false;
@@ -177,6 +180,12 @@ public final class PlayerBrainDamageData
         }
 
         int cost = Math.max(0, Config.domainMeltdownRepairCost);
+        Optional<MeltdownRepairSeMechanic> repairMechanic =
+                SeMechanicRegistry.findEquipped(player, MeltdownRepairSeMechanic.class);
+        if (repairMechanic.isPresent())
+        {
+            cost = Math.max(0, (int) Math.round(cost * repairMechanic.get().repairCostMultiplier()));
+        }
         if (!PlayerCursedEnergyData.tryConsume(player, cost))
         {
             player.displayClientMessage(
@@ -196,6 +205,10 @@ public final class PlayerBrainDamageData
         if (data.brainDamage >= Config.domainMeltdownRepairHighBrainThreshold)
         {
             gain += Math.max(0, Config.domainMeltdownRepairHighBrainExtra);
+        }
+        if (repairMechanic.isPresent())
+        {
+            gain = Math.max(0, (int) Math.round(gain * repairMechanic.get().repairBrainGainMultiplier()));
         }
         int before = data.brainDamage;
         data.brainDamage = clampDamage(player, data.brainDamage + gain);

@@ -10,6 +10,7 @@ import com.darkness.jujutsukaisenzone.player.PlayerCursedEnergyData;
 import com.darkness.jujutsukaisenzone.player.PlayerCombatPowerData;
 import com.darkness.jujutsukaisenzone.player.PlayerCursedGradeData;
 import com.darkness.jujutsukaisenzone.player.PlayerDomainExpansionData;
+import com.darkness.jujutsukaisenzone.player.PlayerMeltdownRepairData;
 import com.darkness.jujutsukaisenzone.player.PlayerBrainDamageData;
 import com.darkness.jujutsukaisenzone.player.PlayerFactionData;
 import com.darkness.jujutsukaisenzone.player.PlayerHealthData;
@@ -186,6 +187,7 @@ public final class CursedEnergyEvents
         ModNetwork.sendReverseTechniqueSync(serverPlayer, PlayerReverseTechniqueData.hasReverseTechnique(serverPlayer));
         PlayerBarrierTechniqueData.syncToClient(serverPlayer);
         ModNetwork.sendDomainExpansionLearnedSync(serverPlayer, PlayerDomainExpansionData.hasLearned(serverPlayer));
+        ModNetwork.sendMeltdownRepairLearnedSync(serverPlayer, PlayerMeltdownRepairData.hasLearned(serverPlayer));
         PlayerBrainDamageData.refreshDebuffs(serverPlayer);
         PlayerBrainDamageData.syncToClient(serverPlayer);
         ModNetwork.sendSeanceTechniqueLearnedSync(

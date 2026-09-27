@@ -42,6 +42,8 @@ public final class ModCreativeTabEvents
         event.accept(ModItems.CURSED_OBJECT_TORN_FAN, CreativeModeTab.TabVisibility.SEARCH_TAB_ONLY);
         event.accept(ModItems.CURSED_OBJECT_OLD_PIPE, CreativeModeTab.TabVisibility.SEARCH_TAB_ONLY);
         event.accept(ModItems.CURSED_OBJECT_CRACKED_ABACUS, CreativeModeTab.TabVisibility.SEARCH_TAB_ONLY);
+        event.accept(ModItems.CURSED_OBJECT_MELTED_ICE_PACK, CreativeModeTab.TabVisibility.SEARCH_TAB_ONLY);
+        event.accept(ModItems.CURSED_OBJECT_LOOSE_EARPLUGS, CreativeModeTab.TabVisibility.SEARCH_TAB_ONLY);
         event.accept(ModItems.CURSED_OBJECT_WARPED_MIRROR, CreativeModeTab.TabVisibility.SEARCH_TAB_ONLY);
         event.accept(ModItems.CURSED_OBJECT_WORN_DOLL, CreativeModeTab.TabVisibility.SEARCH_TAB_ONLY);
         event.accept(ModItems.CURSED_OBJECT_CRACKED_PHONE, CreativeModeTab.TabVisibility.SEARCH_TAB_ONLY);
@@ -53,6 +55,9 @@ public final class ModCreativeTabEvents
         event.accept(ModItems.CURSED_OBJECT_COLD_WEDDING_RING, CreativeModeTab.TabVisibility.SEARCH_TAB_ONLY);
         event.accept(ModItems.CURSED_OBJECT_TORN_STUDENT_ID, CreativeModeTab.TabVisibility.SEARCH_TAB_ONLY);
         event.accept(ModItems.CURSED_OBJECT_CRACKED_URN, CreativeModeTab.TabVisibility.SEARCH_TAB_ONLY);
+        event.accept(ModItems.CURSED_OBJECT_PROOF_OF_THE_STRONGEST, CreativeModeTab.TabVisibility.SEARCH_TAB_ONLY);
+        event.accept(ModItems.CURSED_OBJECT_FILLED_TIMESHEET, CreativeModeTab.TabVisibility.SEARCH_TAB_ONLY);
+        event.accept(ModItems.CURSED_OBJECT_DAMAGED_LEATHER_WATCH, CreativeModeTab.TabVisibility.SEARCH_TAB_ONLY);
         event.accept(ModItems.CURSED_OBJECT_SUKUNA_FINGER, CreativeModeTab.TabVisibility.SEARCH_TAB_ONLY);
     }
 }
