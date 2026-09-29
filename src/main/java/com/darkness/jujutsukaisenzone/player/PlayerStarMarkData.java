@@ -1,11 +1,14 @@
 package com.darkness.jujutsukaisenzone.player;
 
+import com.darkness.jujutsukaisenzone.network.ModNetwork;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.Nullable;
@@ -39,6 +42,11 @@ public final class PlayerStarMarkData
     private static final String KEY_STACKS = "stacks";
     /** 最后一次打标 / 叠加的游戏刻；旧存档没有这个键 → 读作 0（等价于「很久以前打的」）。 */
     private static final String KEY_MARKED_AT = "marked";
+    /** 喷漆所在面（Direction 3D data value）；旧存档缺失 → 按 kind 默认。 */
+    private static final String KEY_FACE = "face";
+    /** 喷漆面上局部 UV。 */
+    private static final String KEY_U = "u";
+    private static final String KEY_V = "v";
 
     /**
      * 单个施术者能同时持有的标记条数上限（杀生樱式）。
@@ -150,7 +158,7 @@ public final class PlayerStarMarkData
             marks.add(mark);
             evicted = evictOverflow(marks, mark);
         }
-        save(player, marks);
+        save(player, marks, true);
         return new PutOutcome(replaced, evicted);
     }
 
@@ -217,7 +225,7 @@ public final class PlayerStarMarkData
         List<StarMark> marks = read(player);
         if (marks.removeIf(mark -> mark.sameTargetAs(target)))
         {
-            save(player, marks);
+            save(player, marks, true);
         }
     }
 
@@ -234,7 +242,7 @@ public final class PlayerStarMarkData
         int removed = before - marks.size();
         if (removed > 0)
         {
-            save(player, marks);
+            save(player, marks, true);
         }
         return removed;
     }
@@ -242,7 +250,8 @@ public final class PlayerStarMarkData
     /** 用一份新的完整列表覆盖（批量失效清理、刷新实体坐标时使用，只写一次 NBT）。 */
     public static void replaceAll(Player player, List<StarMark> marks)
     {
-        save(player, marks);
+        List<StarMark> previous = read(player);
+        save(player, marks, !sameVisual(previous, marks));
     }
 
     /**
@@ -258,7 +267,7 @@ public final class PlayerStarMarkData
         int removed = read(player).size();
         if (removed > 0)
         {
-            save(player, Collections.emptyList());
+            save(player, Collections.emptyList(), true);
         }
         return removed;
     }
@@ -290,19 +299,42 @@ public final class PlayerStarMarkData
         return result;
     }
 
-    private static void save(Player player, List<StarMark> marks)
+    private static void save(Player player, List<StarMark> marks, boolean sync)
     {
         if (marks.isEmpty())
         {
             player.getPersistentData().remove(TAG_ROOT);
-            return;
         }
-        ListTag list = new ListTag();
-        for (StarMark mark : marks)
+        else
         {
-            list.add(toTag(mark));
+            ListTag list = new ListTag();
+            for (StarMark mark : marks)
+            {
+                list.add(toTag(mark));
+            }
+            player.getPersistentData().put(TAG_ROOT, list);
         }
-        player.getPersistentData().put(TAG_ROOT, list);
+        if (sync && player instanceof ServerPlayer serverPlayer)
+        {
+            ModNetwork.sendStarMarksSync(serverPlayer, marks);
+        }
+    }
+
+    /** 视觉相关字段是否一致（忽略实体坐标刷新，避免每 tick 刷同步包）。 */
+    private static boolean sameVisual(List<StarMark> a, List<StarMark> b)
+    {
+        if (a.size() != b.size())
+        {
+            return false;
+        }
+        for (int i = 0; i < a.size(); i++)
+        {
+            if (!a.get(i).visualKey().equals(b.get(i).visualKey()))
+            {
+                return false;
+            }
+        }
+        return true;
     }
 
     @Nullable
@@ -316,6 +348,10 @@ public final class PlayerStarMarkData
         StarMark.Kind kind;
         try
         {
+            /*
+             * 旧存档可能仍有 kind=ITEM（掉落物标记）。该类型已从系统移除，
+             * valueOf 会抛异常 → 整条丢弃，无需迁移。
+             */
             kind = StarMark.Kind.valueOf(tag.getString(KEY_KIND));
         }
         catch (IllegalArgumentException e)
@@ -335,6 +371,13 @@ public final class PlayerStarMarkData
         int stacks = tag.contains(KEY_STACKS) ? tag.getInt(KEY_STACKS) : 1;
         /* 打标时刻同样是后加的键：缺失读作 0，等价于「很久以前打的」，会被立刻结算到 1 级 */
         long lastMarkedAt = tag.getLong(KEY_MARKED_AT);
+        Direction face = StarMark.defaultFace(kind);
+        if (tag.contains(KEY_FACE))
+        {
+            face = Direction.from3DDataValue(tag.getByte(KEY_FACE));
+        }
+        float u = tag.contains(KEY_U) ? tag.getFloat(KEY_U) : 0.5F;
+        float v = tag.contains(KEY_V) ? tag.getFloat(KEY_V) : 0.5F;
         return new StarMark(
                 kind,
                 ResourceKey.create(Registries.DIMENSION, dimensionId),
@@ -342,7 +385,10 @@ public final class PlayerStarMarkData
                 entityId,
                 type,
                 stacks,
-                lastMarkedAt);
+                lastMarkedAt,
+                face,
+                u,
+                v);
     }
 
     private static CompoundTag toTag(StarMark mark)
@@ -355,6 +401,9 @@ public final class PlayerStarMarkData
         tag.putString(KEY_STAR, mark.type().id());
         tag.putInt(KEY_STACKS, mark.stacks());
         tag.putLong(KEY_MARKED_AT, mark.lastMarkedAt());
+        tag.putByte(KEY_FACE, (byte) mark.face().get3DDataValue());
+        tag.putFloat(KEY_U, mark.u());
+        tag.putFloat(KEY_V, mark.v());
         return tag;
     }
 

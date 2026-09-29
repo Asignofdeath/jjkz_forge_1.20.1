@@ -3,6 +3,7 @@ package com.darkness.jujutsukaisenzone.technique.skill;
 import com.darkness.jujutsukaisenzone.JuJutsuKaisenZone;
 import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
 import com.darkness.jujutsukaisenzone.technique.TechniqueDamageSources;
+import com.darkness.jujutsukaisenzone.technique.skillset.RatioTechniqueSkillSet;
 import com.darkness.jujutsukaisenzone.technique.skillset.SkillDamageType;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.particles.ParticleTypes;
@@ -155,7 +156,8 @@ public final class RatioImpactLogic
         player.setDeltaMovement(player.getDeltaMovement().add(dash));
         player.hurtMarked = true;
 
-        TechniqueDamageSources.deal(target, player, DAMAGE, SkillDamageType.MARTIAL);
+        TechniqueDamageSources.deal(target, player, DAMAGE, SkillDamageType.MARTIAL,
+                RatioTechniqueSkillSet.SKILL_IMPACT);
 
         Vec3 launch = flat.scale(LAUNCH_HORIZONTAL).add(0.0D, LAUNCH_VERTICAL, 0.0D);
         target.setDeltaMovement(target.getDeltaMovement().add(launch));

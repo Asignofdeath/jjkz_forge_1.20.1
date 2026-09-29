@@ -54,6 +54,24 @@ public final class CommandWheelRuntimeEvents
     }
 
     @SubscribeEvent
+    public static void onShikigamiHurt(LivingHurtEvent event)
+    {
+        if (event.getEntity().level().isClientSide)
+        {
+            return;
+        }
+        if (!(event.getEntity() instanceof net.minecraft.world.entity.Mob mob))
+        {
+            return;
+        }
+        Entity source = event.getSource().getEntity();
+        if (source instanceof LivingEntity attacker)
+        {
+            TenShadowsShikigamiAiLogic.onShikigamiHurt(mob, attacker);
+        }
+    }
+
+    @SubscribeEvent
     public static void onOwnerAttack(AttackEntityEvent event)
     {
         if (!(event.getEntity() instanceof ServerPlayer owner) || owner.level().isClientSide)

@@ -5,6 +5,7 @@ import com.darkness.jujutsukaisenzone.registry.ModItems;
 import com.darkness.jujutsukaisenzone.technique.SkillDamageResolver;
 import com.darkness.jujutsukaisenzone.technique.TechniqueDamageSources;
 import com.darkness.jujutsukaisenzone.technique.skill.GavelFormStats;
+import com.darkness.jujutsukaisenzone.technique.skillset.JudgmentTechniqueSkillSet;
 import com.darkness.jujutsukaisenzone.technique.skillset.SkillDamageType;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
@@ -58,7 +59,7 @@ public class GavelProjectileEntity extends ThrowableItemProjectile
         if (!this.level().isClientSide)
         {
             // 法槌命中是一次结算（撞击 + 爆炸各一次）⇒ 放行暴击
-            TechniqueDamageSources.runWithTypeCrit(SkillDamageType.TECHNIQUE, () -> {
+            TechniqueDamageSources.runWithTypeCrit(SkillDamageType.TECHNIQUE, JudgmentTechniqueSkillSet.SKILL_GAVEL, () -> {
                 detonateAt(result.getLocation());
                 Entity hit = result.getEntity();
                 Entity owner = this.getOwner();
@@ -80,7 +81,7 @@ public class GavelProjectileEntity extends ThrowableItemProjectile
     {
         if (!this.level().isClientSide)
         {
-            TechniqueDamageSources.runWithTypeCrit(SkillDamageType.TECHNIQUE,
+            TechniqueDamageSources.runWithTypeCrit(SkillDamageType.TECHNIQUE, JudgmentTechniqueSkillSet.SKILL_GAVEL,
                     () -> detonateAt(result.getLocation()));
         }
         this.discard();

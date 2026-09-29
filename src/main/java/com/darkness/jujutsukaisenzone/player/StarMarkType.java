@@ -1,5 +1,8 @@
 package com.darkness.jujutsukaisenzone.player;
 
+import com.darkness.jujutsukaisenzone.JuJutsuKaisenZone;
+import net.minecraft.resources.ResourceLocation;
+
 /**
  * 「星星标记」的五种标记，取自南十字座五星。
  * <p>
@@ -72,6 +75,20 @@ public enum StarMarkType
     public float blue()
     {
         return (rgb & 0xFF) / 255.0F;
+    }
+
+    /** 喷漆贴花贴图（五星各一张）。 */
+    public ResourceLocation decalTexture()
+    {
+        return ResourceLocation.fromNamespaceAndPath(
+                JuJutsuKaisenZone.MODID, "textures/effect/star_mark/" + id + ".png");
+    }
+
+    /** 头顶标记贴图（始终朝向玩家）。 */
+    public ResourceLocation headTexture()
+    {
+        return ResourceLocation.fromNamespaceAndPath(
+                JuJutsuKaisenZone.MODID, "textures/effect/star_mark/head/" + id + ".png");
     }
 
     /** 两颗星在顺序上是否相邻（相邻可以自由靠近）。 */

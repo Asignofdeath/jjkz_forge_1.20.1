@@ -47,7 +47,7 @@ import java.util.UUID;
  *   <li><b>收域</b>——立刻关掉施术者自己的全部星域（跟随 / 固定一并解除）。本技能<b>不需要星域</b>，
  *       星域只是它的素材来源，出手前一律清场；</li>
  *   <li><b>依次穿越</b>（仅当取到快照）——按星序扫过快照里解锁的每一颗星位，每位取<b>最近的</b>已标记目标
- *       作为一段路标（方块 / 掉落物 / 实体都可以，够不着的位直接跳过，找到几颗算几颗），逐段飞过去。
+ *       作为一段路标（方块 / 实体都可以，够不着的位直接跳过，找到几颗算几颗），逐段飞过去。
  *       每穿过一颗，这一脚的踢击伤害 +{@link #PASS_BONUS_PER_STAR}，封顶 +{@link #PASS_BONUS_CAP}；</li>
  *   <li><b>追踪</b>——每一段都以高速<b>平移</b>推进，每 tick 按锚点的<b>当前位置</b>重算方向与步长，
  *       所以目标跑动时这一脚会拐着弯追上去；</li>
@@ -159,7 +159,7 @@ public final class StarFlightSkillLogic
     /**
      * 飞行折线上的一段。
      * <p>
-     * 段目标可以是<b>三类标记里的任何一种</b>——「依次穿越」要吃的正是方块与掉落物，
+     * 段目标可以是方块或实体标记——「依次穿越」吃的正是这两类，
      * 所以这里存 {@link StarMark} 加一个可空实体：方块只有坐标，实体每 tick 现查位置
      * （见 {@link #legAnchor(ServerLevel, Leg, boolean)}）。折线的最后一段恒为 {@link #pickTarget} 选出的真实目标。
      */
@@ -262,7 +262,7 @@ public final class StarFlightSkillLogic
         for (StarMarkSkillLogic.ResolvedMark resolved : marks)
         {
             Entity entity = resolved.entity();
-            /* 方块锚点弹不动、掉落物不是 LivingEntity，都不是「相会」的对象；自己也不是 */
+            /* 方块锚点弹不动、非 LivingEntity 都不是「相会」的对象；自己也不是 */
             if (!(entity instanceof LivingEntity living) || entity == player || !living.isAlive())
             {
                 continue;
@@ -382,7 +382,7 @@ public final class StarFlightSkillLogic
      * 某一位找不到合用的目标就跳过它——找到几颗算几颗。
      * <p>
      * 目标只要求「已被标记」，<b>不</b>要求星位叠满（满级是最后那一段的门槛，不是路过星位的门槛），
-     * 也不分方块 / 掉落物 / 实体：穿越段吃的正是这三类。
+     * 也不分方块 / 实体：穿越段吃的正是这两类。
      * <p>
      * 三处排除：
      * <ul>
@@ -672,7 +672,8 @@ public final class StarFlightSkillLogic
             }
             if (entity instanceof LivingEntity living)
             {
-                TechniqueDamageSources.deal(living, player, PATH_DAMAGE, SkillDamageType.MARTIAL);
+                TechniqueDamageSources.deal(living, player, PATH_DAMAGE, SkillDamageType.MARTIAL,
+                        LoveRendezvousTechniqueSkillSet.SKILL_STAR_FLIGHT);
             }
             StarMarkRules.flightRam(player, entity, from, PATH_KNOCK);
         }
@@ -720,7 +721,8 @@ public final class StarFlightSkillLogic
         if (mark == null)
         {
             /* 飞行途中标记被清掉了：只兑现冲撞这一脚 */
-            boolean hit = TechniqueDamageSources.deal(target, player, damage, SkillDamageType.MARTIAL);
+            boolean hit = TechniqueDamageSources.deal(target, player, damage, SkillDamageType.MARTIAL,
+                    LoveRendezvousTechniqueSkillSet.SKILL_STAR_FLIGHT);
             notifyPlayer(player, "★飞行，穿越 · " + name
                     + (hit ? " 冲撞 " + Math.round(damage) : " 已被拦下"));
             return;
@@ -731,7 +733,8 @@ public final class StarFlightSkillLogic
         StarMarkDetonation.Result result = StarMarkDetonation.detonate(player, mark, center);
 
         /* ② 冲撞伤害（按穿越段数放大），并给目标补上「当前选中」的那颗印记 */
-        boolean hit = TechniqueDamageSources.deal(target, player, damage, SkillDamageType.MARTIAL);
+        boolean hit = TechniqueDamageSources.deal(target, player, damage, SkillDamageType.MARTIAL,
+                LoveRendezvousTechniqueSkillSet.SKILL_STAR_FLIGHT);
         StarMarkType applied = applySelectedMark(player, target);
 
         /*

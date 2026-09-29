@@ -9,6 +9,7 @@ import com.darkness.jujutsukaisenzone.technique.TechniqueDamageSources;
 import com.darkness.jujutsukaisenzone.technique.development.SkillUnlockLogic;
 import com.darkness.jujutsukaisenzone.technique.se.SeMechanicRegistry;
 import com.darkness.jujutsukaisenzone.technique.se.ZenoWallSeMechanic;
+import com.darkness.jujutsukaisenzone.technique.shikigami.tenshadows.ability.mahoraga.MahoragaAdaptation;
 import com.darkness.jujutsukaisenzone.technique.skillset.LoveRendezvousTechniqueSkillSet;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
@@ -631,7 +632,8 @@ public final class StarMarkRules
 
                 /* 半径定「域有多挤」，星位定「这颗星有多重」，两者相乘 */
                 double impulse = baseImpulse * burstStackScale(mover.mark().stacks());
-                push(mover.entity(), burstKick(shooter.position(), mover.position(), impulse), player, true);
+                push(mover.entity(), burstKick(shooter.position(), mover.position(), impulse), player, true,
+                        LoveRendezvousTechniqueSkillSet.SKILL_STAR_GATE);
                 /*
                  * 盖上「这是被踢出去的球」的标签。撞击伤害只认它——平时被同星吸引蹭过去的标记
                  * 身上没有这个标签，撞了也不结算，于是「缓慢靠近不痛、弹开猛撞才痛」自然成立。
@@ -671,7 +673,8 @@ public final class StarMarkRules
             return;
         }
         double impulse = BURST_IMPULSE_NEAR * burstStackScale(StarMark.MAX_STACKS);
-        push(mover, burstKick(from, mover.position(), impulse), owner, true);
+        push(mover, burstKick(from, mover.position(), impulse), owner, true,
+                LoveRendezvousTechniqueSkillSet.SKILL_STAR_FLIGHT);
         markAsBall(mover, gameTime(owner) + BURST_FLIGHT_TICKS);
     }
 
@@ -710,7 +713,8 @@ public final class StarMarkRules
         {
             return;
         }
-        push(victim, burstKick(from, victim.position(), impulse), owner, true);
+        push(victim, burstKick(from, victim.position(), impulse), owner, true,
+                LoveRendezvousTechniqueSkillSet.SKILL_STAR_FLIGHT);
     }
 
     /**
@@ -815,8 +819,10 @@ public final class StarMarkRules
                 float damage = (float) (speed * IMPACT_DAMAGE_PER_SPEED);
                 /* 两边都要结算，所以用 | 而不是 ||（后者会在第一记生效时短路跳过第二记） */
                 /* 撞击有 IMPACT_COOLDOWN_TICKS 去重，是一次结算而不是逐 tick 灼烧 ⇒ 放行暴击 */
-                boolean dealt = TechniqueDamageSources.dealCrit(living, owner, damage);
-                dealt |= TechniqueDamageSources.dealCrit(ballLiving, owner, damage);
+                boolean dealt = TechniqueDamageSources.dealCrit(living, owner, damage,
+                        LoveRendezvousTechniqueSkillSet.SKILL_STAR_MARK);
+                dealt |= TechniqueDamageSources.dealCrit(ballLiving, owner, damage,
+                        LoveRendezvousTechniqueSkillSet.SKILL_STAR_MARK);
 
                 ball.getPersistentData().putLong(TAG_IMPACT_AT, now);
                 if (detonating)
@@ -1302,7 +1308,10 @@ public final class StarMarkRules
 
                 Vec3 impulse = dir.scale(memberStrength * (0.35D + falloff))
                         .multiply(1.0D, memberVertical, 1.0D);
-                push(member.entity(), impulse, owner, false);
+                push(member.entity(), impulse, owner, false,
+                        pullThisGroup
+                                ? LoveRendezvousTechniqueSkillSet.SKILL_STAR_PULL
+                                : LoveRendezvousTechniqueSkillSet.SKILL_STAR_MARK);
 
                 if (render && pullThisGroup)
                 {
@@ -1465,11 +1474,13 @@ public final class StarMarkRules
                         double strength = zenoPush.outwardImpulse();
                         if (pushA)
                         {
-                            push(a.entity(), dir.scale(strength), owner, zenoPush.pushesOwner());
+                            push(a.entity(), dir.scale(strength), owner, zenoPush.pushesOwner(),
+                                    LoveRendezvousTechniqueSkillSet.SKILL_STAR_GATE);
                         }
                         if (pushB)
                         {
-                            push(b.entity(), dir.scale(-strength), owner, zenoPush.pushesOwner());
+                            push(b.entity(), dir.scale(-strength), owner, zenoPush.pushesOwner(),
+                                    LoveRendezvousTechniqueSkillSet.SKILL_STAR_GATE);
                         }
                     }
                     else
@@ -2084,6 +2095,11 @@ public final class StarMarkRules
         {
             return;
         }
+        if (entity instanceof LivingEntity living
+                && MahoragaAdaptation.tryEngage(living, LoveRendezvousTechniqueSkillSet.SKILL_STAR_GATE))
+        {
+            return;
+        }
 
         /* 进入本 tick：把上一 tick 的最终落点转正成基准。本 tick 内只做一次，之后基准不再变 */
         Long recorded = ZENO_TICK.get(entity);
@@ -2177,6 +2193,16 @@ public final class StarMarkRules
      */
     private static void push(@Nullable Entity entity, Vec3 impulse, ServerPlayer owner, boolean allowOwner)
     {
+        push(entity, impulse, owner, allowOwner, null);
+    }
+
+    private static void push(
+            @Nullable Entity entity,
+            Vec3 impulse,
+            ServerPlayer owner,
+            boolean allowOwner,
+            @Nullable String narrativeMemberId)
+    {
         if (entity == null || entity.isRemoved() || !entity.isAlive())
         {
             return;
@@ -2186,6 +2212,12 @@ public final class StarMarkRules
             return;
         }
         if (entity instanceof Player player && (player.isSpectator() || player.isCreative()))
+        {
+            return;
+        }
+        if (narrativeMemberId != null
+                && entity instanceof LivingEntity living
+                && MahoragaAdaptation.tryEngage(living, narrativeMemberId))
         {
             return;
         }

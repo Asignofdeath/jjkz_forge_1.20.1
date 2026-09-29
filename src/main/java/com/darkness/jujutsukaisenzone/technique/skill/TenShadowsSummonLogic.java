@@ -15,6 +15,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
+import com.darkness.jujutsukaisenzone.entity.JadeDogEntity;
 import net.minecraft.world.entity.animal.Wolf;
 import net.minecraft.world.entity.monster.Ravager;
 import net.minecraft.world.entity.monster.hoglin.Hoglin;
@@ -237,7 +238,15 @@ public final class TenShadowsSummonLogic
             mob.setNoAi(false);
             mob.setPersistenceRequired();
         }
-        if (entity instanceof Wolf wolf)
+        if (entity instanceof JadeDogEntity jadeDog)
+        {
+            jadeDog.setWhiteVariant(spawnIndex == 0);
+            jadeDog.applyMaturityFromOwner(owner);
+            jadeDog.setTame(true);
+            jadeDog.setOwnerUUID(owner.getUUID());
+            jadeDog.setOrderedToSit(false);
+        }
+        else if (entity instanceof Wolf wolf)
         {
             wolf.setTame(true);
             wolf.setOwnerUUID(owner.getUUID());
@@ -256,6 +265,47 @@ public final class TenShadowsSummonLogic
             entity.setDeltaMovement(Vec3.ZERO);
         }
         TenShadowsShikigamiStatsApplier.applyTamed(entity, shikigami, owner);
+    }
+
+    /**
+     * 在已有名册上追加召出（脱兔爆发等）。槽位为空时新建名册。
+     *
+     * @return 实际刷出数量
+     */
+    public static int appendSummons(ServerPlayer player, TenShadowsShikigami shikigami, int count, Vec3 center)
+    {
+        if (player == null || shikigami == null || count <= 0 || center == null)
+        {
+            return 0;
+        }
+        ServerLevel level = player.serverLevel();
+        List<UUID> roster = new ArrayList<>(PlayerTenShadowsRosterData.get(player, shikigami.index()));
+        int spawned = 0;
+        for (int i = 0; i < count; i++)
+        {
+            double angle = (Math.PI * 2.0D * i) / count;
+            double ox = Math.cos(angle) * 1.4D;
+            double oz = Math.sin(angle) * 1.4D;
+            Entity entity = shikigami.placeholderType().create(level);
+            if (!(entity instanceof LivingEntity living))
+            {
+                continue;
+            }
+            living.moveTo(center.x + ox, center.y, center.z + oz, player.getYRot(), 0.0F);
+            prepareShikigami(player, living, shikigami, roster.size() + i);
+            if (!level.addFreshEntity(living))
+            {
+                continue;
+            }
+            roster.add(living.getUUID());
+            spawned++;
+        }
+        if (spawned > 0)
+        {
+            PlayerTenShadowsRosterData.put(player, shikigami.index(), roster);
+            TenShadowsPresenceBonuses.refresh(player);
+        }
+        return spawned;
     }
 }
 

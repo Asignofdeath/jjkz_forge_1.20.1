@@ -5,6 +5,8 @@ import com.darkness.jujutsukaisenzone.player.StarMark;
 import com.darkness.jujutsukaisenzone.player.StarMarkType;
 import com.darkness.jujutsukaisenzone.registry.ModEffects;
 import com.darkness.jujutsukaisenzone.technique.TechniqueDamageSources;
+import com.darkness.jujutsukaisenzone.technique.shikigami.tenshadows.ability.mahoraga.MahoragaAdaptation;
+import com.darkness.jujutsukaisenzone.technique.skillset.LoveRendezvousTechniqueSkillSet;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
@@ -45,7 +47,7 @@ import java.util.List;
  * </ul>
  * <p>
  * 方块标记同样可以引爆，只是方块本身没有生命值——它的爆心取方块锚点，
- * 伤害为零而效果与传染照常落到周围实体身上；掉落物不是 {@link LivingEntity}，同样不受伤。
+ * 伤害为零而效果与传染照常落到周围实体身上。
  * <p>
  * <b>「爱与幽会」域内的传播是另一套规则</b>（细节见 {@link #spreadMark}）：干净目标直接拿满级、
  * 半径内已有的同星标记被一并拉满，于是被炸到的目标当场就成为下一个可燃点，链条才能连起来。
@@ -104,7 +106,7 @@ public final class StarMarkDetonation
     /**
      * 引爆的结算结果，供调用方拼动作栏提示。
      *
-     * @param damaged   是否真的对爆心目标造成了伤害。引爆在方块 / 掉落物上、爆心是施术者自己、
+     * @param damaged   是否真的对爆心目标造成了伤害。引爆在方块上、爆心是施术者自己、
      *                  或实体已消失时为 {@code false}——这三种情况都只走效果与传染
      * @param affected  吃到负面效果的实体数（不含施术者）
      * @param spread    被传染（新打上标记）的实体数；域内给满级、域外给 1 级
@@ -145,7 +147,7 @@ public final class StarMarkDetonation
         level.playSound(null, center.x, center.y, center.z,
                 SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.PLAYERS, BURST_VOLUME, BURST_PITCH);
 
-        /* ④ 波及范围内的生物（LivingEntity 不含掉落物，掉落物既吃不了效果也不该被传染） */
+        /* ④ 波及范围内的生物 */
         AABB area = new AABB(center, center).inflate(RADIUS, RADIUS, RADIUS);
         List<LivingEntity> victims = level.getEntitiesOfClass(
                 LivingEntity.class, area, victim -> victim != owner && victim.isAlive());
@@ -169,10 +171,9 @@ public final class StarMarkDetonation
     /**
      * 爆心的<b>单体</b>伤害：只有被引爆的那个目标受伤，半径内的其他目标一概不碰。
      * <p>
-     * 三类目标拿不到伤害，都不是异常：
+     * 两类目标拿不到伤害，都不是异常：
      * <ul>
      *   <li><b>方块</b>——没有 {@link StarMark#entityId()}，方块本身也没有生命值可言；</li>
-     *   <li><b>掉落物</b>——不是 {@link LivingEntity}；</li>
      *   <li><b>施术者自己</b>——Shift 可以把标记打在自己身上，叠满后同样能引爆；但引爆是自己
      *       主动触发的动作，不该反过来打伤自己。</li>
      * </ul>
@@ -198,7 +199,8 @@ public final class StarMarkDetonation
          * 返回值沿用 hurt 的语义（伤害是否真正生效），因此无敌帧、创造模式目标等情况会被如实报成「没打到」。
          */
         // 引爆是一次结算（不是逐 tick 灼烧）⇒ 放行暴击
-        return TechniqueDamageSources.dealCrit(living, owner, DETONATION_DAMAGE);
+        return TechniqueDamageSources.dealCrit(living, owner, DETONATION_DAMAGE,
+                LoveRendezvousTechniqueSkillSet.SKILL_STAR_MARK);
     }
 
     /**
@@ -209,6 +211,10 @@ public final class StarMarkDetonation
      */
     private static void applyDebuff(LivingEntity victim, StarMarkType type)
     {
+        if (MahoragaAdaptation.tryEngage(victim, LoveRendezvousTechniqueSkillSet.SKILL_STAR_MARK))
+        {
+            return;
+        }
         switch (type)
         {
             /* Imai 薄荷青：减速 */
@@ -275,6 +281,10 @@ public final class StarMarkDetonation
         int evicted = 0;
         for (LivingEntity victim : victims)
         {
+            if (MahoragaAdaptation.tryEngage(victim, LoveRendezvousTechniqueSkillSet.SKILL_STAR_MARK))
+            {
+                continue;
+            }
             StarMark probe = StarMarkSkillLogic.markOfEntity(owner, victim, source.type());
             /* 爆心的原目标：标记刚被消耗掉，不再传染回来 */
             if (probe.sameTargetAs(source))

@@ -7,6 +7,7 @@ import com.darkness.jujutsukaisenzone.photon.OwnerOnlyShrineSlashFx;
 import com.darkness.jujutsukaisenzone.registry.ModSounds;
 import com.darkness.jujutsukaisenzone.technique.TechniqueDamageSources;
 import com.darkness.jujutsukaisenzone.technique.scaling.ShrineSkillGrowth;
+import com.darkness.jujutsukaisenzone.technique.skillset.ShrineTechniqueSkillSet;
 import com.darkness.jujutsukaisenzone.technique.se.ShrineFinishCutMarks;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
@@ -163,7 +164,8 @@ public class ShrineKaiFlyobjBehavior extends EffectBehavior
             if (!target.isAlive()) continue;
             if (!GeometryUtils.aabbIntersectsSphere(sample.x, sample.y, sample.z, rSqr, target.getBoundingBox())) continue;
             if (owner != null && target.getUUID().equals(owner.getUUID())) continue;
-            if (TechniqueDamageSources.deal(target, owner, ShrineSkillGrowth.kaiFlyobjColumnDamage(owner)))
+            if (TechniqueDamageSources.deal(target, owner, ShrineSkillGrowth.kaiFlyobjColumnDamage(owner),
+                    ShrineTechniqueSkillSet.SKILL_KAI_FLYOBJ))
             {
                 ShrineFinishCutMarks.tryMarkFromKaiHit(owner, target);
                 level.playSound(null, entity.getX(), entity.getY(), entity.getZ(),

@@ -5,6 +5,7 @@ import com.darkness.jujutsukaisenzone.player.PlayerStarMarkData;
 import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
 import com.darkness.jujutsukaisenzone.player.StarMark;
 import com.darkness.jujutsukaisenzone.player.StarMarkType;
+import com.darkness.jujutsukaisenzone.registry.ModSounds;
 import com.darkness.jujutsukaisenzone.technique.development.SkillTreeNodeDef;
 import com.darkness.jujutsukaisenzone.technique.development.SkillUnlockLogic;
 import com.darkness.jujutsukaisenzone.technique.development.TechniqueSkillTree;
@@ -13,11 +14,15 @@ import com.darkness.jujutsukaisenzone.technique.skill.StarFlightSkillLogic;
 import com.darkness.jujutsukaisenzone.technique.skill.StarMarkDetonation;
 import com.darkness.jujutsukaisenzone.technique.skill.StarMarkRules;
 import com.darkness.jujutsukaisenzone.technique.skill.StarMarkSkillLogic;
+import com.darkness.jujutsukaisenzone.technique.shikigami.tenshadows.ability.mahoraga.MahoragaAdaptation;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 
@@ -31,7 +36,7 @@ import java.util.stream.Stream;
  * 槽位 1「星星标记」：近战命中实体 / 看向方块后按技能键即打上「当前标记」，咒力在打标那一刻结算一次。
  * 对同一目标重复打<b>同一颗星</b>会叠加星位等级（上限 {@link StarMark#MAX_STACKS} 级），打<b>另一颗星</b>
  * 则是更换（等级归 1）；叠满之后再叠一次即<b>引爆</b>——消耗掉全部层数、对爆心的原目标结算一次
- * <b>单体</b>伤害（方块 / 掉落物 / 施术者自己除外）、给半径内其他实体赋该星对应的负面效果、
+ * <b>单体</b>伤害（方块 / 施术者自己除外）、给半径内其他实体赋该星对应的负面效果、
  * 并把标记传染给尚未被标记的目标，见 {@link StarMarkDetonation}。
  * 槽位 2「牵引」：把当前标记的所有目标拉向自己，持续 5 秒。
  * 槽位 3「禁行」：展开星域，域内跨序之星无法靠近。星域<b>没有时限</b>，展开后一直生效，
@@ -379,14 +384,14 @@ public final class LoveRendezvousTechniqueSkillSet extends AbstractInnateTechniq
             /* 打标本身在「接触」那一刻结算咒力 / 冷却（见 tryApplyMark）。
                实体走近战命中，方块走技能键——视线由服务端自行射线，客户端只报「按了键」。
                没瞄到方块时退化为报当前状态，不消耗。 */
-            BlockPos looked = StarMarkSkillLogic.lookedAtBlock(player);
+            BlockHitResult looked = StarMarkSkillLogic.lookedAtBlockHit(player);
             if (looked == null)
             {
                 notifyStarMarkStatus(player);
                 return;
             }
             tryApplyMark(player, StarMarkSkillLogic.markOfBlock(player, looked),
-                    StarMarkSkillLogic.describeBlock(looked));
+                    StarMarkSkillLogic.describeBlock(looked.getBlockPos()));
             return;
         }
         if (SKILL_STAR_PULL.equals(skillId))
@@ -538,6 +543,15 @@ public final class LoveRendezvousTechniqueSkillSet extends AbstractInnateTechniq
         {
             return;
         }
+        if (target.kind() == StarMark.Kind.ENTITY && target.entityId() != null)
+        {
+            Entity entity = player.serverLevel().getEntity(target.entityId());
+            if (entity instanceof net.minecraft.world.entity.LivingEntity living
+                    && MahoragaAdaptation.tryEngage(living, SKILL_STAR_MARK))
+            {
+                return;
+            }
+        }
 
         StarMarkType selected = PlayerStarMarkData.getSelected(player);
         StarMark existing = PlayerStarMarkData.findTarget(player, target);
@@ -563,6 +577,7 @@ public final class LoveRendezvousTechniqueSkillSet extends AbstractInnateTechniq
     private void applyMark(ServerPlayer player, StarMark target, String targetName, @Nullable StarMark existing)
     {
         PlayerStarMarkData.PutOutcome outcome = PlayerStarMarkData.put(player, target);
+        playStarMarkSound(player, target);
         String suffix = existing == null ? "" : "（已覆盖 " + existing.type().displayName() + "）";
         player.displayClientMessage(
                 Component.literal(target.type().displayName() + " · 已标记" + targetName + suffix
@@ -598,7 +613,9 @@ public final class LoveRendezvousTechniqueSkillSet extends AbstractInnateTechniq
     private void stackMark(ServerPlayer player, StarMark target, StarMark existing, String targetName)
     {
         int stacks = existing.stacks() + 1;
-        PlayerStarMarkData.put(player, target.withStacks(stacks));
+        StarMark stacked = target.withStacks(stacks);
+        PlayerStarMarkData.put(player, stacked);
+        playStarMarkSound(player, stacked);
         player.displayClientMessage(
                 Component.literal(existing.type().displayName() + " · " + targetName
                         + " 星位 " + stacks + "/" + StarMark.MAX_STACKS), true);
@@ -610,7 +627,7 @@ public final class LoveRendezvousTechniqueSkillSet extends AbstractInnateTechniq
      * 爆心取标记的锚点——实体标记用实体头顶的锚点，方块标记用方块上方锚点，与火花表现同源，
      * 因此爆炸看起来就发生在那个标记光点上，而不是目标的脚下。
      * <p>
-     * 伤害只落在爆心那一个目标身上，且方块 / 掉落物 / 施术者自己拿不到伤害，
+     * 伤害只落在爆心那一个目标身上，且方块 / 施术者自己拿不到伤害，
      * 所以提示里按 {@link StarMarkDetonation.Result#damaged()} 决定要不要报这个数。
      */
     private void detonateMark(ServerPlayer player, StarMark existing, String targetName)
@@ -628,7 +645,7 @@ public final class LoveRendezvousTechniqueSkillSet extends AbstractInnateTechniq
     }
 
     /**
-     * 取爆心用的实体：只有实体 / 掉落物标记才有。解析不到（区块未加载、实体已消失）时返回 null，
+     * 取爆心用的实体：只有实体标记才有。解析不到（区块未加载、实体已消失）时返回 null，
      * 由 {@link StarMarkSkillLogic#anchorOf} 退回按最后一次已知坐标估算高度。
      */
     @Nullable
@@ -682,10 +699,25 @@ public final class LoveRendezvousTechniqueSkillSet extends AbstractInnateTechniq
         StarMark mark = StarMarkSkillLogic.markOfEntity(player, player);
         StarMark existing = PlayerStarMarkData.findTarget(player, mark);
         PlayerStarMarkData.PutOutcome outcome = PlayerStarMarkData.put(player, mark);
+        playStarMarkSound(player, mark);
         String suffix = existing == null ? "" : "（已覆盖 " + existing.type().displayName() + "）";
         player.displayClientMessage(
                 Component.literal(mark.type().displayName() + " · 已标记自身" + suffix
                         + evictionNote(player, outcome)), true);
+    }
+
+    /** 在标记锚点播放打标范围音效（固定听距 32 格）。 */
+    private static void playStarMarkSound(ServerPlayer player, StarMark mark)
+    {
+        ServerLevel level = player.serverLevel();
+        Vec3 pos = StarMarkSkillLogic.anchorOf(mark, resolveAnchor(player, mark));
+        level.playSound(
+                null,
+                pos.x, pos.y, pos.z,
+                ModSounds.STAR_MARK.get(),
+                SoundSource.PLAYERS,
+                1.0F,
+                1.0F);
     }
 
     /** 施术者自己身上是否已有标记（任意一颗星）。 */

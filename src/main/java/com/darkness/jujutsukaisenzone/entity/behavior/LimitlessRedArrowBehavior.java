@@ -5,6 +5,7 @@ import com.darkness.jujutsukaisenzone.entity.data.LimitlessRedConfig;
 import com.darkness.jujutsukaisenzone.technique.config.SkillCombatConfigRegistry;
 import com.darkness.jujutsukaisenzone.technique.TechniqueDamageSources;
 import com.darkness.jujutsukaisenzone.technique.scaling.LimitlessRedSkillGrowth;
+import com.darkness.jujutsukaisenzone.technique.skillset.LimitlessTechniqueSkillSet;
 import com.darkness.jujutsukaisenzone.technique.skillset.SkillDamageType;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.particles.ParticleTypes;
@@ -107,7 +108,7 @@ public class LimitlessRedArrowBehavior extends EffectBehavior
         }
 
         // 单次爆炸 ⇒ 显式放行暴击（术式默认不放行，见 TechniqueDamageSources#critAllowed）
-        TechniqueDamageSources.runWithTypeCrit(SkillDamageType.TECHNIQUE, () ->
+        TechniqueDamageSources.runWithTypeCrit(SkillDamageType.TECHNIQUE, LimitlessTechniqueSkillSet.SKILL_RED, () ->
                 entity.level().explode(entity, entity.getX(), entity.getY(), entity.getZ(),
                         this.explosionPower, false, ExplosionInteraction.TNT));
 

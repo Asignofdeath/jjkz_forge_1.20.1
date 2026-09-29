@@ -13,5 +13,9 @@ public enum UnlockConditionType
     /** 已习得修复术式熔断（通用技能，无等级）。 */
     HAS_MELTDOWN_REPAIR,
     /** 说明节点默认可见（绑定该术式后即可显示）。 */
-    ALWAYS_VISIBLE
+    ALWAYS_VISIBLE,
+    /**
+     * 十影：已调伏指定式神（arg = {@code TenShadowsShikigami#id}，如 {@code nue}）。
+     */
+    HAS_TAMED_SHIKIGAMI
 }

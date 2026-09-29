@@ -39,4 +39,19 @@ public final class TenShadowsFieldQuery
         }
         return result;
     }
+
+    /** 主人场上全部友方式神。 */
+    public static List<Mob> allOwnedMobs(ServerPlayer owner)
+    {
+        List<Mob> result = new ArrayList<>();
+        if (owner == null)
+        {
+            return result;
+        }
+        for (TenShadowsShikigami shikigami : TenShadowsShikigami.values())
+        {
+            result.addAll(aliveMobs(owner, shikigami));
+        }
+        return result;
+    }
 }

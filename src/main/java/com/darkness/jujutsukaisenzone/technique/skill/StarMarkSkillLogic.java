@@ -5,13 +5,14 @@ import com.darkness.jujutsukaisenzone.player.StarMark;
 import com.darkness.jujutsukaisenzone.player.StarMarkType;
 import com.darkness.jujutsukaisenzone.technique.BarrierTechniqueServerLogic;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.particles.DustParticleOptions;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.level.ClipContext;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
@@ -20,30 +21,31 @@ import org.joml.Vector3f;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /**
- * 「星星标记」：把当前的星打到接触到的目标身上，并负责标记的解析、失效清理与粒子表现。
+ * 「星星标记」：把当前的星打到接触到的目标身上，并负责标记的解析、失效清理。
  * <p>
  * 与原作一致，施加方式是**接触**而不是远距离视线点选：近战命中实体（由 {@code StarMarkEvents} 挂载）
  * / 看向方块后按「星星标记」技能键（触及距离 {@link #LOOK_REACH} 格）。
  * 两条入口最终都汇入 {@code LoveRendezvousTechniqueSkillSet#tryApplyMark}。
+ * 常驻表现是客户端喷漆贴花（见 {@code StarMarkDecalRenderer}）；粒子只用于牵引线 / 星域环 / 引爆。
  * 力学的三态规则不在这里，见 {@link StarMarkRules}。
  */
 public final class StarMarkSkillLogic
 {
-    /** 粒子重绘间隔（tick）。 */
+    /** 粒子重绘间隔（tick）——星域环等仍沿用。 */
     public static final int RENDER_INTERVAL_TICKS = 5;
 
-    /** 标记火花相对目标的高度偏移。 */
+    /** 标记锚点相对目标的高度偏移（力学 / 准星 / 引爆中心仍用）。 */
     private static final double BLOCK_MARK_HEIGHT = 1.15D;
-    private static final double ITEM_MARK_HEIGHT = 0.35D;
     private static final double ENTITY_MARK_HEIGHT = 0.45D;
-
-    /** 火花默认尺寸。 */
-    private static final float SPARK_SCALE = 0.45F;
 
     /** 技能键打方块时的最大可及距离（格）。沿用右键年代的方块触及距离，手感不变。 */
     private static final double LOOK_REACH = 4.5D;
+
+    /** 近战打实体时估算命中点的射线长度。 */
+    private static final double ENTITY_ATTACH_REACH = 6.0D;
 
     private StarMarkSkillLogic()
     {
@@ -54,16 +56,32 @@ public final class StarMarkSkillLogic
     {
     }
 
+    /** 喷漆附着点：面 + 面上 UV。 */
+    public record DecalAttachment(Direction face, float u, float v)
+    {
+        public static DecalAttachment of(Direction face, float u, float v)
+        {
+            return new DecalAttachment(face, u, v);
+        }
+
+        public static DecalAttachment defaults(StarMark.Kind kind)
+        {
+            return of(StarMark.defaultFace(kind), 0.5F, kind == StarMark.Kind.ENTITY ? 0.55F : 0.5F);
+        }
+    }
+
     // ======================== 打标 ========================
 
     /**
-     * 以当前选中的星，构造某个实体身上的标记（掉落物归 ITEM，其余归 ENTITY）。
+     * 以当前选中的星，构造某个实体身上的标记。
      * <p>
      * 这里造出的永远是<b>全新的 1 级标记</b>，并带上「此刻」作为最后打标时刻
      * （{@link StarMark#lastMarkedAt()}）——叠加与换星都走这条路径重新构造，所以每次打标都会
      * 刷新星位等级的衰减计时。跨序的「经过」进度不在标记上（它属于星域实例，展开时统一重置，
      * 见 {@code StarMarkRules}），星位等级的叠加由打标入口负责
      * （见 {@code LoveRendezvousTechniqueSkillSet#tryApplyMark}）。
+     * <p>
+     * 掉落物不在标记系统内；调用方须自行排除 {@code ItemEntity}。
      */
     public static StarMark markOfEntity(ServerPlayer player, Entity entity)
     {
@@ -78,19 +96,35 @@ public final class StarMarkSkillLogic
      */
     public static StarMark markOfEntity(ServerPlayer player, Entity entity, StarMarkType type)
     {
-        StarMark.Kind kind = entity instanceof ItemEntity ? StarMark.Kind.ITEM : StarMark.Kind.ENTITY;
+        DecalAttachment attach = attachmentOnEntity(player, entity);
         return new StarMark(
-                kind,
+                StarMark.Kind.ENTITY,
                 player.level().dimension(),
                 entity.blockPosition(),
                 entity.getUUID(),
                 type,
                 1,
-                player.level().getGameTime());
+                player.level().getGameTime(),
+                attach.face(),
+                attach.u(),
+                attach.v());
     }
 
     /** 以当前选中的星，构造某个方块上的标记（同为 1 级，规则见 {@link #markOfEntity}）。 */
     public static StarMark markOfBlock(ServerPlayer player, BlockPos pos)
+    {
+        return markOfBlock(player, pos, DecalAttachment.defaults(StarMark.Kind.BLOCK));
+    }
+
+    /** 以命中结果构造方块标记（带喷漆面与 UV）。 */
+    public static StarMark markOfBlock(ServerPlayer player, BlockHitResult hit)
+    {
+        BlockPos pos = hit.getBlockPos().immutable();
+        DecalAttachment attach = attachmentOnBlock(hit);
+        return markOfBlock(player, pos, attach);
+    }
+
+    private static StarMark markOfBlock(ServerPlayer player, BlockPos pos, DecalAttachment attach)
     {
         StarMarkType selected = PlayerStarMarkData.getSelected(player);
         return new StarMark(
@@ -100,7 +134,10 @@ public final class StarMarkSkillLogic
                 null,
                 selected,
                 1,
-                player.level().getGameTime());
+                player.level().getGameTime(),
+                attach.face(),
+                attach.u(),
+                attach.v());
     }
 
     /**
@@ -112,6 +149,14 @@ public final class StarMarkSkillLogic
     @Nullable
     public static BlockPos lookedAtBlock(ServerPlayer player)
     {
+        BlockHitResult hit = lookedAtBlockHit(player);
+        return hit == null ? null : hit.getBlockPos().immutable();
+    }
+
+    /** 视线命中方块的完整结果（含面与命中点）；未命中返回 {@code null}。 */
+    @Nullable
+    public static BlockHitResult lookedAtBlockHit(ServerPlayer player)
+    {
         Vec3 eye = player.getEyePosition();
         Vec3 end = eye.add(player.getViewVector(1.0F).scale(LOOK_REACH));
         BlockHitResult hit = player.level().clip(
@@ -121,19 +166,148 @@ public final class StarMarkSkillLogic
             return null;
         }
         BlockPos pos = hit.getBlockPos();
-        return player.level().getBlockState(pos).isAir() ? null : pos.immutable();
+        return player.level().getBlockState(pos).isAir() ? null : hit;
     }
 
     /** 目标的中文描述，用于动作栏提示。 */
     public static String describeTarget(Entity entity)
     {
-        return entity instanceof ItemEntity ? "掉落物" : "实体「" + entity.getName().getString() + "」";
+        return "实体「" + entity.getName().getString() + "」";
     }
 
     /** 目标方块的中文描述，用于动作栏提示。 */
     public static String describeBlock(BlockPos pos)
     {
         return "方块 (" + pos.getX() + ", " + pos.getY() + ", " + pos.getZ() + ")";
+    }
+
+    // ======================== 喷漆附着 ========================
+
+    /** 方块命中面 + 面上 UV。 */
+    public static DecalAttachment attachmentOnBlock(BlockHitResult hit)
+    {
+        Direction face = hit.getDirection();
+        BlockPos pos = hit.getBlockPos();
+        Vec3 loc = hit.getLocation();
+        float[] uv = faceUv(
+                pos.getX(), pos.getY(), pos.getZ(),
+                pos.getX() + 1.0D, pos.getY() + 1.0D, pos.getZ() + 1.0D,
+                face, loc);
+        return DecalAttachment.of(face, uv[0], uv[1]);
+    }
+
+    /**
+     * 实体喷漆附着：世界命中面换算到实体局部朝向（相对 yaw=0），随实体转身一起转。
+     * 自身打标（attacker == entity）默认贴在局部南面胸口。
+     */
+    public static DecalAttachment attachmentOnEntity(ServerPlayer attacker, Entity entity)
+    {
+        if (attacker == entity)
+        {
+            return DecalAttachment.defaults(StarMark.Kind.ENTITY);
+        }
+        AABB box = entity.getBoundingBox();
+        Vec3 start = attacker.getEyePosition();
+        Vec3 end = start.add(attacker.getViewVector(1.0F).scale(ENTITY_ATTACH_REACH));
+        Optional<Vec3> clip = box.clip(start, end);
+        Vec3 hit = clip.orElseGet(box::getCenter);
+        Direction worldFace = nearestFace(box, hit);
+        float[] uv = faceUv(box.minX, box.minY, box.minZ, box.maxX, box.maxY, box.maxZ, worldFace, hit);
+        Direction localFace = worldHorizontalToLocal(worldFace, entity.getYRot());
+        return DecalAttachment.of(localFace, uv[0], uv[1]);
+    }
+
+    /** 世界水平面 → 实体局部面（UP/DOWN 不变）。 */
+    public static Direction worldHorizontalToLocal(Direction worldFace, float yRot)
+    {
+        if (worldFace.getAxis() == Direction.Axis.Y)
+        {
+            return worldFace;
+        }
+        int steps = Math.floorMod(Math.round(yRot / 90.0F), 4);
+        Direction local = worldFace;
+        for (int i = 0; i < steps; i++)
+        {
+            local = local.getCounterClockWise();
+        }
+        return local;
+    }
+
+    /** 实体局部面 → 当前世界面。 */
+    public static Direction localHorizontalToWorld(Direction localFace, float yRot)
+    {
+        if (localFace.getAxis() == Direction.Axis.Y)
+        {
+            return localFace;
+        }
+        int steps = Math.floorMod(Math.round(yRot / 90.0F), 4);
+        Direction world = localFace;
+        for (int i = 0; i < steps; i++)
+        {
+            world = world.getClockWise();
+        }
+        return world;
+    }
+
+    private static Direction nearestFace(AABB box, Vec3 hit)
+    {
+        double dxMin = Math.abs(hit.x - box.minX);
+        double dxMax = Math.abs(hit.x - box.maxX);
+        double dyMin = Math.abs(hit.y - box.minY);
+        double dyMax = Math.abs(hit.y - box.maxY);
+        double dzMin = Math.abs(hit.z - box.minZ);
+        double dzMax = Math.abs(hit.z - box.maxZ);
+        double best = dxMin;
+        Direction face = Direction.WEST;
+        if (dxMax < best)
+        {
+            best = dxMax;
+            face = Direction.EAST;
+        }
+        if (dyMin < best)
+        {
+            best = dyMin;
+            face = Direction.DOWN;
+        }
+        if (dyMax < best)
+        {
+            best = dyMax;
+            face = Direction.UP;
+        }
+        if (dzMin < best)
+        {
+            best = dzMin;
+            face = Direction.NORTH;
+        }
+        if (dzMax < best)
+        {
+            face = Direction.SOUTH;
+        }
+        return face;
+    }
+
+    private static float[] faceUv(double minX, double minY, double minZ,
+                                 double maxX, double maxY, double maxZ,
+                                 Direction face, Vec3 hit)
+    {
+        double w = Math.max(1.0E-6D, maxX - minX);
+        double h = Math.max(1.0E-6D, maxY - minY);
+        double d = Math.max(1.0E-6D, maxZ - minZ);
+        return switch (face)
+        {
+            case UP, DOWN -> new float[]{
+                    (float) ((hit.x - minX) / w),
+                    (float) ((hit.z - minZ) / d)
+            };
+            case NORTH, SOUTH -> new float[]{
+                    (float) ((hit.x - minX) / w),
+                    (float) ((hit.y - minY) / h)
+            };
+            case WEST, EAST -> new float[]{
+                    (float) ((hit.z - minZ) / d),
+                    (float) ((hit.y - minY) / h)
+            };
+        };
     }
 
     // ======================== 解析与表现 ========================
@@ -253,23 +427,10 @@ public final class StarMarkSkillLogic
         return resolved;
     }
 
-    /** 解析 + 重绘火花；每 tick 的力学结算与表现入口。 */
+    /** 解析标记；常驻火花已改为客户端贴花，这里只做数据结算。 */
     public static List<ResolvedMark> resolveAndRender(ServerPlayer player)
     {
-        List<ResolvedMark> resolved = resolveAll(player);
-        if (resolved.isEmpty())
-        {
-            return resolved;
-        }
-        ServerLevel level = player.serverLevel();
-        if (level.getGameTime() % RENDER_INTERVAL_TICKS == 0L)
-        {
-            for (ResolvedMark mark : resolved)
-            {
-                spawnSpark(level, mark.position(), mark.mark().type(), SPARK_SCALE);
-            }
-        }
-        return resolved;
+        return resolveAll(player);
     }
 
     /**
@@ -284,8 +445,7 @@ public final class StarMarkSkillLogic
             BlockPos pos = mark.pos();
             return new Vec3(pos.getX() + 0.5D, pos.getY() + BLOCK_MARK_HEIGHT, pos.getZ() + 0.5D);
         }
-        double height = mark.kind() == StarMark.Kind.ITEM ? ITEM_MARK_HEIGHT : ENTITY_MARK_HEIGHT;
-        return new Vec3(entity.getX(), entity.getY() + entity.getBbHeight() + height, entity.getZ());
+        return new Vec3(entity.getX(), entity.getY() + entity.getBbHeight() + ENTITY_MARK_HEIGHT, entity.getZ());
     }
 
     // ======================== 准星判定（清除用） ========================
@@ -297,7 +457,7 @@ public final class StarMarkSkillLogic
      * 取准星命中的「已标记目标」，供双击 Shift 的单独清除使用。
      * <p>
      * <b>距离无限、允许穿墙</b>，并且候选集只有施术者自己持有的标记——因为按定义，
-     * 「目标」就是已经带上标记的方块 / 掉落物 / 实体，所以这里不需要对世界做射线，
+     * 「目标」就是已经带上标记的方块 / 实体，所以这里不需要对世界做射线，
      * 也不受区块是否加载影响。判定方式：把锚点投到视线上，在「不在背后」且「垂距落在容差内」
      * 的候选里取沿视线最近的一个。
      *

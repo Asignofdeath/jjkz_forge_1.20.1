@@ -8,6 +8,7 @@ import com.darkness.jujutsukaisenzone.registry.ModEntities;
 import com.darkness.jujutsukaisenzone.registry.ModSounds;
 import com.darkness.jujutsukaisenzone.technique.TechniqueDamageSources;
 import com.darkness.jujutsukaisenzone.technique.scaling.ShrineSkillGrowth;
+import com.darkness.jujutsukaisenzone.technique.skillset.ShrineTechniqueSkillSet;
 import com.darkness.jujutsukaisenzone.technique.se.ShrineFinishCutMarks;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
@@ -208,7 +209,8 @@ public class ShrineKaiArrowBehavior extends EffectBehavior
             if (!target.isAlive()) continue;
             if (!GeometryUtils.aabbIntersectsSphere(sample.x, sample.y, sample.z, rSqr, target.getBoundingBox())) continue;
             if (owner != null && target.getUUID().equals(owner.getUUID())) continue;
-            if (TechniqueDamageSources.deal(target, owner, ShrineSkillGrowth.kaiColumnDamage(owner)))
+            if (TechniqueDamageSources.deal(target, owner, ShrineSkillGrowth.kaiColumnDamage(owner),
+                    ShrineTechniqueSkillSet.SKILL_KAI))
             {
                 ShrineFinishCutMarks.tryMarkFromKaiHit(owner, target);
                 SoundEvent hitSound = this.slashType == 2

@@ -11,7 +11,7 @@ import net.minecraft.network.chat.Component;
  * @param modifierMask      主动触发修饰键；自动招为 0。掩码精确匹配（同 {@code SpecialMoveInput}）
  * @param displayName       展示名
  * @param cursedEnergyCost  咒力；0 表示不扣
- * @param cooldownTicks     成功后写入该式神公用 CD 桶的时长
+ * @param cooldownTicks     成功后写入冷却时长；{@link ShikigamiCastMode#AUTO} 为该招独立桶，其余为式神槽公用桶
  * @param autoPriority      AUTO/BOTH 优先级，越大越先试
  * @param effect            效果体
  */

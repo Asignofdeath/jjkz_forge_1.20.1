@@ -2,6 +2,7 @@ package com.darkness.jujutsukaisenzone.technique.skill;
 
 import com.darkness.jujutsukaisenzone.player.PlayerRatioOvertimeData;
 import com.darkness.jujutsukaisenzone.technique.TechniqueDamageSources;
+import com.darkness.jujutsukaisenzone.technique.skillset.RatioTechniqueSkillSet;
 import com.darkness.jujutsukaisenzone.technique.skillset.SkillDamageType;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
@@ -96,7 +97,8 @@ public final class RatioAbsolutionLogic
             {
                 continue;
             }
-            if (TechniqueDamageSources.deal(living, player, DAMAGE, SkillDamageType.MARTIAL))
+            if (TechniqueDamageSources.deal(living, player, DAMAGE, SkillDamageType.MARTIAL,
+                    RatioTechniqueSkillSet.SKILL_ABSOLUTION))
             {
                 livingHits++;
                 hit.add(living.getUUID());
@@ -121,7 +123,8 @@ public final class RatioAbsolutionLogic
                         && !entity.getUUID().equals(player.getUUID())
                         && !hit.contains(entity.getUUID())))
         {
-            if (TechniqueDamageSources.deal(living, player, IMPACT_DAMAGE, SkillDamageType.MARTIAL))
+            if (TechniqueDamageSources.deal(living, player, IMPACT_DAMAGE, SkillDamageType.MARTIAL,
+                    RatioTechniqueSkillSet.SKILL_ABSOLUTION))
             {
                 impactHits++;
                 living.setDeltaMovement(living.getDeltaMovement().add(look.scale(0.55D).add(0.0D, 0.25D, 0.0D)));

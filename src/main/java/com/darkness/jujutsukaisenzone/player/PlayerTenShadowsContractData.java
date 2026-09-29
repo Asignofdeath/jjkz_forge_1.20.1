@@ -14,6 +14,8 @@ public final class PlayerTenShadowsContractData
 {
     public static final String TAG_TAMED_MASK = "jujutsukaisenzone_ten_shadows_tamed_mask";
     public static final int DEFAULT_MASK = 1 << TenShadowsShikigami.DIVINE_DOGS.index();
+    /** 十种式神全部已调伏（index 0～9）。 */
+    public static final int ALL_TAMED_MASK = (1 << TenShadowsShikigami.values().length) - 1;
 
     private PlayerTenShadowsContractData()
     {
@@ -60,6 +62,12 @@ public final class PlayerTenShadowsContractData
             return;
         }
         setMask(player, getMask(player) | (1 << shikigami.index()));
+    }
+
+    /** 作弊 / 调试：一键写入全部式神契约。 */
+    public static void grantAllTamed(ServerPlayer player)
+    {
+        setMask(player, ALL_TAMED_MASK);
     }
 
     public static void ensureInitialized(ServerPlayer player)

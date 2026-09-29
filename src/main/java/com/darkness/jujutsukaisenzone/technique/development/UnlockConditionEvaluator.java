@@ -4,8 +4,10 @@ import com.darkness.jujutsukaisenzone.player.PlayerCursedGradeData;
 import com.darkness.jujutsukaisenzone.player.PlayerDomainExpansionData;
 import com.darkness.jujutsukaisenzone.player.PlayerMeltdownRepairData;
 import com.darkness.jujutsukaisenzone.player.PlayerReverseTechniqueData;
+import com.darkness.jujutsukaisenzone.player.PlayerTenShadowsContractData;
 import com.darkness.jujutsukaisenzone.technique.MeltdownRepairLearnLogic;
 import com.darkness.jujutsukaisenzone.technique.commonskill.ReverseTechniqueCommonKeySkill;
+import com.darkness.jujutsukaisenzone.technique.skill.TenShadowsShikigami;
 import net.minecraft.world.entity.player.Player;
 
 /**
@@ -27,7 +29,14 @@ public final class UnlockConditionEvaluator
             case HAS_DOMAIN_EXPANSION -> PlayerDomainExpansionData.hasLearned(player);
             case HAS_MELTDOWN_REPAIR -> PlayerMeltdownRepairData.hasLearned(player);
             case ALWAYS_VISIBLE -> true;
+            case HAS_TAMED_SHIKIGAMI -> evaluateTamedShikigami(player, condition.arg());
         };
+    }
+
+    private static boolean evaluateTamedShikigami(Player player, String shikigamiId)
+    {
+        TenShadowsShikigami shikigami = TenShadowsShikigami.byId(shikigamiId);
+        return shikigami != null && PlayerTenShadowsContractData.isTamed(player, shikigami);
     }
 
     public static boolean evaluateAll(Player player, Iterable<UnlockCondition> conditions)

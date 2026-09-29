@@ -6,6 +6,8 @@ import com.darkness.jujutsukaisenzone.entity.CourtSeatEntity;
 import com.darkness.jujutsukaisenzone.entity.DemonSubduingShrineEntity;
 import com.darkness.jujutsukaisenzone.entity.JudgeEntity;
 import com.darkness.jujutsukaisenzone.entity.GavelProjectileEntity;
+import com.darkness.jujutsukaisenzone.entity.JadeDogEntity;
+import com.darkness.jujutsukaisenzone.entity.MahoragaEntity;
 import com.darkness.jujutsukaisenzone.entity.SpecialEffectEntity;
 import com.darkness.jujutsukaisenzone.entity.WedgeEntity;
 import net.minecraft.world.entity.EntityType;
@@ -75,6 +77,23 @@ public final class ModEntities
                             .clientTrackingRange(4)
                             .updateInterval(10)
                             .build("gavel_projectile"));
+
+    /** 十种影法·玉犬 */
+    public static final RegistryObject<EntityType<JadeDogEntity>> JADE_DOG =
+            ENTITY_TYPES.register("jade_dog",
+                    () -> EntityType.Builder.<JadeDogEntity>of(JadeDogEntity::new, MobCategory.CREATURE)
+                            .sized(0.7F, 0.95F)
+                            .clientTrackingRange(10)
+                            .build("jade_dog"));
+
+    /** 十种影法·魔虚罗 */
+    public static final RegistryObject<EntityType<MahoragaEntity>> MAHORAGA =
+            ENTITY_TYPES.register("mahoraga",
+                    () -> EntityType.Builder.<MahoragaEntity>of(MahoragaEntity::new, MobCategory.CREATURE)
+                            .sized(1.2F, 2.9F)
+                            .clientTrackingRange(10)
+                            .fireImmune()
+                            .build("mahoraga"));
 
     /** 天元之楔 */
     public static final RegistryObject<EntityType<WedgeEntity>> WEDGE =

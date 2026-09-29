@@ -5,6 +5,7 @@ import com.darkness.jujutsukaisenzone.network.packet.AdjustCastRangeTierC2SPacke
 import com.darkness.jujutsukaisenzone.network.packet.AerialMultiJumpC2SPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SelectStarMarkC2SPacket;
 import com.darkness.jujutsukaisenzone.network.packet.StarMarkClearC2SPacket;
+import com.darkness.jujutsukaisenzone.network.packet.SyncStarMarksS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.AdjustBarrierRadiusTierC2SPacket;
 import com.darkness.jujutsukaisenzone.network.packet.BarrierTechniqueCastC2SPacket;
 import com.darkness.jujutsukaisenzone.network.packet.DomainExpansionCastC2SPacket;
@@ -100,10 +101,12 @@ import com.darkness.jujutsukaisenzone.network.packet.EmotionalReleaseC2SPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncEmotionalReleaseStateS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.ToggleMimicryC2SPacket;
 import com.darkness.jujutsukaisenzone.player.PlayerMimicryData;
+import com.darkness.jujutsukaisenzone.player.StarMark;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.phys.Vec3;
 
+import java.util.List;
 import java.util.UUID;
 import net.minecraftforge.network.NetworkDirection;
 import net.minecraftforge.network.NetworkRegistry;
@@ -594,6 +597,11 @@ public final class ModNetwork
                 .decoder(StarMarkClearC2SPacket::decode)
                 .consumerMainThread(StarMarkClearC2SPacket::handle)
                 .add();
+        CHANNEL.messageBuilder(SyncStarMarksS2CPacket.class, packetId++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(SyncStarMarksS2CPacket::encode)
+                .decoder(SyncStarMarksS2CPacket::decode)
+                .consumerMainThread(SyncStarMarksS2CPacket::handle)
+                .add();
         CHANNEL.messageBuilder(SyncCombatPowerS2CPacket.class, packetId++, NetworkDirection.PLAY_TO_CLIENT)
                 .encoder(SyncCombatPowerS2CPacket::encode)
                 .decoder(SyncCombatPowerS2CPacket::decode)
@@ -793,6 +801,25 @@ public final class ModNetwork
     public static void sendStarMarkClearToServer()
     {
         CHANNEL.send(PacketDistributor.SERVER.noArg(), new StarMarkClearC2SPacket());
+    }
+
+    /**
+     * 服务端 → 同维度玩家：同步某施术者的星星标记列表（喷漆贴花）。
+     * 列表为空时表示该施术者已无标记（清除 / 登出）。
+     */
+    public static void sendStarMarksSync(ServerPlayer owner, List<StarMark> marks)
+    {
+        CHANNEL.send(
+                PacketDistributor.DIMENSION.with(owner.level()::dimension),
+                new SyncStarMarksS2CPacket(owner.getUUID(), marks));
+    }
+
+    /** 服务端 → 指定玩家：推送某施术者的标记快照（登录 / 进维度时补发）。 */
+    public static void sendStarMarksSyncTo(ServerPlayer viewer, ServerPlayer owner, List<StarMark> marks)
+    {
+        CHANNEL.send(
+                PacketDistributor.PLAYER.with(() -> viewer),
+                new SyncStarMarksS2CPacket(owner.getUUID(), marks));
     }
 
     public static void sendUnlockSkillResult(

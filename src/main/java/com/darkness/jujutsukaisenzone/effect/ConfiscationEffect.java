@@ -2,6 +2,7 @@ package com.darkness.jujutsukaisenzone.effect;
 
 import com.darkness.jujutsukaisenzone.compat.EpicFightCompat;
 import com.darkness.jujutsukaisenzone.registry.ModEffects;
+import com.darkness.jujutsukaisenzone.technique.shikigami.tenshadows.ability.mahoraga.MahoragaAdaptation;
 import com.darkness.jujutsukaisenzone.technique.skill.JudgmentSoundLogic;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.particles.DustParticleOptions;
@@ -59,6 +60,10 @@ public final class ConfiscationEffect extends MobEffect
 
     public static void applyRandom(ServerPlayer caster, LivingEntity target)
     {
+        if (MahoragaAdaptation.tryEngage(target, "judgment_confiscation"))
+        {
+            return;
+        }
         if (target instanceof ServerPlayer playerTarget)
         {
             applyRandomPlayerConfiscation(caster, playerTarget);

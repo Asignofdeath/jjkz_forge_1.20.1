@@ -1,5 +1,6 @@
 package com.darkness.jujutsukaisenzone.technique.shikigami.tenshadows.ability;
 
+import com.darkness.jujutsukaisenzone.entity.JadeDogEntity;
 import com.darkness.jujutsukaisenzone.technique.shikigami.ShikigamiAbility;
 import com.darkness.jujutsukaisenzone.technique.shikigami.ShikigamiAbilitySource;
 import com.darkness.jujutsukaisenzone.technique.shikigami.tenshadows.TenShadowsFieldQuery;
@@ -35,6 +36,10 @@ public final class DivineDogsPounceLogic
             {
                 continue;
             }
+            if (dog instanceof JadeDogEntity eating && eating.isEating())
+            {
+                continue;
+            }
             double distSq = dog.distanceToSqr(target);
             if (distSq < MIN_RANGE * MIN_RANGE || distSq > MAX_RANGE * MAX_RANGE)
             {
@@ -43,6 +48,10 @@ public final class DivineDogsPounceLogic
             Vec3 delta = target.position().subtract(dog.position()).normalize().scale(1.15D);
             dog.setDeltaMovement(dog.getDeltaMovement().add(delta.x, 0.35D, delta.z));
             dog.hurtMarked = true;
+            if (dog instanceof JadeDogEntity jadeDog)
+            {
+                jadeDog.playPounceAnimation();
+            }
             if (dog.distanceToSqr(target) <= (MIN_RANGE + 1.5D) * (MIN_RANGE + 1.5D)
                     || distSq <= 16.0D)
             {

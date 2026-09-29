@@ -1,7 +1,11 @@
 package com.darkness.jujutsukaisenzone.technique.skill;
 
+import com.darkness.jujutsukaisenzone.entity.JadeDogEntity;
 import com.darkness.jujutsukaisenzone.player.PlayerTenShadowsRosterData;
 import com.darkness.jujutsukaisenzone.player.PlayerTenShadowsStanceData;
+import com.darkness.jujutsukaisenzone.technique.shikigami.tenshadows.ability.GreatSerpentAmbushLogic;
+import com.darkness.jujutsukaisenzone.technique.shikigami.tenshadows.ability.PiercingOxChargeLogic;
+import com.darkness.jujutsukaisenzone.entity.MahoragaEntity;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
@@ -23,16 +27,21 @@ import java.util.UUID;
 public final class TenShadowsShikigamiAiLogic
 {
     public static final String TAG_ORDERED_TARGET = "jujutsukaisenzone_ten_shadows_ordered_target";
+    /** 式神自身受击后的反击目标（高优先）。 */
+    public static final String TAG_RETALIATE_TARGET = "jujutsukaisenzone_ten_shadows_retaliate_target";
 
     /** 超过此距离开始走向主人。 */
     private static final double FOLLOW_START = 5.0D;
-    /** 超过此距离传送回主人附近。 */
+    /** 超过此距离传送回主人附近（仅护卫）。 */
     private static final double TELEPORT_DISTANCE = 18.0D;
+    /** 协同作战主动索敌半径。 */
+    private static final double ASSIST_AGGRO = 28.0D;
+    private static final double ASSIST_AGGRO_SQR = ASSIST_AGGRO * ASSIST_AGGRO;
     /** 护卫环绕半径。 */
     private static final double GUARD_ORBIT = 4.5D;
-    /** 护卫警戒半径（相对主人）。 */
-    private static final double GUARD_ALERT = 8.0D;
-    private static final double GUARD_ALERT_SQR = GUARD_ALERT * GUARD_ALERT;
+    /** 护卫：仇恨锁定主人时的拦截半径（不必等主人挨打）。 */
+    private static final double GUARD_THREAT_RANGE = 16.0D;
+    private static final double GUARD_THREAT_RANGE_SQR = GUARD_THREAT_RANGE * GUARD_THREAT_RANGE;
 
     private TenShadowsShikigamiAiLogic()
     {
@@ -70,6 +79,14 @@ public final class TenShadowsShikigamiAiLogic
                 {
                     continue;
                 }
+                if (GreatSerpentAmbushLogic.isAmbushing(mob) || PiercingOxChargeLogic.isCharging(mob))
+                {
+                    continue;
+                }
+                if (mob instanceof JadeDogEntity jadeDog && jadeDog.isEating())
+                {
+                    continue;
+                }
                 tickOne(owner, mob, guard, slot, Math.max(1, total));
                 slot++;
             }
@@ -84,9 +101,10 @@ public final class TenShadowsShikigamiAiLogic
         }
 
         double distSqr = mob.distanceToSqr(owner);
-        if (distSqr > TELEPORT_DISTANCE * TELEPORT_DISTANCE)
+        /* 护卫姿态才拉回主人附近；协同作战不传送，避免打断追击 */
+        if (guard && distSqr > TELEPORT_DISTANCE * TELEPORT_DISTANCE)
         {
-            teleportNearOwner(owner, mob, slotIndex, totalCount, guard);
+            teleportNearOwner(owner, mob, slotIndex, totalCount, true);
         }
 
         if (guard)
@@ -102,9 +120,15 @@ public final class TenShadowsShikigamiAiLogic
     private static void tickAssist(ServerPlayer owner, Mob mob, double distSqr)
     {
         LivingEntity ordered = resolveOrderedTarget(owner, mob);
+        LivingEntity retaliate = resolveRetaliateTarget(owner, mob);
         if (ordered != null)
         {
             setAttackTarget(mob, ordered);
+        }
+        else if (retaliate != null)
+        {
+            /* 自身受击反击：高于普通索敌 */
+            setAttackTarget(mob, retaliate);
         }
         else
         {
@@ -113,75 +137,171 @@ public final class TenShadowsShikigamiAiLogic
             {
                 clearTarget(mob);
                 clearOrdered(mob);
+                current = null;
+            }
+            /* 协同：主动搜寻附近敌对并进攻 */
+            if (current == null)
+            {
+                LivingEntity hunt = findAssistTarget(owner, mob);
+                if (hunt != null)
+                {
+                    setAttackTarget(mob, hunt);
+                }
             }
         }
 
         LivingEntity target = mob.getTarget();
         if (target != null && target.isAlive())
         {
-            mob.getNavigation().moveTo(target, 1.15D);
+            /* 大蛇 / 蝦蟇无常规近战：只保持仇恨供招式，不追咬 */
+            if (isAbilityOnlyMeleeLocked(mob))
+            {
+                if (distSqr > FOLLOW_START * FOLLOW_START)
+                {
+                    mob.getNavigation().moveTo(owner, 1.05D);
+                }
+                return;
+            }
+            mob.getNavigation().moveTo(target, chaseSpeed(mob, target));
             return;
         }
         if (distSqr > FOLLOW_START * FOLLOW_START)
         {
-            mob.getNavigation().moveTo(owner, 1.1D);
+            mob.getNavigation().moveTo(owner, followSpeed(mob));
         }
+    }
+
+    private static double chaseSpeed(Mob mob, LivingEntity target)
+    {
+        if (mob instanceof MahoragaEntity mahoraga)
+        {
+            return mahoraga.navigationSpeedForChase(target);
+        }
+        return 1.15D;
+    }
+
+    private static double followSpeed(Mob mob)
+    {
+        if (mob instanceof MahoragaEntity mahoraga)
+        {
+            return mahoraga.navigationSpeedForFollow();
+        }
+        return 1.1D;
+    }
+
+    private static boolean isAbilityOnlyMeleeLocked(Mob mob)
+    {
+        int index = mob.getPersistentData().getInt(TenShadowsSummonLogic.TAG_INDEX);
+        return index == TenShadowsShikigami.GREAT_SERPENT.index()
+                || index == TenShadowsShikigami.TOAD.index()
+                || index == TenShadowsShikigami.ROUND_DEER.index();
     }
 
     private static void tickGuard(ServerPlayer owner, Mob mob, int slotIndex, int totalCount)
     {
         clearOrdered(mob);
+
+        /* 最高优先：仇恨锁定主人且进入威胁距离 → 立刻拦截 */
+        LivingEntity priorityThreat = findOwnerAggroThreat(owner, mob);
+        if (priorityThreat != null)
+        {
+            chaseGuardTarget(owner, mob, slotIndex, totalCount, priorityThreat);
+            return;
+        }
+
+        /* 次高优先：自身受击反击 */
+        LivingEntity retaliate = resolveRetaliateTarget(owner, mob);
+        if (retaliate != null)
+        {
+            setAttackTarget(mob, retaliate);
+            chaseGuardTarget(owner, mob, slotIndex, totalCount, retaliate);
+            return;
+        }
+
         LivingEntity current = mob.getTarget();
         if (current != null)
         {
+            /* 无高优先威胁时：丢弃已失效或未锁定主人的目标 */
             if (!current.isAlive()
                     || isFriendly(owner, current)
-                    || current.distanceToSqr(owner) > GUARD_ALERT_SQR)
+                    || current.distanceToSqr(owner) > GUARD_THREAT_RANGE_SQR
+                    || !isAggroOnOwner(owner, current))
             {
                 clearTarget(mob);
                 current = null;
             }
         }
-        if (current == null)
-        {
-            LivingEntity alert = findAlertTarget(owner, mob);
-            if (alert != null)
-            {
-                setAttackTarget(mob, alert);
-                current = alert;
-            }
-        }
 
         if (current != null)
         {
-            mob.getNavigation().moveTo(current, 1.2D);
+            chaseGuardTarget(owner, mob, slotIndex, totalCount, current);
             return;
         }
 
         Vec3 orbit = orbitPoint(owner, slotIndex, totalCount);
         if (mob.distanceToSqr(orbit) > 2.25D)
         {
-            mob.getNavigation().moveTo(orbit.x, orbit.y, orbit.z, 1.05D);
+            mob.getNavigation().moveTo(orbit.x, orbit.y, orbit.z, followSpeed(mob));
         }
     }
 
-    private static LivingEntity findAlertTarget(ServerPlayer owner, Mob mob)
+    private static void chaseGuardTarget(
+            ServerPlayer owner, Mob mob, int slotIndex, int totalCount, LivingEntity target)
+    {
+        setAttackTarget(mob, target);
+        if (isAbilityOnlyMeleeLocked(mob))
+        {
+            Vec3 orbit = orbitPoint(owner, slotIndex, totalCount);
+            if (mob.distanceToSqr(orbit) > 2.25D)
+            {
+                mob.getNavigation().moveTo(orbit.x, orbit.y, orbit.z, 1.05D);
+            }
+            return;
+        }
+        mob.getNavigation().moveTo(target, chaseSpeed(mob, target));
+    }
+
+    /** 协同：大范围主动索敌。 */
+    private static LivingEntity findAssistTarget(ServerPlayer owner, Mob mob)
     {
         List<LivingEntity> nearby = owner.level().getEntitiesOfClass(
                 LivingEntity.class,
-                owner.getBoundingBox().inflate(GUARD_ALERT),
+                mob.getBoundingBox().inflate(ASSIST_AGGRO),
                 candidate -> candidate.isAlive()
                         && candidate != owner
                         && candidate != mob
                         && !isFriendly(owner, candidate)
-                        && candidate.distanceToSqr(owner) <= GUARD_ALERT_SQR
-                        && isThreat(owner, candidate)
+                        && mob.distanceToSqr(candidate) <= ASSIST_AGGRO_SQR
+                        && isHostileThreat(candidate)
                         && mob.hasLineOfSight(candidate));
+        return nearestTo(mob, nearby);
+    }
+
+    /**
+     * 护卫高优先：已仇恨锁定主人，且距主人小于 {@link #GUARD_THREAT_RANGE}。
+     * 不要求视线，也不必等主人先挨打。
+     */
+    private static LivingEntity findOwnerAggroThreat(ServerPlayer owner, Mob mob)
+    {
+        List<LivingEntity> nearby = owner.level().getEntitiesOfClass(
+                LivingEntity.class,
+                owner.getBoundingBox().inflate(GUARD_THREAT_RANGE),
+                candidate -> candidate.isAlive()
+                        && candidate != owner
+                        && candidate != mob
+                        && !isFriendly(owner, candidate)
+                        && candidate.distanceToSqr(owner) <= GUARD_THREAT_RANGE_SQR
+                        && isAggroOnOwner(owner, candidate));
+        return nearestTo(owner, nearby);
+    }
+
+    private static LivingEntity nearestTo(Entity origin, List<LivingEntity> candidates)
+    {
         LivingEntity best = null;
         double bestDist = Double.MAX_VALUE;
-        for (LivingEntity candidate : nearby)
+        for (LivingEntity candidate : candidates)
         {
-            double d = candidate.distanceToSqr(owner);
+            double d = origin.distanceToSqr(candidate);
             if (d < bestDist)
             {
                 bestDist = d;
@@ -248,6 +368,7 @@ public final class TenShadowsShikigamiAiLogic
                 if (entity instanceof Mob mob)
                 {
                     clearOrdered(mob);
+                    clearRetaliate(mob);
                     clearTarget(mob);
                 }
             }
@@ -260,7 +381,8 @@ public final class TenShadowsShikigamiAiLogic
         {
             return;
         }
-        if (!PlayerTenShadowsStanceData.isAssist(owner))
+        /* 协同主动参战；护卫在主人挨打时也拦截 */
+        if (!PlayerTenShadowsStanceData.isAssist(owner) && !PlayerTenShadowsStanceData.isGuard(owner))
         {
             return;
         }
@@ -272,13 +394,43 @@ public final class TenShadowsShikigamiAiLogic
                 Entity entity = level.getEntity(id);
                 if (entity instanceof Mob mob && mob.isAlive() && TenShadowsSummonLogic.isOwnedBy(mob, owner.getUUID()))
                 {
-                    if (mob.getTarget() == null)
+                    if (PlayerTenShadowsStanceData.isGuard(owner))
+                    {
+                        setAttackTarget(mob, attacker);
+                    }
+                    else if (mob.getTarget() == null)
                     {
                         setAttackTarget(mob, attacker);
                     }
                 }
             }
         }
+    }
+
+    /**
+     * 式神自身受击：将攻击者记为高优先反击目标（协同 / 护卫均生效）。
+     */
+    public static void onShikigamiHurt(Mob shikigami, LivingEntity attacker)
+    {
+        if (shikigami == null || attacker == null || !attacker.isAlive() || shikigami.level().isClientSide)
+        {
+            return;
+        }
+        if (!TenShadowsSummonLogic.isFriendlyOwned(shikigami))
+        {
+            return;
+        }
+        UUID ownerId = TenShadowsSummonLogic.getOwnerId(shikigami);
+        if (ownerId == null)
+        {
+            return;
+        }
+        if (attacker.getUUID().equals(ownerId) || TenShadowsSummonLogic.isOwnedBy(attacker, ownerId))
+        {
+            return;
+        }
+        shikigami.getPersistentData().putUUID(TAG_RETALIATE_TARGET, attacker.getUUID());
+        setAttackTarget(shikigami, attacker);
     }
 
     public static void onOwnerAttack(ServerPlayer owner, LivingEntity victim)
@@ -321,6 +473,27 @@ public final class TenShadowsShikigamiAiLogic
         return living;
     }
 
+    private static LivingEntity resolveRetaliateTarget(ServerPlayer owner, Mob mob)
+    {
+        if (!mob.getPersistentData().hasUUID(TAG_RETALIATE_TARGET))
+        {
+            return null;
+        }
+        UUID targetId = mob.getPersistentData().getUUID(TAG_RETALIATE_TARGET);
+        Entity entity = owner.serverLevel().getEntity(targetId);
+        if (!(entity instanceof LivingEntity living) || !living.isAlive() || isFriendly(owner, living))
+        {
+            clearRetaliate(mob);
+            return null;
+        }
+        return living;
+    }
+
+    private static void clearRetaliate(Mob mob)
+    {
+        mob.getPersistentData().remove(TAG_RETALIATE_TARGET);
+    }
+
     private static boolean isFriendly(ServerPlayer owner, LivingEntity other)
     {
         if (other.getUUID().equals(owner.getUUID()))
@@ -330,23 +503,47 @@ public final class TenShadowsShikigamiAiLogic
         return TenShadowsSummonLogic.isOwnedBy(other, owner.getUUID());
     }
 
-    /** 护卫警戒：玩家、敌对生物，或正在以主人为目标的生物。 */
-    private static boolean isThreat(ServerPlayer owner, LivingEntity candidate)
+    /** 协同索敌：敌对生物 / 其他玩家。 */
+    private static boolean isHostileThreat(LivingEntity candidate)
     {
         if (candidate instanceof net.minecraft.world.entity.player.Player)
         {
             return true;
         }
-        if (candidate instanceof net.minecraft.world.entity.monster.Enemy)
+        return candidate instanceof net.minecraft.world.entity.monster.Enemy;
+    }
+
+    /** 是否已将主人设为仇恨 / 战斗目标（含中立生物的持久愤怒）。 */
+    private static boolean isAggroOnOwner(ServerPlayer owner, LivingEntity candidate)
+    {
+        if (candidate instanceof Mob mob && mob.getTarget() == owner)
         {
             return true;
         }
-        return candidate instanceof Mob m && m.getTarget() == owner;
+        if (candidate instanceof net.minecraft.world.entity.NeutralMob neutral)
+        {
+            java.util.UUID anger = neutral.getPersistentAngerTarget();
+            if (anger != null && anger.equals(owner.getUUID()))
+            {
+                return true;
+            }
+        }
+        if (candidate instanceof Warden warden)
+        {
+            return warden.getBrain().getMemory(MemoryModuleType.ATTACK_TARGET)
+                    .filter(t -> t == owner)
+                    .isPresent();
+        }
+        return false;
     }
 
     private static void setAttackTarget(Mob mob, LivingEntity target)
     {
         mob.setTarget(target);
+        if (mob instanceof MahoragaEntity mahoraga)
+        {
+            mahoraga.beginChase(target);
+        }
         if (mob instanceof Warden warden)
         {
             warden.getBrain().setMemory(MemoryModuleType.ATTACK_TARGET, target);
@@ -360,10 +557,15 @@ public final class TenShadowsShikigamiAiLogic
     private static void clearTarget(Mob mob)
     {
         mob.setTarget(null);
+        if (mob instanceof MahoragaEntity mahoraga)
+        {
+            mahoraga.clearChaseLock();
+        }
         if (mob instanceof Warden warden)
         {
             warden.getBrain().eraseMemory(MemoryModuleType.ATTACK_TARGET);
             warden.getBrain().eraseMemory(MemoryModuleType.ROAR_TARGET);
+            warden.getBrain().eraseMemory(MemoryModuleType.DISTURBANCE_LOCATION);
         }
     }
 

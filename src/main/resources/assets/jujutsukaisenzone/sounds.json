@@ -246,6 +246,15 @@
       }
     ]
   },
+  "jutsushiki.love_rendezvous.star_mark": {
+    "subtitle": "subtitles.jujutsukaisenzone.jutsushiki.love_rendezvous.star_mark",
+    "sounds": [
+      {
+        "name": "jujutsukaisenzone:technique/starmark",
+        "attenuation_distance": 32
+      }
+    ]
+  },
   "character.sukuna.hmph": {
     "subtitle": "subtitles.jujutsukaisenzone.character.sukuna.hmph",
     "sounds": [

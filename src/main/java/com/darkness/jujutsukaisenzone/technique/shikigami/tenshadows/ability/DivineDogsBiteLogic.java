@@ -1,5 +1,6 @@
 package com.darkness.jujutsukaisenzone.technique.shikigami.tenshadows.ability;
 
+import com.darkness.jujutsukaisenzone.entity.JadeDogEntity;
 import com.darkness.jujutsukaisenzone.technique.shikigami.ShikigamiAbility;
 import com.darkness.jujutsukaisenzone.technique.shikigami.ShikigamiAbilitySource;
 import com.darkness.jujutsukaisenzone.technique.shikigami.tenshadows.TenShadowsFieldQuery;
@@ -33,7 +34,15 @@ public final class DivineDogsBiteLogic
             {
                 continue;
             }
+            if (dog instanceof JadeDogEntity eating && eating.isEating())
+            {
+                continue;
+            }
             target.hurt(dog.damageSources().mobAttack(dog), DAMAGE);
+            if (dog instanceof JadeDogEntity jadeDog)
+            {
+                jadeDog.playBiteAnimation();
+            }
             any = true;
         }
         return any;

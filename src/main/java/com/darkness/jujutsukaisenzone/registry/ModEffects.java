@@ -3,11 +3,13 @@ package com.darkness.jujutsukaisenzone.registry;
 import com.darkness.jujutsukaisenzone.JuJutsuKaisenZone;
 import com.darkness.jujutsukaisenzone.effect.ConfiscationEffect;
 import com.darkness.jujutsukaisenzone.effect.DeathSentenceEffect;
+import com.darkness.jujutsukaisenzone.effect.ElectrifiedEffect;
 import com.darkness.jujutsukaisenzone.effect.RushIntoTheZoneClimaxEffect;
 import com.darkness.jujutsukaisenzone.effect.SinfulOneEffect;
 import com.darkness.jujutsukaisenzone.effect.StarArmorBreakEffect;
 import com.darkness.jujutsukaisenzone.effect.StarConfusionEffect;
 import com.darkness.jujutsukaisenzone.effect.TechniqueMeltdownEffect;
+import com.darkness.jujutsukaisenzone.effect.VulnerabilityEffect;
 import com.darkness.jujutsukaisenzone.effect.ZoneEffect;
 import net.minecraft.world.effect.MobEffect;
 import net.minecraftforge.eventbus.api.IEventBus;
@@ -37,6 +39,12 @@ public final class ModEffects
     /** 星间飞行 · Ginan 引爆：短时混乱，非玩家实体随机转向。 */
     public static final RegistryObject<MobEffect> STAR_CONFUSION =
             EFFECTS.register("star_confusion", StarConfusionEffect::new);
+    /** 鵺等雷系：感电占位（轻度减速）。 */
+    public static final RegistryObject<MobEffect> ELECTRIFIED =
+            EFFECTS.register("electrified", ElectrifiedEffect::new);
+    /** 鵺等：易伤占位（受伤加深）。 */
+    public static final RegistryObject<MobEffect> VULNERABILITY =
+            EFFECTS.register("vulnerability", VulnerabilityEffect::new);
 
     private ModEffects()
     {

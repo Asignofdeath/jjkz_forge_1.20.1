@@ -7,6 +7,7 @@ import com.darkness.jujutsukaisenzone.technique.development.SkillTreeNodeDef;
 import com.darkness.jujutsukaisenzone.technique.development.SkillUnlockLogic;
 import com.darkness.jujutsukaisenzone.technique.development.TechniqueSkillTree;
 import com.darkness.jujutsukaisenzone.technique.development.UnlockCondition;
+import com.darkness.jujutsukaisenzone.technique.skill.TenShadowsShikigami;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
@@ -70,7 +71,31 @@ public final class TenShadowsTechniqueSkillSet extends AbstractInnateTechniqueSk
                             .visibleWhen(UnlockCondition.alwaysVisible())
                             .autoGranted()
                             .build())
+                    .node(shikigamiInfo(TenShadowsShikigami.DIVINE_DOGS))
+                    .node(shikigamiInfo(TenShadowsShikigami.NUE))
+                    .node(shikigamiInfo(TenShadowsShikigami.TOAD))
+                    .node(shikigamiInfo(TenShadowsShikigami.GREAT_SERPENT))
+                    .node(shikigamiInfo(TenShadowsShikigami.MAX_ELEPHANT))
+                    .node(shikigamiInfo(TenShadowsShikigami.RABBIT_ESCAPE))
+                    .node(shikigamiInfo(TenShadowsShikigami.ROUND_DEER))
+                    .node(shikigamiInfo(TenShadowsShikigami.PIERCING_OX))
+                    .node(shikigamiInfo(TenShadowsShikigami.TIGER_FUNERAL))
+                    .node(shikigamiInfo(TenShadowsShikigami.MAHORAGA))
                     .build();
+
+    /** 已调伏后才显示的式神说明节点（召唤 / 维持 / 招式咒力见 lang）。 */
+    private static SkillTreeNodeDef shikigamiInfo(TenShadowsShikigami shikigami)
+    {
+        String nodeId = "ten_shadows_" + shikigami.id();
+        return SkillTreeNodeDef.info(nodeId)
+                .titleKey("skill_tree.jujutsukaisenzone." + nodeId + ".title")
+                .iconPath(ICON)
+                .descriptionKey("skill_tree.jujutsukaisenzone." + nodeId + ".desc")
+                .requires("hand_shadow")
+                .visibleWhen(UnlockCondition.hasTamedShikigami(shikigami.id()))
+                .autoGranted()
+                .build();
+    }
 
     static
     {

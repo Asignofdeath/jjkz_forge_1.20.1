@@ -77,6 +77,14 @@ public final class ModSounds
                     55.0F));
     /** 黑闪触发音效（{@code assets/.../sounds/sound_effects/black_flash}）。 */
     public static final RegistryObject<SoundEvent> BLACK_FLASH = register("sound_effects.black_flash");
+    /**
+     * 星星标记打标音效（{@code assets/.../sounds/technique/starmark}）。
+     * 固定听距：服务端向半径内玩家发包，不只默认 16 格。
+     */
+    public static final RegistryObject<SoundEvent> STAR_MARK =
+            SOUND_EVENTS.register("jutsushiki.love_rendezvous.star_mark", () -> SoundEvent.createFixedRangeEvent(
+                    ResourceLocation.fromNamespaceAndPath(JuJutsuKaisenZone.MODID, "jutsushiki.love_rendezvous.star_mark"),
+                    32.0F));
     /** 宿傩拟态语音「hmph」（{@code assets/.../sounds/character/sukuna/hmph}）。 */
     public static final RegistryObject<SoundEvent> SUKUNA_HMPH = register("character.sukuna.hmph");
     /** 宿傩拟态语音「kai」（{@code assets/.../sounds/character/sukuna/kai}）。 */

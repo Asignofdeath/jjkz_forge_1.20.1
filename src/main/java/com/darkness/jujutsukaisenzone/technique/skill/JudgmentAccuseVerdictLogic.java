@@ -5,6 +5,8 @@ import com.darkness.jujutsukaisenzone.effect.DeathSentenceEffect;
 import com.darkness.jujutsukaisenzone.effect.SinfulOneEffect;
 import com.darkness.jujutsukaisenzone.player.JudgmentTrialTargetData;
 import com.darkness.jujutsukaisenzone.player.PlayerCrimeRecordData;
+import com.darkness.jujutsukaisenzone.technique.shikigami.tenshadows.ability.mahoraga.MahoragaAdaptation;
+import com.darkness.jujutsukaisenzone.technique.skillset.JudgmentTechniqueSkillSet;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
@@ -240,6 +242,10 @@ public final class JudgmentAccuseVerdictLogic
 
     private static void applyImmobilize(LivingEntity target)
     {
+        if (MahoragaAdaptation.tryEngage(target, JudgmentTechniqueSkillSet.SKILL_ACCUSE))
+        {
+            return;
+        }
         target.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, TIMEOUT_IMMOBILIZE_TICKS, 255, false, false, true));
         target.addEffect(new MobEffectInstance(MobEffects.JUMP, TIMEOUT_IMMOBILIZE_TICKS, 128, false, false, true));
     }

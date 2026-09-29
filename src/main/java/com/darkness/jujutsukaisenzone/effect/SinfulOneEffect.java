@@ -2,6 +2,7 @@ package com.darkness.jujutsukaisenzone.effect;
 
 import com.darkness.jujutsukaisenzone.player.PlayerCrimeRecordData;
 import com.darkness.jujutsukaisenzone.registry.ModEffects;
+import com.darkness.jujutsukaisenzone.technique.shikigami.tenshadows.ability.mahoraga.MahoragaAdaptation;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.effect.MobEffect;
@@ -45,6 +46,11 @@ public final class SinfulOneEffect extends MobEffect
             BlockPos recordPosition)
     {
         if (isActive(target))
+        {
+            return;
+        }
+        if (category == PlayerCrimeRecordData.Category.JUDGMENT_TECHNIQUE
+                && MahoragaAdaptation.tryEngage(target, "judgment_sinful_one"))
         {
             return;
         }

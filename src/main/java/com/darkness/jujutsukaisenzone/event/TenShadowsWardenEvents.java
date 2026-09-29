@@ -7,6 +7,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Unit;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Pose;
 import net.minecraft.world.entity.ai.memory.MemoryModuleType;
@@ -62,7 +63,7 @@ public final class TenShadowsWardenEvents
         entity.removeEffect(MobEffects.BLINDNESS);
     }
 
-    /** 持续刷新挖地冷却，并打断已开始的挖掘 / 钻出姿势。 */
+    /** 持续刷新挖地冷却，打断挖掘姿势，并抑制对主人的愤怒追击。 */
     @SubscribeEvent
     public static void onMahoragaTick(LivingEvent.LivingTickEvent event)
     {
@@ -80,6 +81,40 @@ public final class TenShadowsWardenEvents
         if (pose == Pose.DIGGING || pose == Pose.EMERGING)
         {
             warden.setPose(Pose.STANDING);
+        }
+        if (TenShadowsSummonLogic.isFriendlyOwned(warden))
+        {
+            suppressOwnerAnger(warden);
+        }
+    }
+
+    private static void suppressOwnerAnger(Warden warden)
+    {
+        if (!(warden.level() instanceof ServerLevel level))
+        {
+            return;
+        }
+        if (!warden.getPersistentData().hasUUID(TenShadowsSummonLogic.TAG_OWNER))
+        {
+            return;
+        }
+        java.util.UUID ownerId = warden.getPersistentData().getUUID(TenShadowsSummonLogic.TAG_OWNER);
+        Entity owner = level.getPlayerByUUID(ownerId);
+        if (owner == null)
+        {
+            owner = level.getEntity(ownerId);
+        }
+        if (owner != null)
+        {
+            warden.clearAnger(owner);
+        }
+        LivingEntity mobTarget = warden.getTarget();
+        if (mobTarget != null && mobTarget.getUUID().equals(ownerId))
+        {
+            warden.setTarget(null);
+            warden.getBrain().eraseMemory(MemoryModuleType.ATTACK_TARGET);
+            warden.getBrain().eraseMemory(MemoryModuleType.ROAR_TARGET);
+            warden.getBrain().eraseMemory(MemoryModuleType.DISTURBANCE_LOCATION);
         }
     }
 

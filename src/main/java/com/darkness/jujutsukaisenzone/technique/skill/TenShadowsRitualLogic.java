@@ -1,6 +1,7 @@
 package com.darkness.jujutsukaisenzone.technique.skill;
 
 import com.darkness.jujutsukaisenzone.compat.EpicFightCompat;
+import com.darkness.jujutsukaisenzone.entity.JadeDogEntity;
 import com.darkness.jujutsukaisenzone.network.ModNetwork;
 import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
 import com.darkness.jujutsukaisenzone.player.PlayerTenShadowsContractData;
@@ -484,7 +485,15 @@ public final class TenShadowsRitualLogic
             mob.setNoAi(false);
             mob.setTarget(caster);
         }
-        if (entity instanceof Wolf wolf)
+        if (entity instanceof JadeDogEntity jadeDog)
+        {
+            jadeDog.setWhiteVariant(spawnIndex == 0);
+            jadeDog.applyMaturityFromOwner(caster);
+            jadeDog.setTame(false);
+            jadeDog.setPersistentAngerTarget(caster.getUUID());
+            jadeDog.setRemainingPersistentAngerTime(20 * 60 * 20);
+        }
+        else if (entity instanceof Wolf wolf)
         {
             wolf.setTame(false);
             wolf.setPersistentAngerTarget(caster.getUUID());

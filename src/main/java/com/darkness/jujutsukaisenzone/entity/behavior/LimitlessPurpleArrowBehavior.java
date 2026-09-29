@@ -8,6 +8,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.util.Mth;
 import com.darkness.jujutsukaisenzone.technique.SkillDamageResolver;
 import com.darkness.jujutsukaisenzone.technique.TechniqueDamageSources;
+import com.darkness.jujutsukaisenzone.technique.skillset.LimitlessTechniqueSkillSet;
 import com.darkness.jujutsukaisenzone.technique.skillset.SkillDamageType;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
@@ -113,7 +114,7 @@ public class LimitlessPurpleArrowBehavior extends EffectBehavior
             if (owner != null && target.getUUID().equals(owner.getUUID())) continue;
 
             DamageSource source = TechniqueDamageSources.techniqueSource(level, owner);
-            TechniqueDamageSources.runWithType(SkillDamageType.TECHNIQUE, () -> {
+            TechniqueDamageSources.runWithType(SkillDamageType.TECHNIQUE, LimitlessTechniqueSkillSet.SKILL_PURPLE, () -> {
                 if (target instanceof Player)
                 {
                     target.hurt(source, dmg);

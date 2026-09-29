@@ -1,12 +1,13 @@
 package com.darkness.jujutsukaisenzone.technique.skill;
 
+import com.darkness.jujutsukaisenzone.registry.ModEntities;
 import net.minecraft.world.entity.EntityType;
 import org.lwjgl.glfw.GLFW;
 
 /**
  * 十种影法术式神槽位：数字行 1～0 ↔ 索引 0～9。
  * <p>
- * {@link #placeholderType()} 为临时原版外观，后续可换成自定义实体而不改键位。
+ * {@link #placeholderType()} 为召出实体类型；未换模的式神仍用原版占位。
  * 玉犬一对共用键 1；虎葬占键 9。
  */
 public enum TenShadowsShikigami
@@ -60,6 +61,14 @@ public enum TenShadowsShikigami
 
     public EntityType<?> placeholderType()
     {
+        if (this == DIVINE_DOGS)
+        {
+            return ModEntities.JADE_DOG.get();
+        }
+        if (this == MAHORAGA)
+        {
+            return ModEntities.MAHORAGA.get();
+        }
         return placeholderType;
     }
 

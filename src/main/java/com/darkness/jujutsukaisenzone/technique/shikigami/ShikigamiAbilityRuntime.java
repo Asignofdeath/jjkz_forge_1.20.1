@@ -13,7 +13,9 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 式神招式统一结算：在场 → 公用 CD → 咒力 → 效果 → 写桶。
+ * 式神招式统一结算：在场 → CD → 咒力 → 效果 → 写桶。
+ * <p>
+ * {@link ShikigamiCastMode#AUTO} 使用按招独立 CD；主动 / BOTH 仍用式神槽公用 CD。
  * <p>
  * 与热键栏特别招式经济链路无关。
  */
@@ -24,6 +26,12 @@ public final class ShikigamiAbilityRuntime
 
     private ShikigamiAbilityRuntime()
     {
+    }
+
+    /** {@link ShikigamiCastMode#AUTO} 招独立冷却；其余用槽位公用桶。 */
+    private static boolean usesIndependentCooldown(ShikigamiAbility ability)
+    {
+        return ability.castMode() == ShikigamiCastMode.AUTO;
     }
 
     public static boolean tryCast(
@@ -60,8 +68,12 @@ public final class ShikigamiAbilityRuntime
         }
 
         long now = owner.level().getGameTime();
-        int remain = PlayerShikigamiCooldownData.getRemainingTicks(
-                owner, mode.modeId(), ability.shikigamiSlotId(), now);
+        boolean independent = usesIndependentCooldown(ability);
+        int remain = independent
+                ? PlayerShikigamiCooldownData.getAbilityRemainingTicks(
+                        owner, mode.modeId(), ability.abilityId(), now)
+                : PlayerShikigamiCooldownData.getRemainingTicks(
+                        owner, mode.modeId(), ability.shikigamiSlotId(), now);
         if (remain > 0)
         {
             if (source == ShikigamiAbilitySource.PLAYER)
@@ -116,11 +128,17 @@ public final class ShikigamiAbilityRuntime
 
         if (ability.cooldownTicks() > 0)
         {
-            PlayerShikigamiCooldownData.setCooldown(
-                    owner,
-                    mode.modeId(),
-                    ability.shikigamiSlotId(),
-                    now + ability.cooldownTicks());
+            long expire = now + ability.cooldownTicks();
+            if (independent)
+            {
+                PlayerShikigamiCooldownData.setAbilityCooldown(
+                        owner, mode.modeId(), ability.abilityId(), expire);
+            }
+            else
+            {
+                PlayerShikigamiCooldownData.setCooldown(
+                        owner, mode.modeId(), ability.shikigamiSlotId(), expire);
+            }
         }
         if (source == ShikigamiAbilitySource.PLAYER)
         {
@@ -158,6 +176,8 @@ public final class ShikigamiAbilityRuntime
     /**
      * 自动侧：对主人当前模式场上各式神，按优先级尝试一招。
      * 本 tick 已主动放过的槽跳过。
+     * <p>
+     * AUTO 招各自独立 CD，不因槽位公用桶整槽封锁；BOTH 仍受槽位公用 CD 约束。
      */
     public static void tickAuto(ServerPlayer owner)
     {
@@ -176,7 +196,6 @@ public final class ShikigamiAbilityRuntime
             return;
         }
         ShikigamiMode mode = modeOpt.get();
-        long now = owner.level().getGameTime();
         java.util.LinkedHashSet<String> slots = new java.util.LinkedHashSet<>();
         for (ShikigamiAbility probe : mode.abilities())
         {
@@ -189,10 +208,6 @@ public final class ShikigamiAbilityRuntime
                 continue;
             }
             if (playerCastSlotThisTick(owner, slotId))
-            {
-                continue;
-            }
-            if (!PlayerShikigamiCooldownData.isReady(owner, mode.modeId(), slotId, now))
             {
                 continue;
             }

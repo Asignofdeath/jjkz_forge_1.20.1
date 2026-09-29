@@ -56,6 +56,7 @@ public final class PlayerCursedGradeData
             PlayerHealthData.syncFromEntity(serverPlayer);
             StrengthenTechniqueLearnLogic.tryUnlockForGrade(serverPlayer);
             com.darkness.jujutsukaisenzone.player.SpNodeShelfLogic.syncWithExperience(serverPlayer);
+            com.darkness.jujutsukaisenzone.entity.JadeDogEntity.refreshMaturityForOwner(serverPlayer);
             return;
         }
         player.getPersistentData().putInt(TAG_EXPERIENCE, clamped);

@@ -6,6 +6,7 @@ import com.darkness.jujutsukaisenzone.entity.data.ShrineHachiConfig;
 import com.darkness.jujutsukaisenzone.network.ModNetwork;
 import com.darkness.jujutsukaisenzone.technique.TechniqueDamageSources;
 import com.darkness.jujutsukaisenzone.technique.scaling.ShrineSkillGrowth;
+import com.darkness.jujutsukaisenzone.technique.skillset.ShrineTechniqueSkillSet;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -116,7 +117,8 @@ public class ShrineHachiBehavior extends EffectBehavior
     private void dealDamage(SpecialEffectEntity entity, ServerLevel level, LivingEntity target)
     {
         LivingEntity owner = resolveOwner(entity, this.ownerUuid);
-        TechniqueDamageSources.deal(target, owner, ShrineSkillGrowth.hachiDamage(owner));
+        TechniqueDamageSources.deal(target, owner, ShrineSkillGrowth.hachiDamage(owner),
+                ShrineTechniqueSkillSet.SKILL_HACHI);
     }
 
     private void applyMovementLock(LivingEntity target)

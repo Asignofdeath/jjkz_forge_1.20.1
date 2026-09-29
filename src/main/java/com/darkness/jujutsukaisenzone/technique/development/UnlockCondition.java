@@ -37,6 +37,16 @@ public record UnlockCondition(UnlockConditionType type, String arg)
         return new UnlockCondition(UnlockConditionType.ALWAYS_VISIBLE, "");
     }
 
+    /**
+     * 十影：已调伏指定式神后，说明节点才可见。
+     *
+     * @param shikigamiId {@code TenShadowsShikigami#id()}，如 {@code divine_dogs}
+     */
+    public static UnlockCondition hasTamedShikigami(String shikigamiId)
+    {
+        return new UnlockCondition(UnlockConditionType.HAS_TAMED_SHIKIGAMI, shikigamiId == null ? "" : shikigamiId);
+    }
+
     public boolean evaluate(Player player)
     {
         return UnlockConditionEvaluator.evaluate(player, this);

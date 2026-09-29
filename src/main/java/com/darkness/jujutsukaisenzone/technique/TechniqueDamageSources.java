@@ -77,6 +77,13 @@ public final class TechniqueDamageSources
     private static final ThreadLocal<SkillDamageType> ACTIVE_DAMAGE_TYPE = new ThreadLocal<>();
 
     /**
+     * 正在结算的叙事成员 id（skillId / 特别招式 id / 内部别名）。
+     * 只在 {@link #deal} / {@link #runWithNarrative} / 带叙事参数的 {@link #runWithType} 栈内有值；
+     * 魔虚罗适应等用 {@link #currentNarrativeFamilyId()} 解析成族键。
+     */
+    private static final ThreadLocal<String> ACTIVE_NARRATIVE_MEMBER = new ThreadLocal<>();
+
+    /**
      * 本次伤害是否已由 {@link #deal} 做过强度换算。
      * <p>
      * {@code TechniqueDamageZoneEvents} 的「区 0」负责给 EF / 原版近战这类<b>不走 deal</b> 的体术伤害
@@ -321,6 +328,16 @@ public final class TechniqueDamageSources
         return deal(target, owner, amount, SkillDamageType.TECHNIQUE);
     }
 
+    /** 同 {@link #deal(LivingEntity, LivingEntity, float, SkillDamageType)}，并挂叙事成员 id。 */
+    public static boolean deal(
+            LivingEntity target,
+            @Nullable LivingEntity owner,
+            float amount,
+            @Nullable String narrativeMemberId)
+    {
+        return deal(target, owner, amount, SkillDamageType.TECHNIQUE, narrativeMemberId);
+    }
+
     /**
      * 对目标造成一次指定分型的伤害。
      * <p>
@@ -336,6 +353,29 @@ public final class TechniqueDamageSources
      * @param damageType 这一击的叙事分型；传 {@link SkillDamageType#TECHNIQUE} 与旧三参重载等价
      */
     public static boolean deal(LivingEntity target, @Nullable LivingEntity owner, float amount, SkillDamageType damageType)
+    {
+        return deal(target, owner, amount, damageType, null);
+    }
+
+    /**
+     * 同 {@link #deal(LivingEntity, LivingEntity, float, SkillDamageType)}，并挂叙事成员 id
+     *（技能族见 {@link NarrativeSkillFamilies}）。
+     */
+    public static boolean deal(
+            LivingEntity target,
+            @Nullable LivingEntity owner,
+            float amount,
+            SkillDamageType damageType,
+            @Nullable String narrativeMemberId)
+    {
+        return callWithNarrative(narrativeMemberId, () -> dealInternal(target, owner, amount, damageType));
+    }
+
+    private static boolean dealInternal(
+            LivingEntity target,
+            @Nullable LivingEntity owner,
+            float amount,
+            SkillDamageType damageType)
     {
         float resolvedAmount = resolvePowerScaled(owner, amount, damageType);
         boolean previousScaledFlag = POWER_ALREADY_SCALED.get();
@@ -387,7 +427,17 @@ public final class TechniqueDamageSources
      */
     public static boolean dealCrit(LivingEntity target, @Nullable LivingEntity owner, float amount, SkillDamageType damageType)
     {
-        return callWithCrit(true, () -> deal(target, owner, amount, damageType));
+        return dealCrit(target, owner, amount, damageType, null);
+    }
+
+    public static boolean dealCrit(
+            LivingEntity target,
+            @Nullable LivingEntity owner,
+            float amount,
+            SkillDamageType damageType,
+            @Nullable String narrativeMemberId)
+    {
+        return callWithCrit(true, () -> deal(target, owner, amount, damageType, narrativeMemberId));
     }
 
     /** 同 {@link #dealCrit(LivingEntity, LivingEntity, float, SkillDamageType)}，分型默认术式。 */
@@ -396,6 +446,14 @@ public final class TechniqueDamageSources
         return dealCrit(target, owner, amount, SkillDamageType.TECHNIQUE);
     }
 
+    public static boolean dealCrit(
+            LivingEntity target,
+            @Nullable LivingEntity owner,
+            float amount,
+            @Nullable String narrativeMemberId)
+    {
+        return dealCrit(target, owner, amount, SkillDamageType.TECHNIQUE, narrativeMemberId);
+    }
     /**
      * 明确拒绝暴击的一次伤害。
      * <p>
@@ -503,6 +561,18 @@ public final class TechniqueDamageSources
         });
     }
 
+    /** 同 {@link #runWithType}，并挂叙事成员 id。 */
+    public static void runWithType(
+            SkillDamageType damageType,
+            @Nullable String narrativeMemberId,
+            Runnable action)
+    {
+        callWithNarrative(narrativeMemberId, () -> {
+            runWithType(damageType, action);
+            return null;
+        });
+    }
+
     /**
      * 同 {@link #runWithType}，带回返回值（如 {@code hurt} 的 boolean）。
      */
@@ -536,10 +606,54 @@ public final class TechniqueDamageSources
      */
     public static void runWithTypeCrit(SkillDamageType damageType, Runnable action)
     {
-        callWithCrit(true, () -> callWithType(damageType, () -> {
+        runWithTypeCrit(damageType, null, action);
+    }
+
+    public static void runWithTypeCrit(
+            SkillDamageType damageType,
+            @Nullable String narrativeMemberId,
+            Runnable action)
+    {
+        callWithNarrative(narrativeMemberId, () -> callWithCrit(true, () -> callWithType(damageType, () -> {
             action.run();
             return null;
-        }));
+        })));
+    }
+
+    /**
+     * 在任意出伤通道上挂叙事成员 id（可与 {@link #runWithType} 嵌套）。
+     */
+    public static void runWithNarrative(@Nullable String narrativeMemberId, Runnable action)
+    {
+        callWithNarrative(narrativeMemberId, () -> {
+            action.run();
+            return null;
+        });
+    }
+
+    public static <T> T callWithNarrative(@Nullable String narrativeMemberId, Supplier<T> action)
+    {
+        if (narrativeMemberId == null || narrativeMemberId.isBlank())
+        {
+            return action.get();
+        }
+        String previous = ACTIVE_NARRATIVE_MEMBER.get();
+        ACTIVE_NARRATIVE_MEMBER.set(narrativeMemberId);
+        try
+        {
+            return action.get();
+        }
+        finally
+        {
+            if (previous == null)
+            {
+                ACTIVE_NARRATIVE_MEMBER.remove();
+            }
+            else
+            {
+                ACTIVE_NARRATIVE_MEMBER.set(previous);
+            }
+        }
     }
 
     /**
@@ -550,6 +664,20 @@ public final class TechniqueDamageSources
     public static SkillDamageType currentDamageType()
     {
         return ACTIVE_DAMAGE_TYPE.get();
+    }
+
+    /** 当前结算中的叙事成员 id；未挂则为 null。 */
+    @Nullable
+    public static String currentNarrativeMemberId()
+    {
+        return ACTIVE_NARRATIVE_MEMBER.get();
+    }
+
+    /** 当前结算对应的叙事族 id（经 {@link NarrativeSkillFamilies#resolveFamilyId}）。 */
+    @Nullable
+    public static String currentNarrativeFamilyId()
+    {
+        return NarrativeSkillFamilies.resolveFamilyId(ACTIVE_NARRATIVE_MEMBER.get());
     }
 
     /**

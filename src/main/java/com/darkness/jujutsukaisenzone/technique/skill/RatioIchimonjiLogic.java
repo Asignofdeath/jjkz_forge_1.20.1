@@ -6,6 +6,7 @@ import com.darkness.jujutsukaisenzone.player.PlayerRatioBreakData;
 import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
 import com.darkness.jujutsukaisenzone.registry.ModItemTags;
 import com.darkness.jujutsukaisenzone.technique.TechniqueDamageSources;
+import com.darkness.jujutsukaisenzone.technique.skillset.RatioTechniqueSkillSet;
 import com.darkness.jujutsukaisenzone.technique.skillset.SkillDamageType;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.particles.ParticleTypes;
@@ -166,7 +167,8 @@ public final class RatioIchimonjiLogic
             {
                 continue;
             }
-            if (TechniqueDamageSources.deal(living, player, DAMAGE_PER_HIT, SkillDamageType.MARTIAL))
+            if (TechniqueDamageSources.deal(living, player, DAMAGE_PER_HIT, SkillDamageType.MARTIAL,
+                    RatioTechniqueSkillSet.SKILL_ICHIMONJI))
             {
                 hitCount++;
             }

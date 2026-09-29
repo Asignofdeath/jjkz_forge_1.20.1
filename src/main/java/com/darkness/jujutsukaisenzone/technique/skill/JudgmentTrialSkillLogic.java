@@ -11,6 +11,7 @@ import com.darkness.jujutsukaisenzone.player.PlayerCrimeRecordData;
 import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
 import com.darkness.jujutsukaisenzone.registry.ModEntities;
 import com.darkness.jujutsukaisenzone.technique.development.SkillUnlockLogic;
+import com.darkness.jujutsukaisenzone.technique.shikigami.tenshadows.ability.mahoraga.MahoragaAdaptation;
 import com.darkness.jujutsukaisenzone.technique.skillset.JudgmentTechniqueSkillSet;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
@@ -219,6 +220,10 @@ public final class JudgmentTrialSkillLogic
 
     public static void applyTrialCompleteSlowness(LivingEntity target)
     {
+        if (MahoragaAdaptation.tryEngage(target, JudgmentTechniqueSkillSet.SKILL_TRIAL))
+        {
+            return;
+        }
         target.addEffect(new MobEffectInstance(
                 MobEffects.MOVEMENT_SLOWDOWN,
                 TRIAL_COMPLETE_SLOWNESS_TICKS,

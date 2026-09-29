@@ -22,8 +22,10 @@ import com.darkness.jujutsukaisenzone.player.PlayerHealthData;
 import com.darkness.jujutsukaisenzone.player.PlayerMeltdownRepairData;
 import com.darkness.jujutsukaisenzone.player.PlayerReverseTechniqueData;
 import com.darkness.jujutsukaisenzone.technique.MeltdownRepairLearnLogic;
+import com.darkness.jujutsukaisenzone.player.PlayerTenShadowsContractData;
 import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
 import com.darkness.jujutsukaisenzone.player.PlayerTechniqueIntelData;
+import com.darkness.jujutsukaisenzone.technique.skill.TenShadowsShikigami;
 import com.darkness.jujutsukaisenzone.player.PlayerSpData;
 import com.darkness.jujutsukaisenzone.player.PlayerSpNodeData;
 import com.darkness.jujutsukaisenzone.player.PlayerSeLoadoutData;
@@ -46,6 +48,7 @@ import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import net.minecraft.commands.CommandSourceStack;
@@ -161,6 +164,7 @@ public final class JjkzCommands
                         .then(buildSeanceTechniqueCheatBranch())
                         .then(buildStrengthenTechniqueCheatBranch())
                         .then(buildDomainExpansionCheatBranch())
+                        .then(buildTenShadowsCheatBranch())
                         .then(buildSpecialEffectBranch())
                         .then(buildDemonSubduingShrineBranch())
                         .then(buildTengenWedgeBranch())
@@ -1488,6 +1492,37 @@ public final class JjkzCommands
         player.sendSystemMessage(Component.literal(ModRules.StylizedDamageStyles.playerStatusLine(player)));
         boolean ready = ModRules.StylizedDamageStyles.isServerReady() && ModRules.StylizedDamageStyles.hasPlayerMod(player);
         player.sendSystemMessage(Component.literal("跳字联动可用：" + (ready ? "是" : "否")));
+        return 1;
+    }
+
+    /**
+     * 十影契约作弊：{@code /jjkz tenShadows tameAll}（或 {@code /jjkz tenShadows 调伏全部}）
+     * 一键调伏全部十种式神。
+     */
+    private static LiteralArgumentBuilder<CommandSourceStack> buildTenShadowsCheatBranch()
+    {
+        LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal("tenShadows")
+                .requires(source -> source.hasPermission(Commands.LEVEL_GAMEMASTERS));
+        root.then(Commands.literal("tameAll").executes(ctx -> executeTenShadowsTameAll(ctx.getSource())));
+        root.then(Commands.literal("调伏全部").executes(ctx -> executeTenShadowsTameAll(ctx.getSource())));
+        return root;
+    }
+
+    private static int executeTenShadowsTameAll(CommandSourceStack source) throws CommandSyntaxException
+    {
+        ServerPlayer player = source.getPlayerOrException();
+        PlayerTenShadowsContractData.grantAllTamed(player);
+        StringBuilder names = new StringBuilder();
+        for (TenShadowsShikigami shikigami : TenShadowsShikigami.values())
+        {
+            if (!names.isEmpty())
+            {
+                names.append("、");
+            }
+            names.append(shikigami.displayName());
+        }
+        player.sendSystemMessage(Component.literal(
+                "已调伏全部十影式神（作弊）：" + names + "。"));
         return 1;
     }
 

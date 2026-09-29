@@ -575,13 +575,16 @@ public class LimitlessRemoteMurasakiBehavior extends EffectBehavior
             }
 
             DamageSource source = TechniqueDamageSources.techniqueSource(level, owner);
-            TechniqueDamageSources.runWithType(SkillDamageType.TECHNIQUE, () -> {
-                target.hurt(source, dmg);
-                if (!(target instanceof Player) && !target.isAlive())
-                {
-                    target.discard();
-                }
-            });
+            TechniqueDamageSources.runWithType(
+                    SkillDamageType.TECHNIQUE,
+                    LimitlessTechniqueSkillSet.SKILL_REMOTE_PURPLE,
+                    () -> {
+                        target.hurt(source, dmg);
+                        if (!(target instanceof Player) && !target.isAlive())
+                        {
+                            target.discard();
+                        }
+                    });
         }
     }
 

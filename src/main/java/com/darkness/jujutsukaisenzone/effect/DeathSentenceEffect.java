@@ -2,6 +2,7 @@ package com.darkness.jujutsukaisenzone.effect;
 
 import com.darkness.jujutsukaisenzone.photon.PhotonFxCommands;
 import com.darkness.jujutsukaisenzone.registry.ModEffects;
+import com.darkness.jujutsukaisenzone.technique.shikigami.tenshadows.ability.mahoraga.MahoragaAdaptation;
 import com.darkness.jujutsukaisenzone.technique.skill.JudgmentJudgeEntityLogic;
 import com.darkness.jujutsukaisenzone.technique.skill.JudgmentSoundLogic;
 import net.minecraft.server.level.ServerPlayer;
@@ -58,6 +59,10 @@ public final class DeathSentenceEffect extends MobEffect
 
     public static void apply(LivingEntity target, ServerPlayer caster, ApplyMode mode)
     {
+        if (MahoragaAdaptation.tryEngage(target, "judgment_death_sentence"))
+        {
+            return;
+        }
         target.addEffect(new MobEffectInstance(
                 ModEffects.DEATH_SENTENCE.get(),
                 DURATION_TICKS,

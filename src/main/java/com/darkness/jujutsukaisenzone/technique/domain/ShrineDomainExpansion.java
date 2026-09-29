@@ -1293,7 +1293,8 @@ public final class ShrineDomainExpansion extends AbstractTechniqueDomain
             return false;
         }
 
-        if (!TechniqueDamageSources.deal(target, owner, ShrineDomainSkillGrowth.slashDamage(owner)))
+        if (!TechniqueDamageSources.deal(target, owner, ShrineDomainSkillGrowth.slashDamage(owner),
+                "shrine_domain_slash"))
         {
             return false;
         }
@@ -1312,7 +1313,8 @@ public final class ShrineDomainExpansion extends AbstractTechniqueDomain
             return false;
         }
 
-        if (!TechniqueDamageSources.deal(target, owner, ShrineDomainSkillGrowth.powerSlashDamage(owner)))
+        if (!TechniqueDamageSources.deal(target, owner, ShrineDomainSkillGrowth.powerSlashDamage(owner),
+                "shrine_domain_power_slash"))
         {
             return false;
         }
