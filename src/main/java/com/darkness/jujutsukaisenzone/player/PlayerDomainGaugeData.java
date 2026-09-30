@@ -70,10 +70,15 @@ public final class PlayerDomainGaugeData
 
     /**
      * 展开前检查：量表未满则提示并返回 false（不应扣咒力）。
+     * 创造模式不要求量表满。
      */
     public static boolean tryAllowDomainExpansion(ServerPlayer player)
     {
         if (!enabled())
+        {
+            return true;
+        }
+        if (player.isCreative())
         {
             return true;
         }
@@ -88,10 +93,14 @@ public final class PlayerDomainGaugeData
         return false;
     }
 
-    /** 成功展开后抽干量表。 */
+    /** 成功展开后抽干量表（创造模式不消耗）。 */
     public static void consumeOnExpand(ServerPlayer player)
     {
         if (!enabled())
+        {
+            return;
+        }
+        if (player.isCreative())
         {
             return;
         }

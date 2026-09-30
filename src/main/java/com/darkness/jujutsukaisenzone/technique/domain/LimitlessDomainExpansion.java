@@ -67,8 +67,13 @@ public final class LimitlessDomainExpansion extends AbstractTechniqueDomain
 
     /** 领域展开蓄力时间（tick），3 秒 = 60 tick */
     private static final int CAST_DELAY_TICKS = 60;
-    /** 白色滤镜总时长（tick），6 秒 = 120 tick */
+    /** 白色滤镜总时长（tick），6 秒 = 120 tick（旧滤镜参数，保留供参考） */
     private static final int WHITE_OVERLAY_TOTAL_TICKS = 120;
+    /**
+     * Shader 白幕总时长：铺开约 2.1s；全白保持额外 2.2s（+44 tick）；开洞相对最初提速共 2 倍（66→17 tick）。
+     * 合计 115 tick。与 {@code domain_white_curtain.fsh} 中 spreadEnd≈0.365、holdEnd≈0.852 对齐。
+     */
+    private static final int WHITE_CURTAIN_TOTAL_TICKS = WHITE_OVERLAY_TOTAL_TICKS + 44 - 49;
     /** 白色滤镜淡入时长（tick） */
     private static final int WHITE_OVERLAY_FADE_IN_TICKS = 12;
     /** 白色滤镜淡出时长（tick） */
@@ -186,6 +191,7 @@ public final class LimitlessDomainExpansion extends AbstractTechniqueDomain
     protected void applyDomainSpecificEffect(ServerPlayer player, BarrierInstance instance)
     {
         broadcastLimitlessDomainCompleteScreenShake(player, player.serverLevel());
+        broadcastDomainWhiteCurtainElevate(player, player.serverLevel());
         ModNetwork.sendLimitlessDomainCmdCamSetupA(player, player.position());
         spawnLimitlessLightLineEntity(player, instance);
         populateLimitlessSessionMobWhitelist(player);
@@ -386,9 +392,8 @@ public final class LimitlessDomainExpansion extends AbstractTechniqueDomain
                 1.0F, 1.0F);
 
         /*
-         * 触发客户端白色滤镜动画（淡入-保持-淡出）。
-         * 业务意图：让无量空处施展瞬间对施法者及近距离玩家都产生统一的视觉冲击。
-         * 重要假设：按球形半径 24 格筛选，仅同步同世界且在范围内的玩家。
+         * 蓄力开场白幕：用 DomainWhiteCurtain shader 代替旧 WhiteOverlay 滤镜。
+         * 影响范围同原先：施法者周围 WHITE_OVERLAY_RADIUS 格内玩家。
          */
         double radiusSqr = WHITE_OVERLAY_RADIUS * WHITE_OVERLAY_RADIUS;
         for (ServerPlayer nearbyPlayer : level.players())
@@ -397,13 +402,7 @@ public final class LimitlessDomainExpansion extends AbstractTechniqueDomain
             {
                 continue;
             }
-            ModNetwork.sendWhiteOverlayAnimationSync(
-                    nearbyPlayer,
-                    WHITE_OVERLAY_TOTAL_TICKS,
-                    WHITE_OVERLAY_FADE_IN_TICKS,
-                    WHITE_OVERLAY_FADE_OUT_TICKS,
-                    WHITE_OVERLAY_PEAK_ALPHA
-            );
+            ModNetwork.sendDomainWhiteCurtainSync(nearbyPlayer, WHITE_CURTAIN_TOTAL_TICKS);
         }
 
         /* 进入蓄力状态 */
@@ -552,6 +551,22 @@ public final class LimitlessDomainExpansion extends AbstractTechniqueDomain
                 continue;
             }
             ModNetwork.sendScreenShake(nearby, ScreenShakeKind.DECAY, DOMAIN_COMPLETE_SCREEN_SHAKE_TICKS, DOMAIN_COMPLETE_SCREEN_SHAKE_MAX_DEG);
+        }
+    }
+
+    /**
+     * 结界/天空盒完成后：将范围内玩家正在播放的 shader 白幕提升到 AFTER_LEVEL，避免开洞被天空盒盖住。
+     */
+    private static void broadcastDomainWhiteCurtainElevate(ServerPlayer caster, ServerLevel level)
+    {
+        double radiusSqr = WHITE_OVERLAY_RADIUS * WHITE_OVERLAY_RADIUS;
+        for (ServerPlayer nearby : level.players())
+        {
+            if (nearby.distanceToSqr(caster) > radiusSqr)
+            {
+                continue;
+            }
+            ModNetwork.sendDomainWhiteCurtainElevateSync(nearby);
         }
     }
 

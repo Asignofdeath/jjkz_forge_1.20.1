@@ -39,6 +39,10 @@ public final class MahoragaSonicLogic
         {
             return false;
         }
+        if (mahoraga instanceof com.darkness.jujutsukaisenzone.entity.MahoragaEntity entity && entity.isRideMode())
+        {
+            return false;
+        }
         LivingEntity focus = MahoragaSupport.resolveCombatTarget(owner, mahoraga);
         if (focus == null && source == ShikigamiAbilitySource.AUTO)
         {

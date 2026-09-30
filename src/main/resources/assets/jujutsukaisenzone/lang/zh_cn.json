@@ -388,6 +388,8 @@
   "death.attack.jjkz.technique.player": "%1$s 被 %2$s 的术式击杀",
   "key.jujutsukaisenzone.command_wheel": "指令圆盘",
   "command_wheel.jujutsukaisenzone.title": "指令圆盘",
+  "command_wheel.jujutsukaisenzone.mahoraga_title": "魔虚罗指令圆盘",
+  "command_wheel.jujutsukaisenzone.mahoraga_ride": "骑乘魔虚罗",
   "command_wheel.jujutsukaisenzone.hint": "移向扇区后松手",
   "command_wheel.jujutsukaisenzone.empty": "当前术式暂无圆盘指令",
   "command_wheel.jujutsukaisenzone.ten_shadows_mode_on": "影之式神 · 展开",

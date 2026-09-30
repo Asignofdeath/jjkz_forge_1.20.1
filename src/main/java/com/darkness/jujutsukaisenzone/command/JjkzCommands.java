@@ -171,6 +171,7 @@ public final class JjkzCommands
                         .then(buildWedgeSpawnBranch())
                         .then(buildCurseSpiritSpawnBranch())
                         .then(buildWhiteOverlayBranch())
+                        .then(buildWhiteCurtainBranch())
                         .then(buildRushIntoTheZoneClimaxBranch())
                         .then(buildModRulesBranch())
                         .then(buildDomainSphereDebugBranch())
@@ -975,6 +976,28 @@ public final class JjkzCommands
         }
         int alphaPercent = Math.round(alpha * 100.0F);
         player.sendSystemMessage(Component.literal("白色滤镜已开启，透明度：" + alphaPercent + "%。"));
+        return 1;
+    }
+
+    /**
+     * 调试领域白幕 shader：{@code /jjkz whiteCurtain play [ticks]}。
+     */
+    private static LiteralArgumentBuilder<CommandSourceStack> buildWhiteCurtainBranch()
+    {
+        return Commands.literal("whiteCurtain")
+                .requires(source -> source.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                .then(Commands.literal("play")
+                        .executes(ctx -> executeWhiteCurtainPlay(ctx.getSource().getPlayerOrException(), 115))
+                        .then(Commands.argument("ticks", IntegerArgumentType.integer(1, 400))
+                                .executes(ctx -> executeWhiteCurtainPlay(
+                                        ctx.getSource().getPlayerOrException(),
+                                        IntegerArgumentType.getInteger(ctx, "ticks")))));
+    }
+
+    private static int executeWhiteCurtainPlay(ServerPlayer player, int durationTicks)
+    {
+        ModNetwork.sendDomainWhiteCurtainSync(player, durationTicks);
+        player.sendSystemMessage(Component.literal("已播放领域白幕演出（" + durationTicks + " tick）。"));
         return 1;
     }
 

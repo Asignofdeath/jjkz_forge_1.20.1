@@ -213,6 +213,13 @@ public final class ShikigamiAbilityRuntime
             }
             for (ShikigamiAbility ability : mode.autoAbilities(slotId))
             {
+                if ("mahoraga".equals(slotId)
+                        && com.darkness.jujutsukaisenzone.technique.shikigami.tenshadows.ability.mahoraga.MahoragaSupport.first(owner)
+                        instanceof com.darkness.jujutsukaisenzone.entity.MahoragaEntity mahoraga
+                        && mahoraga.isRideMode())
+                {
+                    break;
+                }
                 if (tryCast(owner, mode, ability, ShikigamiAbilitySource.AUTO))
                 {
                     break;

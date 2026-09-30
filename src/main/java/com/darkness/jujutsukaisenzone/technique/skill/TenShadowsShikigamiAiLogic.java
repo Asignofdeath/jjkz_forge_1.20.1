@@ -32,6 +32,12 @@ public final class TenShadowsShikigamiAiLogic
 
     /** 超过此距离开始走向主人。 */
     private static final double FOLLOW_START = 5.0D;
+    /** 魔虚罗：更远才跟，少瞎走好播 idle。 */
+    private static final double MAHORAGA_FOLLOW_START = 12.0D;
+    /** 魔虚罗护卫环绕：偏离这么远才补位。 */
+    private static final double MAHORAGA_ORBIT_TOLERANCE_SQR = 16.0D; // 4 格
+    /** 普通式神护卫环绕容差。 */
+    private static final double ORBIT_TOLERANCE_SQR = 2.25D; // 1.5 格
     /** 超过此距离传送回主人附近（仅护卫）。 */
     private static final double TELEPORT_DISTANCE = 18.0D;
     /** 协同作战主动索敌半径。 */
@@ -84,6 +90,10 @@ public final class TenShadowsShikigamiAiLogic
                     continue;
                 }
                 if (mob instanceof JadeDogEntity jadeDog && jadeDog.isEating())
+                {
+                    continue;
+                }
+                if (mob instanceof MahoragaEntity mahoraga && mahoraga.isRideMode())
                 {
                     continue;
                 }
@@ -156,18 +166,46 @@ public final class TenShadowsShikigamiAiLogic
             /* 大蛇 / 蝦蟇无常规近战：只保持仇恨供招式，不追咬 */
             if (isAbilityOnlyMeleeLocked(mob))
             {
-                if (distSqr > FOLLOW_START * FOLLOW_START)
+                if (distSqr > followStartSqr(mob))
                 {
                     mob.getNavigation().moveTo(owner, 1.05D);
+                }
+                else
+                {
+                    stopIfIdleMahoraga(mob);
                 }
                 return;
             }
             mob.getNavigation().moveTo(target, chaseSpeed(mob, target));
             return;
         }
-        if (distSqr > FOLLOW_START * FOLLOW_START)
+        if (distSqr > followStartSqr(mob))
         {
             mob.getNavigation().moveTo(owner, followSpeed(mob));
+        }
+        else
+        {
+            stopIfIdleMahoraga(mob);
+        }
+    }
+
+    private static double followStartSqr(Mob mob)
+    {
+        double start = mob instanceof MahoragaEntity ? MAHORAGA_FOLLOW_START : FOLLOW_START;
+        return start * start;
+    }
+
+    private static double orbitToleranceSqr(Mob mob)
+    {
+        return mob instanceof MahoragaEntity ? MAHORAGA_ORBIT_TOLERANCE_SQR : ORBIT_TOLERANCE_SQR;
+    }
+
+    /** 魔虚罗无战时停导航，避免贴着主人细碎挪位盖住 idle。 */
+    private static void stopIfIdleMahoraga(Mob mob)
+    {
+        if (mob instanceof MahoragaEntity && mob.getTarget() == null)
+        {
+            mob.getNavigation().stop();
         }
     }
 
@@ -239,9 +277,13 @@ public final class TenShadowsShikigamiAiLogic
         }
 
         Vec3 orbit = orbitPoint(owner, slotIndex, totalCount);
-        if (mob.distanceToSqr(orbit) > 2.25D)
+        if (mob.distanceToSqr(orbit) > orbitToleranceSqr(mob))
         {
             mob.getNavigation().moveTo(orbit.x, orbit.y, orbit.z, followSpeed(mob));
+        }
+        else
+        {
+            stopIfIdleMahoraga(mob);
         }
     }
 
@@ -252,7 +294,7 @@ public final class TenShadowsShikigamiAiLogic
         if (isAbilityOnlyMeleeLocked(mob))
         {
             Vec3 orbit = orbitPoint(owner, slotIndex, totalCount);
-            if (mob.distanceToSqr(orbit) > 2.25D)
+            if (mob.distanceToSqr(orbit) > orbitToleranceSqr(mob))
             {
                 mob.getNavigation().moveTo(orbit.x, orbit.y, orbit.z, 1.05D);
             }

@@ -82,10 +82,15 @@ public final class PlayerBrainDamageData
     /**
      * 展开前检查：满脑损则造成伤害并拦截（返回 false）。
      * 未满返回 true（允许继续走咒力与展开逻辑）。
+     * 创造模式不受脑损满拦截。
      */
     public static boolean tryAllowDomainExpansion(ServerPlayer player)
     {
         if (!Config.domainBrainEnabled)
+        {
+            return true;
+        }
+        if (player.isCreative())
         {
             return true;
         }
@@ -108,10 +113,15 @@ public final class PlayerBrainDamageData
 
     /**
      * 领域成功展开后调用：今日次数 +1；超过免费额度则按档加脑损。
+     * 创造模式不累计次数、不加脑损。
      */
     public static void onDomainExpanded(ServerPlayer player)
     {
         if (!Config.domainBrainEnabled)
+        {
+            return;
+        }
+        if (player.isCreative())
         {
             return;
         }
@@ -201,14 +211,18 @@ public final class PlayerBrainDamageData
         JjkzPlayerDataStorage.PlayerDataEntry data = getData(player);
         data.meltdownRepairsToday = Math.max(0, data.meltdownRepairsToday) + 1;
         int repairIndex = data.meltdownRepairsToday;
-        int gain = resolveRepairGain(repairIndex);
-        if (data.brainDamage >= Config.domainMeltdownRepairHighBrainThreshold)
+        int gain = 0;
+        if (!player.isCreative())
         {
-            gain += Math.max(0, Config.domainMeltdownRepairHighBrainExtra);
-        }
-        if (repairMechanic.isPresent())
-        {
-            gain = Math.max(0, (int) Math.round(gain * repairMechanic.get().repairBrainGainMultiplier()));
+            gain = resolveRepairGain(repairIndex);
+            if (data.brainDamage >= Config.domainMeltdownRepairHighBrainThreshold)
+            {
+                gain += Math.max(0, Config.domainMeltdownRepairHighBrainExtra);
+            }
+            if (repairMechanic.isPresent())
+            {
+                gain = Math.max(0, (int) Math.round(gain * repairMechanic.get().repairBrainGainMultiplier()));
+            }
         }
         int before = data.brainDamage;
         data.brainDamage = clampDamage(player, data.brainDamage + gain);
@@ -218,12 +232,22 @@ public final class PlayerBrainDamageData
         refreshDebuffs(player);
         syncToClient(player);
 
-        player.displayClientMessage(
-                Component.literal("术式熔断已修复，脑损 +" + actualGain
-                                + "（当前 " + data.brainDamage + "/" + getBrainMax(player)
-                                + "，今日第 " + repairIndex + " 次）")
-                        .withStyle(ChatFormatting.LIGHT_PURPLE),
-                true);
+        if (player.isCreative())
+        {
+            player.displayClientMessage(
+                    Component.literal("术式熔断已修复（创造模式不增加脑损）")
+                            .withStyle(ChatFormatting.LIGHT_PURPLE),
+                    true);
+        }
+        else
+        {
+            player.displayClientMessage(
+                    Component.literal("术式熔断已修复，脑损 +" + actualGain
+                                    + "（当前 " + data.brainDamage + "/" + getBrainMax(player)
+                                    + "，今日第 " + repairIndex + " 次）")
+                            .withStyle(ChatFormatting.LIGHT_PURPLE),
+                    true);
+        }
         return true;
     }
 

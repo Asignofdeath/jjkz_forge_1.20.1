@@ -2,6 +2,7 @@ package com.darkness.jujutsukaisenzone.client;
 
 import com.darkness.jujutsukaisenzone.JuJutsuKaisenZone;
 import com.darkness.jujutsukaisenzone.client.gui.commandwheel.CommandWheelScreen;
+import com.darkness.jujutsukaisenzone.commandwheel.CommandWheelCatalog;
 import com.darkness.jujutsukaisenzone.compat.EpicFightCompat;
 import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.KeyMapping;
@@ -72,7 +73,8 @@ public final class CommandWheelKeyHandler
         if (down && !wasDown)
         {
             if (mc.screen == null
-                    && EpicFightCompat.isBattleMode(mc.player)
+                    && (EpicFightCompat.isBattleMode(mc.player)
+                        || CommandWheelCatalog.isAimingAtMahoraga(mc.player, mc.hitResult))
                     && mc.player.isAlive()
                     && !mc.player.isSpectator())
             {

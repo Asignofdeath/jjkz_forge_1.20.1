@@ -1,6 +1,7 @@
 package com.darkness.jujutsukaisenzone.commandwheel;
 
 import com.darkness.jujutsukaisenzone.compat.EpicFightCompat;
+import com.darkness.jujutsukaisenzone.entity.MahoragaEntity;
 import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
 import com.darkness.jujutsukaisenzone.player.PlayerTenShadowsModeData;
 import com.darkness.jujutsukaisenzone.player.PlayerTenShadowsStanceData;
@@ -32,7 +33,16 @@ public final class CommandWheelActions
         {
             return;
         }
-        if (!EpicFightCompat.isBattleMode(player) || !player.isAlive() || player.isSpectator())
+        if (!player.isAlive() || player.isSpectator())
+        {
+            return;
+        }
+        if (CommandWheelIds.MAHORAGA_RIDE.equals(entryId))
+        {
+            rideMahoraga(player, targetUuid);
+            return;
+        }
+        if (!EpicFightCompat.isBattleMode(player))
         {
             return;
         }
@@ -45,6 +55,38 @@ public final class CommandWheelActions
             {
             }
         }
+    }
+
+    /**
+     * 圆盘打开时准星命中即可锁定 UUID；确认时不再要求准星仍打在身上
+     *（选扇区会偏视角，且魔虚罗可能走开），只校验归属与合理距离。
+     */
+    private static final double MAHORAGA_RIDE_CONFIRM_RANGE = 32.0D;
+
+    private static void rideMahoraga(ServerPlayer player, @Nullable UUID targetUuid)
+    {
+        if (targetUuid == null || !PlayerTechniqueData.isTenShadows(player))
+        {
+            return;
+        }
+        Entity target = player.serverLevel().getEntity(targetUuid);
+        if (!(target instanceof MahoragaEntity mahoraga)
+                || !mahoraga.isAlive()
+                || player.distanceToSqr(mahoraga) > MAHORAGA_RIDE_CONFIRM_RANGE * MAHORAGA_RIDE_CONFIRM_RANGE
+                || !TenShadowsSummonLogic.isOwnedBy(mahoraga, player.getUUID()))
+        {
+            return;
+        }
+        if (player.getVehicle() == mahoraga)
+        {
+            player.stopRiding();
+            return;
+        }
+        if (player.isPassenger() || mahoraga.isVehicle())
+        {
+            return;
+        }
+        mahoraga.beginRide(player);
     }
 
     private static void toggleShikigamiMode(ServerPlayer player)

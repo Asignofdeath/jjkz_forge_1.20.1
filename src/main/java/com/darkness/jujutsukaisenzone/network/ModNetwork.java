@@ -45,6 +45,8 @@ import com.darkness.jujutsukaisenzone.network.packet.SyncFactionS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncPlayerInputLockS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncReverseTechniqueS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncFugaBoomFlashSequenceS2CPacket;
+import com.darkness.jujutsukaisenzone.network.packet.SyncDomainWhiteCurtainElevateS2CPacket;
+import com.darkness.jujutsukaisenzone.network.packet.SyncDomainWhiteCurtainS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncFullScreenWorldFlashS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncLimitlessDomainAmbientSoundStartS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.LimitlessDomainCmdCamSetupAS2CPacket;
@@ -607,6 +609,16 @@ public final class ModNetwork
                 .decoder(SyncCombatPowerS2CPacket::decode)
                 .consumerMainThread(SyncCombatPowerS2CPacket::handle)
                 .add();
+        CHANNEL.messageBuilder(SyncDomainWhiteCurtainS2CPacket.class, packetId++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(SyncDomainWhiteCurtainS2CPacket::encode)
+                .decoder(SyncDomainWhiteCurtainS2CPacket::decode)
+                .consumerMainThread(SyncDomainWhiteCurtainS2CPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(SyncDomainWhiteCurtainElevateS2CPacket.class, packetId++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(SyncDomainWhiteCurtainElevateS2CPacket::encode)
+                .decoder(SyncDomainWhiteCurtainElevateS2CPacket::decode)
+                .consumerMainThread(SyncDomainWhiteCurtainElevateS2CPacket::handle)
+                .add();
     }
 
     public static void sendCombatPowerSync(ServerPlayer player, int physicalPower, int techniquePower)
@@ -1117,6 +1129,24 @@ public final class ModNetwork
         CHANNEL.send(
                 PacketDistributor.PLAYER.with(() -> player),
                 new SyncFullScreenWorldFlashS2CPacket(totalTicks, fadeInTicks, fadeOutTicks, peakAlpha)
+        );
+    }
+
+    /** 领域白幕铺开/开洞演出（自定义 shader），默认供调试与后续领域演出接入。 */
+    public static void sendDomainWhiteCurtainSync(ServerPlayer player, int durationTicks)
+    {
+        CHANNEL.send(
+                PacketDistributor.PLAYER.with(() -> player),
+                new SyncDomainWhiteCurtainS2CPacket(durationTicks)
+        );
+    }
+
+    /** 结界/天空盒完成后将领域白幕提升到 AFTER_LEVEL。 */
+    public static void sendDomainWhiteCurtainElevateSync(ServerPlayer player)
+    {
+        CHANNEL.send(
+                PacketDistributor.PLAYER.with(() -> player),
+                new SyncDomainWhiteCurtainElevateS2CPacket()
         );
     }
 

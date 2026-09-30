@@ -10,6 +10,7 @@ public final class CommandWheelIds
     public static final String TEN_SHADOWS_SHIKIGAMI_MODE = "ten_shadows.shikigami_mode";
     public static final String TEN_SHADOWS_STANCE_TOGGLE = "ten_shadows.stance_toggle";
     public static final String TEN_SHADOWS_ATTACK_ORDER = "ten_shadows.attack_order";
+    public static final String MAHORAGA_RIDE = "mahoraga.ride";
 
     private CommandWheelIds()
     {

@@ -5,6 +5,7 @@ import com.darkness.jujutsukaisenzone.commandwheel.CommandWheelCatalog;
 import com.darkness.jujutsukaisenzone.commandwheel.CommandWheelEntry;
 import com.darkness.jujutsukaisenzone.commandwheel.CommandWheelIds;
 import com.darkness.jujutsukaisenzone.network.CommandWheelNetwork;
+import com.darkness.jujutsukaisenzone.entity.MahoragaEntity;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
@@ -12,6 +13,7 @@ import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.phys.EntityHitResult;
 import yesman.epicfight.api.client.camera.EpicFightCameraAPI;
 
 import javax.annotation.Nullable;
@@ -30,6 +32,9 @@ public final class CommandWheelScreen extends Screen
     private int hoveredIndex = -1;
     /** 打开后短暂忽略松手，避免首 tick 误关。 */
     private int openTicks;
+    private boolean mahoragaWheel;
+    @Nullable
+    private UUID mahoragaId;
 
     public CommandWheelScreen()
     {
@@ -39,6 +44,14 @@ public final class CommandWheelScreen extends Screen
     @Override
     protected void init()
     {
+        LocalPlayer player = Minecraft.getInstance().player;
+        if (player != null && CommandWheelCatalog.isAimingAtMahoraga(player, Minecraft.getInstance().hitResult)
+                && Minecraft.getInstance().hitResult instanceof EntityHitResult hit
+                && hit.getEntity() instanceof MahoragaEntity mahoraga)
+        {
+            mahoragaWheel = true;
+            mahoragaId = mahoraga.getUUID();
+        }
         refreshEntries();
         hoveredIndex = -1;
         openTicks = 0;
@@ -122,7 +135,9 @@ public final class CommandWheelScreen extends Screen
 
         graphics.drawCenteredString(
                 font,
-                Component.translatable("command_wheel.jujutsukaisenzone.title"),
+                Component.translatable(mahoragaWheel
+                        ? "command_wheel.jujutsukaisenzone.mahoraga_title"
+                        : "command_wheel.jujutsukaisenzone.title"),
                 cx,
                 cy - RADIUS - 16,
                 0xFFDDDDDD);
@@ -157,7 +172,7 @@ public final class CommandWheelScreen extends Screen
     private void refreshEntries()
     {
         LocalPlayer player = Minecraft.getInstance().player;
-        entries = player == null ? List.of() : CommandWheelCatalog.entriesFor(player);
+        entries = player == null ? List.of() : CommandWheelCatalog.entriesFor(player, mahoragaWheel);
     }
 
     private void confirmAndClose()
@@ -172,6 +187,10 @@ public final class CommandWheelScreen extends Screen
                 if (CommandWheelIds.TEN_SHADOWS_ATTACK_ORDER.equals(entry.id()))
                 {
                     targetUuid = resolveEpicFightLockTargetUuid();
+                }
+                else if (CommandWheelIds.MAHORAGA_RIDE.equals(entry.id()))
+                {
+                    targetUuid = mahoragaId;
                 }
                 CommandWheelNetwork.sendActionToServer(entry.id(), targetUuid);
             }

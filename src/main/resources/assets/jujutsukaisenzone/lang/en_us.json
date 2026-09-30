@@ -388,6 +388,8 @@
   "death.attack.jjkz.technique.player": "%1$s was killed by %2$s's technique",
   "key.jujutsukaisenzone.command_wheel": "Command Wheel",
   "command_wheel.jujutsukaisenzone.title": "Command Wheel",
+  "command_wheel.jujutsukaisenzone.mahoraga_title": "Mahoraga Commands",
+  "command_wheel.jujutsukaisenzone.mahoraga_ride": "Ride Mahoraga",
   "command_wheel.jujutsukaisenzone.hint": "Aim at a slice, then release",
   "command_wheel.jujutsukaisenzone.empty": "No technique commands",
   "command_wheel.jujutsukaisenzone.ten_shadows_mode_on": "Chimera Shikigami · Open",

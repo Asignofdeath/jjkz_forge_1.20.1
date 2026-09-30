@@ -23,7 +23,7 @@ import org.jetbrains.annotations.NotNull;
 public class JJKZSkyblockEntity extends BlockEntity
 {
     /** 默认纹理文件夹路径（使用 Shadered 的星空纹理） */
-    public static final ResourceLocation DEFAULT_TEXTURE =   new ResourceLocation(
+    public static final ResourceLocation DEFAULT_TEXTURE =     new ResourceLocation(
             "shadered",
             "textures/environment/space"
     );
