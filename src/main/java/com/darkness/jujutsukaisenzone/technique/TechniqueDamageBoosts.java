@@ -24,7 +24,7 @@ import java.util.UUID;
  * <ul>
  *   <li>体术伤害只消耗登记为 {@link SkillDamageType#MARTIAL} 的加成</li>
  *   <li>术式伤害只消耗登记为 {@link SkillDamageType#TECHNIQUE} 的加成</li>
- *   <li>复合伤害（必定黑闪、处刑人之剑必杀等）一次性消耗全部三类加成</li>
+ *   <li>复合伤害（处刑人之剑必杀、十划碎块等）一次性消耗全部三类加成</li>
  * </ul>
  * 同分型多次登记按加算叠加（同一乘区内相加，服从「乘区内加算、乘区间乘算」的纪律）。
  */

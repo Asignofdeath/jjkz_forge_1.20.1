@@ -229,10 +229,6 @@ public class Config
             .comment("护甲 + 抗性合起来的减伤封顶（百分比）。")
             .defineInRange("combatDefense.defenseReductionCap", 85.0D, 0.0D, 100.0D);
 
-    private static final ForgeConfigSpec.DoubleValue COMBAT_DEFENSE_COMPOSITE_SHARE = BUILDER
-            .comment("复合伤害（黑闪 / 处刑必杀）里体抗与术抗各自的计算比例，0.5 表示各按一半计。")
-            .defineInRange("combatDefense.compositeResistanceShare", 0.5D, 0.0D, 1.0D);
-
     private static final ForgeConfigSpec.BooleanValue COMBAT_DEFENSE_PENETRATION_ENABLED = BUILDER
             .comment("Enable physical/technique penetration. Off => pen attributes read as 0.")
             .define("combatDefense.penetrationEnabled", true);
@@ -543,7 +539,6 @@ public class Config
     public static double combatDefensePhysicalResistanceCap;
     public static double combatDefenseTechniqueResistanceCap;
     public static double combatDefenseDefenseReductionCap;
-    public static double combatDefenseCompositeResistanceShare;
     public static boolean combatDefensePenetrationEnabled;
     public static boolean combatDefensePenetrationCanOverpen;
 
@@ -677,7 +672,6 @@ public class Config
         combatDefensePhysicalResistanceCap = COMBAT_DEFENSE_PHYSICAL_RESIST_CAP.get();
         combatDefenseTechniqueResistanceCap = COMBAT_DEFENSE_TECHNIQUE_RESIST_CAP.get();
         combatDefenseDefenseReductionCap = COMBAT_DEFENSE_TOTAL_CAP.get();
-        combatDefenseCompositeResistanceShare = COMBAT_DEFENSE_COMPOSITE_SHARE.get();
         combatDefensePenetrationEnabled = COMBAT_DEFENSE_PENETRATION_ENABLED.get();
         combatDefensePenetrationCanOverpen = COMBAT_DEFENSE_PENETRATION_CAN_OVERPEN.get();
         domainBrainEnabled = DOMAIN_BRAIN_ENABLED.get();

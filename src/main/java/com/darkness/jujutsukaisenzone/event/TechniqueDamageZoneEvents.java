@@ -106,8 +106,7 @@ public final class TechniqueDamageZoneEvents
         // 而怪物近战的攻击者不是 ServerPlayer。区 1 再单独把自己限定到 ServerPlayer。
         SkillDamageType type = resolveDamageType(target, source);
 
-        // 叙事分型 → 跳字可见的 DamageType（EF / 原版近战等不走 deal 的通道）。
-        // 黑闪会在 NORMAL 优先级再投影成 black_flash，覆盖此处的 martial/composite。
+        // 叙事分型 → 跳字可见的 message_id（EF / 原版近战等不走 deal 的通道）。
         if (type != null)
         {
             TechniqueDamageSources.projectDisplayType(source, target.level(), type);
@@ -132,10 +131,7 @@ public final class TechniqueDamageZoneEvents
         // 技能出伤已在 deal / 出伤点用 SkillDamageResolver 按「强度×技能倍率」算成绝对值。
         // 这里只接管 EF / 原版近战通道的绝对伤：再按「体术强度 / physicalBaseline」缩放。
         // ⚠️ 前提是 CursedGradeBonuses 已不再给 ATTACK_DAMAGE 加等级值，否则双计。
-        // 覆盖体术与复合：复合在近战里只有「EF 基础攻击 + 必定黑闪（Rush Into The ZONE）」这一条
-        // （另一条处刑必杀见下），它的原始伤害同样是近战挥击，必须与「随机」黑闪拿到一致的倍率——
-        // 随机黑闪此刻还没掷骰，在此被判为 MARTIAL，早已吃到；若复合漏在这之外，同一招
-        // 「随机 vs 必定」的伤害口径就不一致了。
+        // 覆盖体术与复合：黑闪主拳一律按体术；近战复合目前主要是处刑必杀（见下排除）。
         // ⚠️ 唯一要排除的是处刑人之剑的必杀：它的伤害量已在 HIGHEST 优先级被改写成
         // 固定致死值（{@code JudgmentWeaponLogic#lethalDamageAmount}），在此再乘一道面板倍率，
         // 低强度玩家会把它乘回致死线以下 ⇒ 必杀失效。判定复用分型解析用过的同一个方法，口径一致。
@@ -206,8 +202,8 @@ public final class TechniqueDamageZoneEvents
         // 「总减伤」（体术通道最坏 70% 体抗 + 钻石甲 80% ≈ 94%）。
         // 此时 event.getAmount() 已经过区 1；区 3（ZONE）在交接之后才施加，
         // 封顶基准天然把 ZONE 减伤排除在上限之外，维持 ZONE 原有语义。
-        // 分型【必须】一并交接、不能在 LivingDamageEvent 重新解析：黑闪会在 NORMAL 优先级
-        // 消耗掉「必定黑闪」标记，那时再解析会退化成 MARTIAL。
+        // 分型【必须】一并交接、不能在 LivingDamageEvent 重新解析：处刑必杀等标记
+        // 若在后续优先级被消耗，再解析会丢复合身份。
         if (event.getAmount() > 0.0F)
         {
             rememberIncoming(target, source, type, event.getAmount());
@@ -362,18 +358,16 @@ public final class TechniqueDamageZoneEvents
      * <ol>
      *   <li>出伤点显式写入的 ThreadLocal（{@code deal} / {@code runWithType}）</li>
      *   <li>处刑人之剑对【死刑】目标的挥击 → 复合</li>
-     *   <li>必定黑闪标记下的 EpicFight 基础攻击 → 复合</li>
-     *   <li>EpicFight 基础攻击 → 体术</li>
+     *   <li>EpicFight 基础攻击 → 体术（含黑闪主拳；冲击波另走 deal 术式）</li>
      *   <li>其它贴身格斗（原版怪物近战 / 原版玩家近战）→ 体术</li>
      *   <li>赫击飞方块砸人 → 术式</li>
+     *   <li>十划碎块砸人 → 复合</li>
      *   <li>其余 → null（不吃分型加成，也不吃任何抗性）</li>
      * </ol>
-     * 随机黑闪在默认优先级才掷骰，本管线此时尚不知会否触发，故随机黑闪仍按体术消耗加成；
-     * 必定黑闪与处刑必杀在此即可标复合。
+     * 黑闪主拳不标复合：仍是同一记体术结算，只改伤害量。
      * <p>
      * ⚠️ 这里<b>不再</b>要求攻击者是 {@code ServerPlayer}——怪物近战也要能分出体术，
-     * 否则体术抗性对怪物完全无效。需要玩家身份的两条判据（处刑必杀 / 必定黑闪）自己做了
-     * {@code instanceof} 收敛。
+     * 否则体术抗性对怪物完全无效。处刑必杀判据自己做了 {@code instanceof} 收敛。
      */
     @Nullable
     static SkillDamageType resolveDamageType(LivingEntity target, DamageSource source)
@@ -392,10 +386,6 @@ public final class TechniqueDamageZoneEvents
             }
             if (source instanceof EpicFightDamageSource efSource && efSource.isBasicAttack())
             {
-                if (PlayerBlackFlashData.hasGuaranteedBlackFlash(serverPlayer))
-                {
-                    return SkillDamageType.COMPOSITE;
-                }
                 return SkillDamageType.MARTIAL;
             }
         }

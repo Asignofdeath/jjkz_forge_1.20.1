@@ -11,7 +11,6 @@ import com.darkness.jujutsukaisenzone.player.PlayerShrineBlackFlashMilestoneData
 import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
 import com.darkness.jujutsukaisenzone.technique.SkillDamageResolver;
 import com.darkness.jujutsukaisenzone.technique.TechniqueDamageBoosts;
-import com.darkness.jujutsukaisenzone.technique.TechniqueDamageSources;
 import com.darkness.jujutsukaisenzone.technique.crit.HitCritState;
 import com.darkness.jujutsukaisenzone.technique.development.SkillUnlockLogic;
 import com.darkness.jujutsukaisenzone.technique.skillset.ShrineTechniqueSkillSet;
@@ -326,9 +325,8 @@ public final class BlackFlashEvents
                                           float rawBeforePower)
     {
         HitCritState.markBlackFlash();
-        // 投影为黑闪 DamageType，供 StylizedDamage 按 jjkz.black_flash 选红色跳字（source 对象身份不变）。
-        TechniqueDamageSources.projectDisplayType(
-                event.getSource(), attacker.level(), TechniqueDamageSources.BLACK_FLASH_DAMAGE_TYPE);
+        // 主拳仍是同一记体术挥击（只改 amount 做 2.5 次方）；不强行改复合分型。
+        // 冲击波是另算的术式 AoE，见 BlackFlashShockwaveBehavior。
 
         // 伤害：2.5 次方（符合原著设定）。
         // ⚠️ 必须拿「强度放大之前」的原始伤害取幂，再把面板倍率线性乘回去：

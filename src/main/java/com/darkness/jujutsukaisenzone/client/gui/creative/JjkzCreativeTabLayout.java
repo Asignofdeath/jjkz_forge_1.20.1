@@ -16,7 +16,8 @@ public final class JjkzCreativeTabLayout
     public static final int PLAYER_INVENTORY_OFFSET_Y = 112;
 
     public static final int TAB_HEIGHT = 20;
-    public static final int TAB_WIDTH = 50;
+    /** 4 个分类：术式 / 武器 / 道具 / 咒物，需塞进 PANEL_WIDTH */
+    public static final int TAB_WIDTH = 36;
     public static final int TAB_GAP = 4;
 
     /** 仅覆盖原版创造物品格，不含玩家快捷栏 */

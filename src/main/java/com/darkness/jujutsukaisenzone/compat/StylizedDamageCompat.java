@@ -22,14 +22,17 @@ public final class StylizedDamageCompat
 
     public static final String STYLE_MARTIAL = "jjkz_martial";
     public static final String STYLE_TECHNIQUE = "jjkz_technique";
+    public static final String STYLE_COMPOSITE = "jjkz_composite";
 
     /** 与数据包 message_id / {@code DamageSource#getMsgId()} 一致。 */
     public static final String MSG_MARTIAL = "jjkz.martial";
     public static final String MSG_TECHNIQUE = "jjkz.technique";
+    public static final String MSG_COMPOSITE = "jjkz.composite";
 
     /** 注册名形式（test 命令 / 部分文档写法）。 */
     public static final String ID_MARTIAL = "jujutsukaisenzone:martial";
     public static final String ID_TECHNIQUE = "jujutsukaisenzone:technique";
+    public static final String ID_COMPOSITE = "jujutsukaisenzone:composite";
 
     private static boolean registered;
 
@@ -74,12 +77,20 @@ public final class StylizedDamageCompat
                     .suffix(" \u2726")
                     .register();
 
-            // 只保留体术黄 / 术式蓝。复合紫、黑闪红不再注册。
-            // EF 基础攻击 / 原版近战的 getMsgId 仍是 "player"（反射投影常失败），
-            // 一并绑到体术黄字，避免拳击一直走默认白字。
+            api.createStyle(STYLE_COMPOSITE)
+                    .color("#AB47BC")
+                    .fontSize(1.2f)
+                    .fontStyle("bold")
+                    .shadow(true)
+                    .outlineColor("#4A148C")
+                    .register();
+
+            // 体术黄 / 术式蓝 / 复合紫。红色留给以后的绝对伤害，不在此注册。
+            // 未投影成功的 EF / 原版近战 getMsgId 仍是 "player"，绑到体术黄以免白字。
             api.selectors()
                     .in("common")
                     .branch("common")
+                    .match(MSG_COMPOSITE, ID_COMPOSITE).style(STYLE_COMPOSITE)
                     .match(MSG_TECHNIQUE, ID_TECHNIQUE).style(STYLE_TECHNIQUE)
                     .match(MSG_MARTIAL, ID_MARTIAL, "player", "minecraft:player_attack").style(STYLE_MARTIAL)
                     .register();

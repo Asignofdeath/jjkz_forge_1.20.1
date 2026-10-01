@@ -14,6 +14,7 @@ import net.minecraft.world.damagesource.DamageType;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.Level;
+import net.minecraftforge.event.entity.living.LivingDamageEvent;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.event.entity.living.LivingKnockBackEvent;
 import net.minecraftforge.eventbus.api.EventPriority;
@@ -134,6 +135,7 @@ public final class TechniqueDamageSources
             ResourceKey.create(Registries.DAMAGE_TYPE, new ResourceLocation(JuJutsuKaisenZone.MODID, "martial"));
     public static final ResourceKey<DamageType> COMPOSITE_DAMAGE_TYPE =
             ResourceKey.create(Registries.DAMAGE_TYPE, new ResourceLocation(JuJutsuKaisenZone.MODID, "composite"));
+    /** 数据包仍注册；黑闪主拳跳字走 {@link #COMPOSITE_DAMAGE_TYPE}，不再用本类型当红字。 */
     public static final ResourceKey<DamageType> BLACK_FLASH_DAMAGE_TYPE =
             ResourceKey.create(Registries.DAMAGE_TYPE, new ResourceLocation(JuJutsuKaisenZone.MODID, "black_flash"));
 
@@ -146,7 +148,7 @@ public final class TechniqueDamageSources
     /**
      * EF / 原版近战等无法换成 {@link NarrativeDamageSource} 时，把叙事 message_id 挂在 source 身份上。
      * {@code DamageSourceMixin} 读这里，避免反射改 {@code private final type}（Java 16+ 常失败）。
-     * 只在单次 {@code hurt} → {@link LivingHurtEvent} 栈内存活，LOWEST 清空。
+     * 只在单次 {@code hurt} → {@link LivingDamageEvent} 栈内存活；伤害事件结束后按 source 清掉。
      */
     private static final ThreadLocal<IdentityHashMap<DamageSource, String>> DISPLAY_MSG_OVERRIDE =
             ThreadLocal.withInitial(IdentityHashMap::new);
@@ -211,9 +213,9 @@ public final class TechniqueDamageSources
     }
 
     /**
-     * 给已有 {@link DamageSource} 挂叙事 message_id（EF 近战 / 黑闪等无法重建 source 的通道）。
+     * 给已有 {@link DamageSource} 挂叙事 message_id（EF 近战等无法重建 source 的通道）。
      * 对象身份不变（{@code instanceof EpicFightDamageSource} 仍成立）；
-     * 实际改写的是 {@link #peekDisplayMsgId}，由 Mixin 注入 {@link DamageSource#getMsgId()}。
+     * 实际改写的是 {@link #peekDisplayMsgId}，由 {@code DamageSourceMixin} 注入 {@link DamageSource#getMsgId()}。
      */
     public static void projectDisplayType(DamageSource source, Level level, ResourceKey<DamageType> displayType)
     {
@@ -285,14 +287,36 @@ public final class TechniqueDamageSources
         return map.isEmpty() ? null : map.get(source);
     }
 
-    /** {@link LivingHurtEvent} 结束后清掉投影，避免 ThreadLocal 脏数据。 */
+    /** 取消的 hurt 走不到 {@link LivingDamageEvent}，在此按 source 清投影。 */
     @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void clearDisplayMsgOverride(LivingHurtEvent event)
+    public static void clearDisplayMsgOverrideIfHurtCancelled(LivingHurtEvent event)
+    {
+        if (event.isCanceled())
+        {
+            removeDisplayMsgOverride(event.getSource());
+        }
+    }
+
+    /**
+     * 跳字模组通常在扣血量确定后才读 {@link DamageSource#getMsgId()}，
+     * 故投影要留到 {@link LivingDamageEvent} 之后再清。
+     */
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public static void clearDisplayMsgOverride(LivingDamageEvent event)
+    {
+        removeDisplayMsgOverride(event.getSource());
+    }
+
+    private static void removeDisplayMsgOverride(DamageSource source)
     {
         IdentityHashMap<DamageSource, String> map = DISPLAY_MSG_OVERRIDE.get();
-        if (!map.isEmpty())
+        if (source != null)
         {
-            map.clear();
+            map.remove(source);
+        }
+        if (map.isEmpty())
+        {
+            DISPLAY_MSG_OVERRIDE.remove();
         }
     }
 
@@ -542,7 +566,7 @@ public final class TechniqueDamageSources
      * <ul>
      *   <li>术式 → 术式强度</li>
      *   <li>体术 → 体术强度</li>
-     *   <li>复合 → 两者各算一次取平均（避免黑闪这类同时动用两种能力的技能吃双倍面板）</li>
+     *   <li>复合 → 两者各算一次取平均（避免处刑必杀等同时动用两种能力的技能吃双倍面板）</li>
      * </ul>
      * 非玩家（没有面板）按参考强度把倍率换成绝对伤。
      */

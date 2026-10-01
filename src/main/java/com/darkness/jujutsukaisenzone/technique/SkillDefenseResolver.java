@@ -18,8 +18,9 @@ import org.jetbrains.annotations.Nullable;
  *   <li><b>体术抗性</b>——只吃贴身格斗 / {@code MARTIAL}。可被<strong>穿甲</strong>削减。</li>
  *   <li><b>术式抗性</b>——只吃 {@code TECHNIQUE}。可被<strong>术穿</strong>削减。</li>
  * </ol>
- * 复合（{@code COMPOSITE}）两层各按 {@code combatDefense.compositeResistanceShare} 计入：
- * 体侧吃穿甲、术侧吃术穿。
+ * 复合（{@code COMPOSITE}）减伤为体抗与术抗的<strong>算术平均</strong>
+ * {@code (P + T) / 2}（各自先扣穿甲 / 术穿）。不额外奖励或惩罚双抗均衡：
+ * 同预算偏科与双抗对复合减伤相同，双抗代价只在单线峰值不够高。
  * <p>
  * 穿透公式（百分比点数同单位）：正抗性部分先减穿透；默认不 overpen（最多减到 0，
  * 不把正抗性打成易伤）。已有易伤（负抗性）原样保留。第一期不对「原版护甲层」回补穿甲，
@@ -69,10 +70,9 @@ public final class SkillDefenseResolver
             case TECHNIQUE -> techniqueResistance(target, attacker);
             case COMPOSITE ->
             {
-                double share = Config.combatDefenseCompositeResistanceShare;
-                double physical = physicalResistance(target, attacker) * share;
-                double technique = techniqueResistance(target, attacker) * share;
-                yield 1.0D - (1.0D - physical) * (1.0D - technique);
+                double physical = physicalResistance(target, attacker);
+                double technique = techniqueResistance(target, attacker);
+                yield (physical + technique) * 0.5D;
             }
         };
     }

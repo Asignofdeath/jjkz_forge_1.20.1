@@ -1,6 +1,6 @@
 {
   "parent": "minecraft:item/generated",
   "textures": {
-    "layer0": "jujutsukaisenzone:item/domain_studybook"
+    "layer0": "jujutsukaisenzone:item/placeholder_prop_item"
   }
 }

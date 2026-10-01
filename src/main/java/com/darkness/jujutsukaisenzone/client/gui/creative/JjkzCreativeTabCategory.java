@@ -33,6 +33,12 @@ public enum JjkzCreativeTabCategory
                     ModItems.DOMAIN_STUDYBOOK,
                     ModItems.SOUL_STUDYBOOK,
                     ModItems.TECHNIQUE_INTELLIGENCE,
+                    ModItems.BRAIN_SOOTHING_CANDY,
+                    ModItems.BRAIN_CALMING_PILL
+            )),
+    CURSED_OBJECTS(
+            "gui.jujutsukaisenzone.creative_tab.category.cursed_objects",
+            List.of(
                     ModItems.CURSED_OBJECT_RUSTY_POCKET_WATCH,
                     ModItems.CURSED_OBJECT_BROKEN_GETA,
                     ModItems.CURSED_OBJECT_TORN_FAN,
@@ -52,6 +58,7 @@ public enum JjkzCreativeTabCategory
                     ModItems.CURSED_OBJECT_TORN_STUDENT_ID,
                     ModItems.CURSED_OBJECT_CRACKED_URN,
                     ModItems.CURSED_OBJECT_CHIPPED_CUTTING_BOARD,
+                    ModItems.CURSED_OBJECT_STAR_EARRING,
                     ModItems.CURSED_OBJECT_PROOF_OF_THE_STRONGEST,
                     ModItems.CURSED_OBJECT_FILLED_TIMESHEET,
                     ModItems.CURSED_OBJECT_DAMAGED_LEATHER_WATCH,

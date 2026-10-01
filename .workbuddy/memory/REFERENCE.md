@@ -103,7 +103,7 @@
 汇合点仍在 `TechniqueDamageZoneEvents`：区 0 / 1 / 3 在 `LivingHurtEvent` @HIGH；**区 2 目标防御层**单独挂 `LivingDamageEvent` @HIGH（原版护甲 / 附魔 / 抗性药水算完之后，才能对总减伤精确封顶）。
 
 - **`registry/ModAttributes`**：`jjkz:physical_resistance` / `jjkz:technique_resistance`，`RangedAttribute`，**单位是百分比点数**（25 = 25%），范围 −100~100，`setSyncable(true)`。默认 0 ⇒ **怪物不会凭空变软**。挂在实体类型上就用 `EntityAttributeModificationEvent`：`getTypes()` 是 `List<EntityType<? extends LivingEntity>>`，`add(type, attr)` 自动取 `getDefaultValue()`，**不做重复检查**。
-- **体抗语义（用户定死）**：只吃 EF 基础攻击 / 原版怪物近战 / 原版玩家近战 / 本模组 `MARTIAL`；**不碰**箭、三叉戟、火球、爆炸、闪电、火、岩浆。术抗只吃 `TECHNIQUE`。复合（黑闪 / 处刑必杀）**两层各半**（`combatDefense.compositeResistanceShare`），与 `SkillDamageResolver` 的「复合取均值」两端对称。
+- **体抗语义（用户定死）**：只吃 EF 基础攻击 / 原版怪物近战 / 原版玩家近战 / 本模组 `MARTIAL`；**不碰**箭、三叉戟、火球、爆炸、闪电、火、岩浆。术抗只吃 `TECHNIQUE`。复合减伤为体抗与术抗算术平均 `(P+T)/2`（各自先扣穿甲/术穿），与进攻侧「复合取均值」对称；**不**额外奖励双抗均衡。
 - **`technique/SkillDefenseResolver`**：护甲层 + 抗性层换算，与 `SkillDamageResolver` 对称。护甲层**只该对 `JjkzDamageTypeTags.IS_TECHNIQUE` 调**——其余通道原版已经算过，再补一道就是双计。
 - **`jjkz:technique` 伤害类型**（`TechniqueDamageSources#TECHNIQUE_DAMAGE_TYPE`，数据包 `message_id = "jjkz.technique"` 带点）替代了原先借用的 `MAGIC`。标签取舍：**加** `bypasses_armor`（原版公式对高频小伤害太狠）、`bypasses_shield`；**不加** `bypasses_resistance` / `bypasses_enchantments` / `witch_resistant_to`（后者顺手修掉女巫对术式 ×0.15 的意外减伤）。
 - **近战判据 `TechniqueDamageSources#isMelee`**：`directEntity == getEntity() && instanceof LivingEntity && !IS_EXPLOSION`。比查标签准，不依赖 EF，`fallingBlock` 之类天然排除。

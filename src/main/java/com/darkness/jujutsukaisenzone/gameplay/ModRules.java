@@ -141,7 +141,8 @@ public final class ModRules
      * 本模组对 StylizedDamage 的样式联动（全服）。
      * <p>
      * 样式/选择器在检测到 StylizedDamage 时就会注册进对方引擎。
-     * 本开关只控制服务端是否把叙事分型投影到 message_id（体术黄 / 术式蓝 / 复合紫 / 黑闪红）。
+     * 本开关只控制服务端是否把叙事分型投影到 message_id（体术黄 / 术式蓝 / 复合紫）。
+     * 红色留给以后的绝对伤害，不在此投影。
      * 开启时要求服务端已安装 {@code stylizeddamage}。
      */
     public static final class StylizedDamageStyles
