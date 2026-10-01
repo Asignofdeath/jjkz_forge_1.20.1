@@ -55,3 +55,11 @@
 - ⛔ **不是所有怪都有盾**：`GlobalMobPatch` 不是 `LivingEntityPatch` ⇒ 通用怪既没盾也没条。**监守者/潜影贝/远古守卫者暂时没有韧性条**，待「自注册 patch」阶段补（`EntityPatchRegistryEvent`）。
 - 资格「体抗 + 术抗 ≥ 45」；公式 `poiseDmg = base × (1 + B_eff)`，`B_eff = normalize(B) × (specialized ? resistance : 1)`。**`specialized` 只管 `resistance` 生不生效**，与其它一切无关。
 - 全部细节（HealthBar 坐标、shouldDraw 门槛、setStun 夹取顺序、EntityStunEvent 取消语义、生成 patch 的 7 个抽象方法）见 `REFERENCE.md#EpicFight 硬直护盾`。
+
+## 进程级静态会话状态（2026-09-30 起）
+- ⛔ **领域/结界的活跃实例由进程级静态单例持有**：`AbstractDomainExpansion.ACTIVE_DOMAINS` / `deferredSkyboxPlacementDelayByCaster`（实例字段，但承载者是不变的静态单例）、`BarrierTechniqueServerLogic.ACTIVE_BARRIERS` / `BARRIER_RADIUS_TIER`（static）。Forge **退出世界 / 切换存档不会重载模组类** ⇒ 静态容器跨会话残留、永不淘汰。
+- **后果（正确形态）**：`BarrierInstance` 只存 `ResourceKey<Level>` + 坐标 + 半径，**不持有 ServerLevel**（所以不会有 NPE/悬挂 level 引用）。残留条目会在新会话以「幽灵领域 / 幽灵结界」匹配**同维度同坐标**继续生效（该处静默禁刷怪、触发领域门控）；`BARRIER_RADIUS_TIER` 按 UUID 永久保留 ⇒ 档位串存档；`removedBlocks` 数万条目永久驻留内存。
+- **统一兜底**：`event/SessionStateCleanupEvents`（FORGE 总线）`ServerStoppingEvent` → `DomainExpansionRouter.resetAllSessionState()` + `BarrierTechniqueServerLogic.resetSessionState()`。⛔ 以后新增任何「进程级静态会话容器」都要挂进这里，别在别处零散 `.clear()`。
+- ⚠️ `ACTIVE_DOMAINS` 是**每个领域单例各自一份**；`DomainExpansionRouter.ALL_DOMAINS` 是唯一遍历入口——新增领域实现必须登记进去，否则重置/查询/维持全漏。
+- **登出 / 停机收尾（2026-09-30 追加落地）**：`SessionStateCleanupEvents.onPlayerLoggedOut` → `DomainExpansionRouter.closeAllForPlayer` + `BarrierTechniqueServerLogic.closeAllForPlayer`（都走 `clearBarrierInstance`：触发 `onBarrierClosed` 回调 + 方块还原）；`onServerStopping` 先对在线玩家完整关闭，再 `restoreAllWorldAll`/`restoreAllWorld` 兜底还原离线者的残留方块，最后清容器。`AbstractBarrierTechnique` 抽出 `restoreBarrierWorld(level, instance)`（纯世界侧还原，不触发回调，可空 level）。⚠️ 登出**不**重置结界半径档位（属玩家偏好），档位仅在停机时清。
+- 同类隐患（**本轮未动**）：`RatioIchimonjiLogic.SESSIONS`、`StarFlightSkillLogic.FLIGHTS`、`TenShadowsRitualLogic.BY_CASTER`、`JudgmentTrialSkillLogic.sessionByCaster`、`InnateDomainExperienceManager.SESSIONS`、`StarMarkRules.RENDEZVOUS_DOMAINS`、`TengenWedge*` 等 ~15 处静态 UUID 容器同样不随停机清理。

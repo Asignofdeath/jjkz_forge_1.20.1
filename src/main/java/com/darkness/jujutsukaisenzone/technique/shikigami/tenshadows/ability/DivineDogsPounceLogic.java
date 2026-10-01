@@ -1,10 +1,13 @@
 package com.darkness.jujutsukaisenzone.technique.shikigami.tenshadows.ability;
 
 import com.darkness.jujutsukaisenzone.entity.JadeDogEntity;
+import com.darkness.jujutsukaisenzone.technique.TechniqueDamageSources;
 import com.darkness.jujutsukaisenzone.technique.shikigami.ShikigamiAbility;
 import com.darkness.jujutsukaisenzone.technique.shikigami.ShikigamiAbilitySource;
 import com.darkness.jujutsukaisenzone.technique.shikigami.tenshadows.TenShadowsFieldQuery;
 import com.darkness.jujutsukaisenzone.technique.skill.TenShadowsShikigami;
+import com.darkness.jujutsukaisenzone.technique.skill.tenshadows.TenShadowsShikigamiSkillRatios;
+import com.darkness.jujutsukaisenzone.technique.skillset.SkillDamageType;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
@@ -13,13 +16,12 @@ import net.minecraft.world.phys.Vec3;
 import java.util.List;
 
 /**
- * 玉犬 · 扑击（自动）：占位——中距冲向仇恨目标并造成冲击伤。
+ * 玉犬 · 扑击（自动）：中距冲向仇恨目标并造成冲击伤。
  */
 public final class DivineDogsPounceLogic
 {
     private static final double MIN_RANGE = 3.0D;
     private static final double MAX_RANGE = 8.0D;
-    private static final float DAMAGE = 5.0F;
 
     private DivineDogsPounceLogic()
     {
@@ -55,7 +57,8 @@ public final class DivineDogsPounceLogic
             if (dog.distanceToSqr(target) <= (MIN_RANGE + 1.5D) * (MIN_RANGE + 1.5D)
                     || distSq <= 16.0D)
             {
-                target.hurt(dog.damageSources().mobAttack(dog), DAMAGE);
+                TechniqueDamageSources.deal(target, dog, TenShadowsShikigamiSkillRatios.DIVINE_DOGS_POUNCE,
+                        SkillDamageType.MARTIAL);
             }
             any = true;
         }

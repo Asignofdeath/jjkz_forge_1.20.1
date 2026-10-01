@@ -1,6 +1,7 @@
 package com.darkness.jujutsukaisenzone.event;
 
 import com.darkness.jujutsukaisenzone.JuJutsuKaisenZone;
+import com.darkness.jujutsukaisenzone.player.PlayerDomainModeData;
 import com.darkness.jujutsukaisenzone.player.PlayerTenShadowsStanceData;
 import com.darkness.jujutsukaisenzone.technique.shikigami.ShikigamiAbilityRuntime;
 import com.darkness.jujutsukaisenzone.technique.skill.TenShadowsShikigamiAiLogic;
@@ -90,6 +91,7 @@ public final class CommandWheelRuntimeEvents
         if (event.getEntity() instanceof ServerPlayer player)
         {
             PlayerTenShadowsStanceData.onLogout(player);
+            PlayerDomainModeData.onLogout(player);
         }
     }
 }

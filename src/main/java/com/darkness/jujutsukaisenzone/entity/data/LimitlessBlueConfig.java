@@ -26,14 +26,14 @@ public final class LimitlessBlueConfig
     /** 苍吸附强度系数 */
     public static final double PULL_STRENGTH = 0.99D;
     /**
-     * 【配置项·默认值】苍每间隔伤害值。
+     * 【配置项·默认值】苍每间隔伤害的<b>技能倍率</b>（1.0 = 100% 术式强度）。
      * <p>
      * 对应 {@code [skillCombat.limitlessBlue].damageBaseline}；运行时真值由
      * {@code LimitlessBlueSkillGrowth#damage} 给出，⛔ 业务代码不要直接引用本常量。
      */
-    public static final float DAMAGE = 8.0F;
-    /** 【配置项·默认值】苍伤害每升一级咒术等级的增量。 */
-    public static final float DAMAGE_PER_RANK = 2.0F;
+    public static final float DAMAGE = 0.40F;
+    /** 【配置项·默认值】苍伤害倍率每升一级咒术等级的增量（强度面板开启时通常不生效）。 */
+    public static final float DAMAGE_PER_RANK = 0.10F;
     /** 苍伤害间隔（tick） */
     public static final int DAMAGE_INTERVAL = 4;
     /** 每波随机采样尝试次数 */

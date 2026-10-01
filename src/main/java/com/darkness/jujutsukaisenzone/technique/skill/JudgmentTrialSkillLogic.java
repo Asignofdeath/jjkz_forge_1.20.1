@@ -11,6 +11,7 @@ import com.darkness.jujutsukaisenzone.player.PlayerCrimeRecordData;
 import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
 import com.darkness.jujutsukaisenzone.registry.ModEntities;
 import com.darkness.jujutsukaisenzone.technique.development.SkillUnlockLogic;
+import com.darkness.jujutsukaisenzone.technique.development.SkillUpgradeLogic;
 import com.darkness.jujutsukaisenzone.technique.shikigami.tenshadows.ability.mahoraga.MahoragaAdaptation;
 import com.darkness.jujutsukaisenzone.technique.skillset.JudgmentTechniqueSkillSet;
 import net.minecraft.ChatFormatting;
@@ -26,6 +27,7 @@ import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.Vec3;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -237,7 +239,7 @@ public final class JudgmentTrialSkillLogic
     {
         UUID targetUuid = target.getUUID();
         double guiltyBonus = JudgmentTrialTargetData.getGuiltyBonusPercent(caster, targetUuid);
-        double guiltyChance = BASE_GUILTY_CHANCE_PERCENT + guiltyBonus;
+        double guiltyChance = baseGuiltyChancePercent(caster) + guiltyBonus;
         boolean guilty = SinfulOneEffect.isActive(target)
                 || caster.getRandom().nextDouble() * 100.0D < guiltyChance;
 
@@ -251,6 +253,30 @@ public final class JudgmentTrialSkillLogic
         JudgmentCrimeLibrary.CrimeEntry crime = JudgmentCrimeLibrary.pickForDefendant(target, caster.getRandom());
         JudgmentVerdictType verdictType = rollGuiltyVerdictType(caster, target, crime);
         return new DomainTrialVerdictResult(true, crime, verdictType);
+    }
+
+    /** 基础有罪率：Lv1=10%，每级 +2。 */
+    public static double baseGuiltyChancePercent(ServerPlayer caster)
+    {
+        return BASE_GUILTY_CHANCE_PERCENT
+                + 2.0D * SkillUpgradeLogic.upgradeSteps(
+                caster, PlayerTechniqueData.TECHNIQUE_JUDGMENT, JudgmentTechniqueSkillSet.SKILL_TRIAL);
+    }
+
+    /** 死刑基础率：Lv1=20%，每级 +2。 */
+    public static double baseDeathSentenceChancePercent(ServerPlayer caster)
+    {
+        return DEATH_SENTENCE_CHANCE_PERCENT
+                + 2.0D * SkillUpgradeLogic.upgradeSteps(
+                caster, PlayerTechniqueData.TECHNIQUE_JUDGMENT, JudgmentTechniqueSkillSet.SKILL_TRIAL);
+    }
+
+    /** 锁定距离：Lv1=32，每级 +2。 */
+    public static double lockTargetMaxDistance(ServerPlayer caster)
+    {
+        return LOCK_TARGET_MAX_DISTANCE
+                + 2.0D * SkillUpgradeLogic.upgradeSteps(
+                caster, PlayerTechniqueData.TECHNIQUE_JUDGMENT, JudgmentTechniqueSkillSet.SKILL_TRIAL);
     }
 
     public static void applyDomainTrialVerdictResult(
@@ -420,24 +446,33 @@ public final class JudgmentTrialSkillLogic
 
     /**
      * 计算【死刑】掷骰成功率（%）：基础 + debuff + 重罪加成，上限 100。
+     * <p>
+     * 无施法者时按 Lv1 基础率（仅描述 / 兼容旧调用）。
      */
     public static double computeDeathSentenceChancePercent(LivingEntity target, JudgmentCrimeLibrary.CrimeEntry crime)
     {
-        return computeDeathSentenceChancePercent(target, JudgmentCrimeLibrary.getDeathSentenceBonusPercent(crime));
+        return computeDeathSentenceChancePercent(null, target, JudgmentCrimeLibrary.getDeathSentenceBonusPercent(crime));
     }
 
     public static double computeDeathSentenceChancePercent(LivingEntity target, String accusationChinese)
     {
         return computeDeathSentenceChancePercent(
+                null,
                 target,
                 JudgmentCrimeLibrary.getDeathSentenceBonusPercent(accusationChinese));
     }
 
-    private static double computeDeathSentenceChancePercent(LivingEntity target, double crimeBonusPercent)
+    private static double computeDeathSentenceChancePercent(
+            @Nullable ServerPlayer caster,
+            LivingEntity target,
+            double crimeBonusPercent)
     {
+        double base = caster == null
+                ? DEATH_SENTENCE_CHANCE_PERCENT
+                : baseDeathSentenceChancePercent(caster);
         return Math.min(
                 100.0D,
-                DEATH_SENTENCE_CHANCE_PERCENT
+                base
                         + computeDebuffDeathSentenceBonusPercent(target)
                         + crimeBonusPercent);
     }
@@ -490,8 +525,8 @@ public final class JudgmentTrialSkillLogic
 
         boolean aggravating = isAggravationUnlocked(caster);
         double deathSentenceChance = aggravating
-                ? computeDeathSentenceChancePercent(target, crimeBonusPercent)
-                : DEATH_SENTENCE_CHANCE_PERCENT;
+                ? computeDeathSentenceChancePercent(caster, target, crimeBonusPercent)
+                : baseDeathSentenceChancePercent(caster);
         if (caster.getRandom().nextDouble() * 100.0D >= deathSentenceChance)
         {
             return JudgmentVerdictType.CONFISCATION;
@@ -652,7 +687,8 @@ public final class JudgmentTrialSkillLogic
         {
             return null;
         }
-        double maxDistSq = LOCK_TARGET_MAX_DISTANCE * LOCK_TARGET_MAX_DISTANCE;
+        double maxDistSq = lockTargetMaxDistance(caster);
+        maxDistSq *= maxDistSq;
         if (caster.distanceToSqr(living) > maxDistSq)
         {
             return null;

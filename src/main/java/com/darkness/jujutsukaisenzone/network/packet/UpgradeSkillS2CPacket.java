@@ -1,5 +1,6 @@
 package com.darkness.jujutsukaisenzone.network.packet;
 
+import com.darkness.jujutsukaisenzone.client.gui.technique.SkillUpgradeResultPopup;
 import com.darkness.jujutsukaisenzone.client.gui.technique.TechniqueDevelopmentCanvasWidget;
 import com.darkness.jujutsukaisenzone.technique.development.SkillLevelRules;
 import com.darkness.jujutsukaisenzone.technique.development.SkillUpgradeResult;
@@ -69,7 +70,13 @@ public final class UpgradeSkillS2CPacket
             {
                 player.getPersistentData().putInt(packet.levelTag, packet.level);
             }
-            if (packet.result != SkillUpgradeResult.ALREADY_MAX)
+            if (packet.result == SkillUpgradeResult.SUCCESS)
+            {
+                int newLevel = packet.level;
+                int oldLevel = Math.max(1, newLevel - 1);
+                SkillUpgradeResultPopup.show(packet.techniqueId, packet.skillId, oldLevel, newLevel);
+            }
+            else if (packet.result != SkillUpgradeResult.ALREADY_MAX)
             {
                 player.displayClientMessage(packet.result.toMessage(), false);
             }

@@ -7,6 +7,8 @@ import com.darkness.jujutsukaisenzone.effect.TechniqueMeltdownEffect;
 import com.darkness.jujutsukaisenzone.blockentity.JJKZSkyblockEntity;
 import com.darkness.jujutsukaisenzone.entity.SpecialEffectEntity;
 import com.darkness.jujutsukaisenzone.network.ModNetwork;
+import com.darkness.jujutsukaisenzone.player.PlayerBrainDamageData;
+import com.darkness.jujutsukaisenzone.player.PlayerDomainModeData;
 import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
 import com.darkness.jujutsukaisenzone.registry.ModEntities;
 import com.darkness.jujutsukaisenzone.registry.ModSounds;
@@ -190,6 +192,11 @@ public final class LimitlessDomainExpansion extends AbstractTechniqueDomain
     @Override
     protected void applyDomainSpecificEffect(ServerPlayer player, BarrierInstance instance)
     {
+        /* 瞬发：不搬生物、不上演出锁，只做天空盒与慢镜头。 */
+        if (instance.isAutoCloseOnComplete() || instance.isSkyboxOnlyExpand())
+        {
+            return;
+        }
         broadcastLimitlessDomainCompleteScreenShake(player, player.serverLevel());
         broadcastDomainWhiteCurtainElevate(player, player.serverLevel());
         ModNetwork.sendLimitlessDomainCmdCamSetupA(player, player.position());
@@ -314,6 +321,20 @@ public final class LimitlessDomainExpansion extends AbstractTechniqueDomain
 
     // ==================== 覆盖施放逻辑（延迟蓄力） ====================
 
+    @Override
+    protected void configureDomainInstance(ServerPlayer player, BarrierInstance instance)
+    {
+        if (!PlayerDomainModeData.isInstant(player))
+        {
+            return;
+        }
+        /* 瞬发：只展开天空盒，不放结界壳；铺完后保持完成态 2 秒再关。 */
+        instance.setSkyboxOnlyExpand(true);
+        instance.setAutoCloseOnComplete(true);
+        /* 跳过演出，直接用演出后的第二套天空盒（stat_sky2）。 */
+        instance.setCustomSkyboxTexture(LIMITLESS_DOMAIN_SKYBOX_TEXTURE_AFTER_280);
+    }
+
     /**
      * 无量空处的施放逻辑：先进入蓄力状态，2 秒后才真正展开领域。
      * <p>
@@ -326,6 +347,9 @@ public final class LimitlessDomainExpansion extends AbstractTechniqueDomain
      *   <li>蓄力完成后调用 {@code super.cast(player)} 真正展开领域</li>
      * </ol>
      * 如果玩家已在自己的领域内，立即解除领域（不经过蓄力）。
+     * <p>
+     * 瞬发模式：跳过蓄力与领域演出，只播天空盒展开（不放结界壳方块）；
+     * 构建完成后保持约 2 秒，期间对半径 32 内全体生物施加隐藏最高档缓慢与挖掘疲劳，再自动关闭。
      */
     @Override
     public void cast(ServerPlayer player)
@@ -353,6 +377,33 @@ public final class LimitlessDomainExpansion extends AbstractTechniqueDomain
 
         if (TechniqueMeltdownEffect.blockDomainExpansion(player))
         {
+            return;
+        }
+
+        /* 瞬发：跳过蓄力与演出，直接走结界展开 */
+        if (PlayerDomainModeData.isInstant(player))
+        {
+            if (castingDelayMap.containsKey(uuid))
+            {
+                castingDelayMap.remove(uuid);
+                EpicFightCompat.stopLimitlessDomainChargeAnimation(player);
+                cancelLimitlessChargeClientPresentation(player);
+            }
+            if (DomainExpansionRouter.isPositionInAnyDomain(player.serverLevel(), player.blockPosition()))
+            {
+                player.displayClientMessage(Component.literal("无法展开领域，因为领域对抗还没做").withStyle(ChatFormatting.RED), true);
+                return;
+            }
+            if (!hasLearnedDomainExpansion(player))
+            {
+                player.displayClientMessage(Component.literal("尚未习得领域展开").withStyle(ChatFormatting.RED), true);
+                return;
+            }
+            if (!hasLearnedTechnique(player))
+            {
+                return;
+            }
+            super.cast(player);
             return;
         }
 
@@ -505,15 +556,40 @@ public final class LimitlessDomainExpansion extends AbstractTechniqueDomain
     public void tickMaintain(ServerPlayer player)
     {
         tickPostDomainLocksOncePerServerTick(player);
-        tickPlayerLockState(player);
-        captureNewDomainIntruders(player);
-        tickLockedMobs(player);
+        boolean instant = hasInstantDomainInstance(player);
+        if (!instant)
+        {
+            tickPlayerLockState(player);
+            captureNewDomainIntruders(player);
+            tickLockedMobs(player);
+        }
         /* 驱动蓄力倒计时 */
         tickCastingDelay(player);
         /* 正常的领域维持逻辑 */
         super.tickMaintain(player);
-        tickLimitlessSkyboxTextureSwap(player);
+        if (!instant)
+        {
+            tickLimitlessSkyboxTextureSwap(player);
+        }
         clearOwnerMobLocksIfDomainClosed(player);
+    }
+
+    /** 当前活跃领域是否为瞬发（天空盒-only / 构建完即关）。 */
+    private boolean hasInstantDomainInstance(ServerPlayer player)
+    {
+        java.util.Deque<BarrierInstance> queue = ACTIVE_DOMAINS.get(player.getUUID());
+        if (queue == null || queue.isEmpty())
+        {
+            return false;
+        }
+        for (BarrierInstance instance : queue)
+        {
+            if (instance.isAutoCloseOnComplete() || instance.isSkyboxOnlyExpand())
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     // ==================== 辅助方法 ====================
@@ -742,6 +818,11 @@ public final class LimitlessDomainExpansion extends AbstractTechniqueDomain
         }
         BarrierInstance instance = queue.peekLast();
         if (instance == null)
+        {
+            return;
+        }
+        /* 瞬发领域不转移、不锁定生物位置。 */
+        if (instance.isAutoCloseOnComplete() || instance.isSkyboxOnlyExpand())
         {
             return;
         }
@@ -1284,6 +1365,12 @@ public final class LimitlessDomainExpansion extends AbstractTechniqueDomain
                 continue;
             }
             MobLockState state = entry.getValue();
+            /* 后遗症脑损：停留秒数（tick/20）；仅玩家；无提示。 */
+            LivingEntity locked = findLivingEntity(owner.getServer(), entry.getKey());
+            if (locked instanceof ServerPlayer victim)
+            {
+                PlayerBrainDamageData.addFromLimitlessDomainDwell(victim, state.domainLockElapsedTicks(), false);
+            }
             int postTicks = Math.min(state.domainLockElapsedTicks() * 3, POST_DOMAIN_LOCK_MAX_TICKS);
             if (postTicks > 0)
             {

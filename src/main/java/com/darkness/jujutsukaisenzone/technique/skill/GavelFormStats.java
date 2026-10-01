@@ -2,7 +2,6 @@ package com.darkness.jujutsukaisenzone.technique.skill;
 
 import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
 import com.darkness.jujutsukaisenzone.registry.ModItems;
-import com.darkness.jujutsukaisenzone.technique.development.SkillLevelRules;
 import com.darkness.jujutsukaisenzone.technique.development.SkillUpgradeLogic;
 import com.darkness.jujutsukaisenzone.technique.skillset.JudgmentTechniqueSkillSet;
 import net.minecraft.world.entity.LivingEntity;
@@ -17,7 +16,7 @@ import javax.annotation.Nullable;
  */
 public final class GavelFormStats
 {
-    public static final float STANDARD_PROJECTILE_DAMAGE = 6.0F;
+    public static final float STANDARD_PROJECTILE_DAMAGE = 0.30F;
     public static final float STANDARD_EXPLOSION_POWER = 1.5F;
     public static final float STANDARD_SHOOT_POWER = 3.0F;
     public static final int STANDARD_SHOOT_COOLDOWN_TICKS = 5;
@@ -27,7 +26,7 @@ public final class GavelFormStats
 
     private static final float BIG_HAMMER_SHOOT_POWER = 2.1F;
     private static final int BIG_HAMMER_SHOOT_COOLDOWN_TICKS = 25;
-    private static final float BIG_HAMMER_PROJECTILE_DAMAGE = 15.0F;
+    private static final float BIG_HAMMER_PROJECTILE_DAMAGE = 0.75F;
     private static final float BIG_HAMMER_EXPLOSION_POWER = 4.0F;
 
     private GavelFormStats()
@@ -99,9 +98,8 @@ public final class GavelFormStats
         {
             return 1.0F;
         }
-        int level = SkillUpgradeLogic.getSkillLevel(
+        return SkillUpgradeLogic.powerMultiplier(
                 player, PlayerTechniqueData.TECHNIQUE_JUDGMENT, JudgmentTechniqueSkillSet.SKILL_GAVEL);
-        return SkillLevelRules.powerMultiplier(level);
     }
 
     public static Level.ExplosionInteraction getExplosionInteraction(ItemStack stack)

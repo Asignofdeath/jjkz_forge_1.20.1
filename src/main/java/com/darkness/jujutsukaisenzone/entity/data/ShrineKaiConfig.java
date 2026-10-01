@@ -28,9 +28,9 @@ public final class ShrineKaiConfig
      * 运行时真值由 {@code ShrineSkillGrowth#kaiColumnDamage} / {@code #kaiFlyobjColumnDamage} 给出
      * （两者默认值相同，但对应 {@code [skillCombat]} 下的两个独立条目），⛔ 业务代码不要直接引用本常量。
      */
-    public static final float COLUMN_DAMAGE = 10.0F;
+    public static final float COLUMN_DAMAGE = 0.50F;
     /** 【配置项·默认值】解柱伤害每升一级咒术等级的增量。 */
-    public static final float COLUMN_DAMAGE_PER_RANK = 2.0F;
+    public static final float COLUMN_DAMAGE_PER_RANK = 0.10F;
     /** 解到达终点后 Photon 存活时长（tick） */
     public static final int ARRIVAL_POST_PHOTON_TICKS = 40;
 

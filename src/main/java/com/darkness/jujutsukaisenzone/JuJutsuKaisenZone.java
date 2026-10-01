@@ -143,6 +143,7 @@ public class JuJutsuKaisenZone
 
         event.enqueueWork(MimicryVoiceLineDefaults::register);
         event.enqueueWork(com.darkness.jujutsukaisenzone.technique.se.SeEffectRegistry::rebuildItemIndex);
+        event.enqueueWork(com.darkness.jujutsukaisenzone.attribute.MaxHealthAttributeCap::apply);
         event.enqueueWork(() -> net.minecraftforge.common.world.ForgeChunkManager.setForcedChunkLoadingCallback(
                 MODID,
                 (level, helper) ->

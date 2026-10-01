@@ -1,7 +1,10 @@
 package com.darkness.jujutsukaisenzone.technique.skill;
 
 import com.darkness.jujutsukaisenzone.player.PlayerRatioBreakData;
+import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
 import com.darkness.jujutsukaisenzone.technique.TechniqueDamageSources;
+import com.darkness.jujutsukaisenzone.technique.development.SkillUpgradeLogic;
+import com.darkness.jujutsukaisenzone.technique.skillset.RatioTechniqueSkillSet;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
@@ -31,7 +34,7 @@ public final class RatioCollapseLogic
     /** 单次最多另吃多少击破（每点多 1 块）。 */
     public static final int MAX_BREAKS_CONSUMED = 8;
     public static final double BREAK_RADIUS = 4.0D;
-    public static final float HURT_DAMAGE = 5.0F;
+    public static final float HURT_DAMAGE = 0.25F;
     public static final int HURT_MAX = 16;
     public static final double LAUNCH_SPEED = 0.55D;
     public static final double LAUNCH_UP = 0.42D;
@@ -90,7 +93,12 @@ public final class RatioCollapseLogic
             flying.dropItem = false;
             flying.getPersistentData().putBoolean(TechniqueDamageSources.TAG_RATIO_DEBRIS, true);
             flying.getPersistentData().putUUID("jujutsukaisenzone_ratio_debris_caster", player.getUUID());
-            flying.setHurtsEntities(HURT_DAMAGE, HURT_MAX);
+            float hurt = SkillUpgradeLogic.scaleRatio(
+                    player,
+                    PlayerTechniqueData.TECHNIQUE_RATIO,
+                    RatioTechniqueSkillSet.SKILL_COLLAPSE,
+                    HURT_DAMAGE);
+            flying.setHurtsEntities(hurt, HURT_MAX);
             flying.setDeltaMovement(randomLaunch(level, center, Vec3.atCenterOf(pos)));
             launched++;
         }

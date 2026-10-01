@@ -1,5 +1,7 @@
 package com.darkness.jujutsukaisenzone.technique.development;
 
+import com.darkness.jujutsukaisenzone.player.BarrierTechniqueLevel;
+import com.darkness.jujutsukaisenzone.player.PlayerBarrierTechniqueData;
 import com.darkness.jujutsukaisenzone.player.PlayerCursedGradeData;
 import com.darkness.jujutsukaisenzone.player.PlayerDomainExpansionData;
 import com.darkness.jujutsukaisenzone.player.PlayerMeltdownRepairData;
@@ -30,7 +32,18 @@ public final class UnlockConditionEvaluator
             case HAS_MELTDOWN_REPAIR -> PlayerMeltdownRepairData.hasLearned(player);
             case ALWAYS_VISIBLE -> true;
             case HAS_TAMED_SHIKIGAMI -> evaluateTamedShikigami(player, condition.arg());
+            case MIN_BARRIER_TECHNIQUE_LEVEL -> evaluateMinBarrierTechniqueLevel(player, condition.arg());
         };
+    }
+
+    private static boolean evaluateMinBarrierTechniqueLevel(Player player, String levelName)
+    {
+        BarrierTechniqueLevel required = BarrierTechniqueLevel.fromString(levelName);
+        if (required == BarrierTechniqueLevel.UNLEARNED)
+        {
+            return false;
+        }
+        return PlayerBarrierTechniqueData.getLevel(player).getTier() >= required.getTier();
     }
 
     private static boolean evaluateTamedShikigami(Player player, String shikigamiId)

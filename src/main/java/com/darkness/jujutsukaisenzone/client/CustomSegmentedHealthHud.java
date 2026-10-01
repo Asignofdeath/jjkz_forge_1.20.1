@@ -19,7 +19,8 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
 /**
- * 王者荣耀式分段格条：替换原版心形血条，固定 91px 宽（原版一半），每格 10 HP（最多 20 格）。
+ * 王者荣耀式分段格条：替换原版心形血条，固定 91px 宽（原版一半）。
+ * 每格血量随最大生命阶梯取整（10 / 20 / 25 / 50 / …），格数不超过 {@link Renderer#MAX_SEGMENTS}。
  */
 public final class CustomSegmentedHealthHud
 {
@@ -65,13 +66,9 @@ public final class CustomSegmentedHealthHud
 
         float damageBuffer = DamageBufferTracker.getDisplayHealth(player);
 
-        int segments = Math.max(1, (int) Math.ceil(maxHealth / Renderer.BASE_SEGMENT_HP));
-        float segmentHp = Renderer.BASE_SEGMENT_HP;
-        if (segments > Renderer.MAX_SEGMENTS)
-        {
-            segments = Renderer.MAX_SEGMENTS;
-            segmentHp = maxHealth / Renderer.MAX_SEGMENTS;
-        }
+        SegmentLayout layout = resolveSegmentLayout(maxHealth);
+        int segments = layout.segments;
+        float segmentHp = layout.segmentHp;
 
         float cellWidth = Renderer.BAR_WIDTH / (float) segments;
         float filledHealthSegments = health / segmentHp;
@@ -120,6 +117,63 @@ public final class CustomSegmentedHealthHud
         }
 
         drawDamageBufferBar(graphics, barX, barY, health, damageBuffer, maxHealth);
+    }
+
+    /**
+     * 按最大生命决定「每格血量」与格数：先取能塞进 {@link Renderer#MAX_SEGMENTS} 的最小每格血量，
+     * 再向上取整到 1/2/2.5/5 × 10^n，保证格线读数好看；若仍超格数上限则均分。
+     */
+    static SegmentLayout resolveSegmentLayout(float maxHealth)
+    {
+        float safeMax = Math.max(1.0F, maxHealth);
+        float minPerSegment = safeMax / Renderer.MAX_SEGMENTS;
+        float segmentHp = niceCeilSegmentHp(minPerSegment);
+        int segments = Math.max(1, (int) Math.ceil(safeMax / segmentHp));
+        if (segments > Renderer.MAX_SEGMENTS)
+        {
+            segments = Renderer.MAX_SEGMENTS;
+            segmentHp = safeMax / Renderer.MAX_SEGMENTS;
+        }
+        return new SegmentLayout(segments, segmentHp);
+    }
+
+    /** 向上取整到 1 / 2 / 2.5 / 5 × 10^n，且不低于 {@link Renderer#BASE_SEGMENT_HP}。 */
+    static float niceCeilSegmentHp(float value)
+    {
+        float floor = Renderer.BASE_SEGMENT_HP;
+        if (value <= floor)
+        {
+            return floor;
+        }
+        double exp = Math.floor(Math.log10(value));
+        double mag = Math.pow(10.0D, exp);
+        double norm = value / mag;
+        double niceNorm;
+        if (norm <= 1.0D)
+        {
+            niceNorm = 1.0D;
+        }
+        else if (norm <= 2.0D)
+        {
+            niceNorm = 2.0D;
+        }
+        else if (norm <= 2.5D)
+        {
+            niceNorm = 2.5D;
+        }
+        else if (norm <= 5.0D)
+        {
+            niceNorm = 5.0D;
+        }
+        else
+        {
+            niceNorm = 10.0D;
+        }
+        return (float) (niceNorm * mag);
+    }
+
+    record SegmentLayout(int segments, float segmentHp)
+    {
     }
 
     /** 血条左侧：原版 icons.png 心形（含容器底与状态对应贴图） */
@@ -281,7 +335,8 @@ public final class CustomSegmentedHealthHud
 
             if (bufferHealth > health)
             {
-                bufferHealth = Math.max(health, bufferHealth - Renderer.DAMAGE_BUFFER_DECAY_PER_TICK);
+                float decay = Renderer.damageBufferDecayPerTick(maxHealth);
+                bufferHealth = Math.max(health, bufferHealth - decay);
             }
         }
 
@@ -321,6 +376,7 @@ public final class CustomSegmentedHealthHud
         static final int BAR_WIDTH = 91;
         static final int BAR_HEIGHT = 6;
         static final int CORNER_RADIUS = 2;
+        /** 低血量时每格基准；更高血量由 {@link #niceCeilSegmentHp} 阶梯放大 */
         static final float BASE_SEGMENT_HP = 10.0F;
         static final int MAX_SEGMENTS = 20;
         /** 原版 {@code ForgeGui.leftHeight} 初始值，第一行心形 Y = height - 39 */
@@ -338,8 +394,18 @@ public final class CustomSegmentedHealthHud
         /** 扣血缓冲条：显示刚刚损失的血量，随时间缩短 */
         static final int COLOR_DAMAGE_BUFFER = 0xFFFFD700;
         static final int COLOR_DAMAGE_BUFFER_EDGE = 0xFFFFEE88;
-        /** 缓冲条每游戏刻向当前血量收缩的 HP 量（20 tps 下约 24 HP/秒） */
-        static final float DAMAGE_BUFFER_DECAY_PER_TICK = 1.2F;
+        /** 低血量保底衰减（与旧版 200 血尺度一致：1.2 HP/刻） */
+        static final float DAMAGE_BUFFER_DECAY_BASE = 1.2F;
+        /**
+         * 相对最大生命的每刻衰减比例：在 200 血时与 {@link #DAMAGE_BUFFER_DECAY_BASE} 对齐，
+         * 高血量下保持约 8 秒扫完一整条缓冲的视觉速度。
+         */
+        static final float DAMAGE_BUFFER_DECAY_RATIO_PER_TICK = DAMAGE_BUFFER_DECAY_BASE / 200.0F;
+
+        static float damageBufferDecayPerTick(float maxHealth)
+        {
+            return Math.max(DAMAGE_BUFFER_DECAY_BASE, maxHealth * DAMAGE_BUFFER_DECAY_RATIO_PER_TICK);
+        }
 
         private Renderer()
         {

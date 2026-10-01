@@ -28,5 +28,5 @@ public final class LimitlessPurpleConfig
     /** 茈箭球体方块擦除半径 */
     public static final double ARROW_BLOCK_ERASE_RADIUS = 2.0D;
     /** 茈箭球体每 tick 伤害 */
-    public static final float ARROW_SPHERE_DAMAGE_PER_TICK = 400.0F;
+    public static final float ARROW_SPHERE_DAMAGE_PER_TICK = 20.0F;
 }

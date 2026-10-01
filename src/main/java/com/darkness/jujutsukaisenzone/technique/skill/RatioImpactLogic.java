@@ -3,6 +3,7 @@ package com.darkness.jujutsukaisenzone.technique.skill;
 import com.darkness.jujutsukaisenzone.JuJutsuKaisenZone;
 import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
 import com.darkness.jujutsukaisenzone.technique.TechniqueDamageSources;
+import com.darkness.jujutsukaisenzone.technique.development.SkillUpgradeLogic;
 import com.darkness.jujutsukaisenzone.technique.skillset.RatioTechniqueSkillSet;
 import com.darkness.jujutsukaisenzone.technique.skillset.SkillDamageType;
 import net.minecraft.ChatFormatting;
@@ -34,7 +35,7 @@ import java.util.concurrent.ConcurrentHashMap;
 @Mod.EventBusSubscriber(modid = JuJutsuKaisenZone.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public final class RatioImpactLogic
 {
-    public static final float DAMAGE = 6.0F;
+    public static final float DAMAGE = 0.30F;
     public static final double RANGE = 4.5D;
     public static final double HALF_WIDTH = 1.1D;
     /** 一段命中后可接二段的时限。 */
@@ -156,7 +157,13 @@ public final class RatioImpactLogic
         player.setDeltaMovement(player.getDeltaMovement().add(dash));
         player.hurtMarked = true;
 
-        TechniqueDamageSources.deal(target, player, DAMAGE, SkillDamageType.MARTIAL,
+        TechniqueDamageSources.deal(target, player,
+                SkillUpgradeLogic.scaleRatio(
+                        player,
+                        PlayerTechniqueData.TECHNIQUE_RATIO,
+                        RatioTechniqueSkillSet.SKILL_IMPACT,
+                        DAMAGE),
+                SkillDamageType.MARTIAL,
                 RatioTechniqueSkillSet.SKILL_IMPACT);
 
         Vec3 launch = flat.scale(LAUNCH_HORIZONTAL).add(0.0D, LAUNCH_VERTICAL, 0.0D);

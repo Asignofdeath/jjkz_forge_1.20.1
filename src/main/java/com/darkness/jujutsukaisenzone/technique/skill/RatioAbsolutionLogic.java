@@ -1,7 +1,9 @@
 package com.darkness.jujutsukaisenzone.technique.skill;
 
 import com.darkness.jujutsukaisenzone.player.PlayerRatioOvertimeData;
+import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
 import com.darkness.jujutsukaisenzone.technique.TechniqueDamageSources;
+import com.darkness.jujutsukaisenzone.technique.development.SkillUpgradeLogic;
 import com.darkness.jujutsukaisenzone.technique.skillset.RatioTechniqueSkillSet;
 import com.darkness.jujutsukaisenzone.technique.skillset.SkillDamageType;
 import net.minecraft.ChatFormatting;
@@ -26,8 +28,8 @@ import java.util.UUID;
  */
 public final class RatioAbsolutionLogic
 {
-    public static final float DAMAGE = 18.0F;
-    public static final float IMPACT_DAMAGE = 6.0F;
+    public static final float DAMAGE = 0.90F;
+    public static final float IMPACT_DAMAGE = 0.30F;
     public static final double RANGE = 8.0D;
     public static final double HALF_WIDTH = 1.2D;
     public static final double KNOCKBACK = 1.35D;
@@ -97,7 +99,13 @@ public final class RatioAbsolutionLogic
             {
                 continue;
             }
-            if (TechniqueDamageSources.deal(living, player, DAMAGE, SkillDamageType.MARTIAL,
+            if (TechniqueDamageSources.deal(living, player,
+                    SkillUpgradeLogic.scaleRatio(
+                            player,
+                            PlayerTechniqueData.TECHNIQUE_RATIO,
+                            RatioTechniqueSkillSet.SKILL_ABSOLUTION,
+                            DAMAGE),
+                    SkillDamageType.MARTIAL,
                     RatioTechniqueSkillSet.SKILL_ABSOLUTION))
             {
                 livingHits++;
@@ -123,7 +131,13 @@ public final class RatioAbsolutionLogic
                         && !entity.getUUID().equals(player.getUUID())
                         && !hit.contains(entity.getUUID())))
         {
-            if (TechniqueDamageSources.deal(living, player, IMPACT_DAMAGE, SkillDamageType.MARTIAL,
+            if (TechniqueDamageSources.deal(living, player,
+                    SkillUpgradeLogic.scaleRatio(
+                            player,
+                            PlayerTechniqueData.TECHNIQUE_RATIO,
+                            RatioTechniqueSkillSet.SKILL_ABSOLUTION,
+                            IMPACT_DAMAGE),
+                    SkillDamageType.MARTIAL,
                     RatioTechniqueSkillSet.SKILL_ABSOLUTION))
             {
                 impactHits++;

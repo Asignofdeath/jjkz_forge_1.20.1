@@ -4,6 +4,7 @@ import com.darkness.jujutsukaisenzone.client.CommandWheelKeyHandler;
 import com.darkness.jujutsukaisenzone.commandwheel.CommandWheelCatalog;
 import com.darkness.jujutsukaisenzone.commandwheel.CommandWheelEntry;
 import com.darkness.jujutsukaisenzone.commandwheel.CommandWheelIds;
+import com.darkness.jujutsukaisenzone.commandwheel.CommandWheelPage;
 import com.darkness.jujutsukaisenzone.network.CommandWheelNetwork;
 import com.darkness.jujutsukaisenzone.entity.MahoragaEntity;
 import net.minecraft.client.Minecraft;
@@ -14,6 +15,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.EntityHitResult;
+import org.lwjgl.glfw.GLFW;
 import yesman.epicfight.api.client.camera.EpicFightCameraAPI;
 
 import javax.annotation.Nullable;
@@ -21,12 +23,13 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * 指令圆盘：不暂停游戏；松手或左键确认当前扇区。
+ * 指令圆盘：不暂停游戏；默认通用页，R 循环切页；松手或左键确认当前扇区。
  */
 public final class CommandWheelScreen extends Screen
 {
     private static final int RADIUS = 90;
     private static final int INNER_DEADZONE = 26;
+    private static final CommandWheelPage[] PAGES = CommandWheelPage.values();
 
     private List<CommandWheelEntry> entries = List.of();
     private int hoveredIndex = -1;
@@ -35,6 +38,8 @@ public final class CommandWheelScreen extends Screen
     private boolean mahoragaWheel;
     @Nullable
     private UUID mahoragaId;
+    /** 非魔虚罗模式下的当前页；打开默认通用页。 */
+    private CommandWheelPage page = CommandWheelPage.GENERAL;
 
     public CommandWheelScreen()
     {
@@ -52,6 +57,7 @@ public final class CommandWheelScreen extends Screen
             mahoragaWheel = true;
             mahoragaId = mahoraga.getUUID();
         }
+        page = CommandWheelPage.GENERAL;
         refreshEntries();
         hoveredIndex = -1;
         openTicks = 0;
@@ -68,6 +74,11 @@ public final class CommandWheelScreen extends Screen
     {
         if (CommandWheelKeyHandler.KEY_MAPPING.matches(keyCode, scanCode))
         {
+            return true;
+        }
+        if (!mahoragaWheel && keyCode == GLFW.GLFW_KEY_R)
+        {
+            cyclePage();
             return true;
         }
         return super.keyPressed(keyCode, scanCode, modifiers);
@@ -105,12 +116,26 @@ public final class CommandWheelScreen extends Screen
         int n = entries.size();
         if (n == 0)
         {
+            graphics.drawCenteredString(font, titleForPage(), cx, cy - RADIUS - 16, 0xFFDDDDDD);
             graphics.drawCenteredString(
                     font,
-                    Component.translatable("command_wheel.jujutsukaisenzone.empty"),
+                    Component.translatable(mahoragaWheel
+                            ? "command_wheel.jujutsukaisenzone.empty"
+                            : page == CommandWheelPage.TECHNIQUE
+                                    ? "command_wheel.jujutsukaisenzone.empty_technique"
+                                    : "command_wheel.jujutsukaisenzone.empty"),
                     cx,
                     cy - 4,
                     0xFFAAAAAA);
+            if (!mahoragaWheel)
+            {
+                graphics.drawCenteredString(
+                        font,
+                        Component.translatable("command_wheel.jujutsukaisenzone.hint_cycle"),
+                        cx,
+                        cy + RADIUS + 6,
+                        0xFF777777);
+            }
             super.render(graphics, mouseX, mouseY, partialTick);
             return;
         }
@@ -133,14 +158,7 @@ public final class CommandWheelScreen extends Screen
             graphics.drawCenteredString(font, label, lx, ly - 3, textColor);
         }
 
-        graphics.drawCenteredString(
-                font,
-                Component.translatable(mahoragaWheel
-                        ? "command_wheel.jujutsukaisenzone.mahoraga_title"
-                        : "command_wheel.jujutsukaisenzone.title"),
-                cx,
-                cy - RADIUS - 16,
-                0xFFDDDDDD);
+        graphics.drawCenteredString(font, titleForPage(), cx, cy - RADIUS - 16, 0xFFDDDDDD);
         if (hoveredIndex >= 0 && hoveredIndex < n)
         {
             graphics.drawCenteredString(font, entries.get(hoveredIndex).labelFor(player), cx, cy - 4, 0xFFFFFFFF);
@@ -153,6 +171,15 @@ public final class CommandWheelScreen extends Screen
                     cx,
                     cy - 4,
                     0xFF888888);
+        }
+        if (!mahoragaWheel)
+        {
+            graphics.drawCenteredString(
+                    font,
+                    Component.translatable("command_wheel.jujutsukaisenzone.hint_cycle"),
+                    cx,
+                    cy + RADIUS + 6,
+                    0xFF777777);
         }
 
         super.render(graphics, mouseX, mouseY, partialTick);
@@ -169,10 +196,39 @@ public final class CommandWheelScreen extends Screen
         return super.mouseClicked(mouseX, mouseY, button);
     }
 
+    private void cyclePage()
+    {
+        int index = page.ordinal();
+        page = PAGES[(index + 1) % PAGES.length];
+        hoveredIndex = -1;
+        refreshEntries();
+    }
+
+    private Component titleForPage()
+    {
+        if (mahoragaWheel)
+        {
+            return Component.translatable("command_wheel.jujutsukaisenzone.mahoraga_title");
+        }
+        return Component.translatable(page == CommandWheelPage.GENERAL
+                ? "command_wheel.jujutsukaisenzone.title_general"
+                : "command_wheel.jujutsukaisenzone.title_technique");
+    }
+
     private void refreshEntries()
     {
         LocalPlayer player = Minecraft.getInstance().player;
-        entries = player == null ? List.of() : CommandWheelCatalog.entriesFor(player, mahoragaWheel);
+        if (player == null)
+        {
+            entries = List.of();
+            return;
+        }
+        if (mahoragaWheel)
+        {
+            entries = CommandWheelCatalog.entriesFor(player, true);
+            return;
+        }
+        entries = CommandWheelCatalog.entriesFor(player, page);
     }
 
     private void confirmAndClose()

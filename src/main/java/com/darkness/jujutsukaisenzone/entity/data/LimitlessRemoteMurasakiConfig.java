@@ -91,7 +91,7 @@ public final class LimitlessRemoteMurasakiConfig
     /** 箭体球体判定半径：普通茈 {@link LimitlessPurpleConfig#ARROW_BLOCK_ERASE_RADIUS} 的 5 倍。 */
     public static final double ARROW_BLOCK_ERASE_RADIUS = 7.0D;
     /** 箭体球体每 tick 伤害。 */
-    public static final float ARROW_SPHERE_DAMAGE_PER_TICK = 400.0F;
+    public static final float ARROW_SPHERE_DAMAGE_PER_TICK = 20.0F;
     /**
      * 【配置项·默认值】最大飞行距离（区块数）：64 区块。
      * <p>

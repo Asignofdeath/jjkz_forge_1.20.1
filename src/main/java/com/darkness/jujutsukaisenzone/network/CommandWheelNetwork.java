@@ -2,6 +2,7 @@ package com.darkness.jujutsukaisenzone.network;
 
 import com.darkness.jujutsukaisenzone.JuJutsuKaisenZone;
 import com.darkness.jujutsukaisenzone.network.packet.CommandWheelActionC2SPacket;
+import com.darkness.jujutsukaisenzone.network.packet.SyncDomainModeS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncTenShadowsStanceS2CPacket;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
@@ -44,6 +45,11 @@ public final class CommandWheelNetwork
                 .decoder(SyncTenShadowsStanceS2CPacket::decode)
                 .consumerMainThread(SyncTenShadowsStanceS2CPacket::handle)
                 .add();
+        CHANNEL.messageBuilder(SyncDomainModeS2CPacket.class, packetId++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(SyncDomainModeS2CPacket::encode)
+                .decoder(SyncDomainModeS2CPacket::decode)
+                .consumerMainThread(SyncDomainModeS2CPacket::handle)
+                .add();
     }
 
     public static void sendActionToServer(String entryId, @Nullable UUID targetUuid)
@@ -54,5 +60,10 @@ public final class CommandWheelNetwork
     public static void sendStanceSync(ServerPlayer player, boolean guard)
     {
         CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new SyncTenShadowsStanceS2CPacket(guard));
+    }
+
+    public static void sendDomainModeSync(ServerPlayer player, boolean instant)
+    {
+        CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new SyncDomainModeS2CPacket(instant));
     }
 }

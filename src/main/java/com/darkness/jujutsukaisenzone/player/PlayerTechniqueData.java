@@ -39,6 +39,7 @@ public final class PlayerTechniqueData
             TechniqueSkillSetRegistry.syncSkillBarToClient(serverPlayer);
             PlayerMimicryData.onTechniqueChanged(serverPlayer, normalized);
             PlayerTenShadowsModeData.clearIfTechniqueChanged(serverPlayer, normalized);
+            PlayerDomainModeData.clearIfTechniqueChanged(serverPlayer, normalized);
             return;
         }
         player.getPersistentData().putString(TAG_INNATE_TECHNIQUE, normalized);

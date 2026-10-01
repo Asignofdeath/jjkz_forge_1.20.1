@@ -17,5 +17,9 @@ public enum UnlockConditionType
     /**
      * 十影：已调伏指定式神（arg = {@code TenShadowsShikigami#id}，如 {@code nue}）。
      */
-    HAS_TAMED_SHIKIGAMI
+    HAS_TAMED_SHIKIGAMI,
+    /**
+     * 结界术最低等级（arg = {@link com.darkness.jujutsukaisenzone.player.BarrierTechniqueLevel} 枚举名）。
+     */
+    MIN_BARRIER_TECHNIQUE_LEVEL
 }

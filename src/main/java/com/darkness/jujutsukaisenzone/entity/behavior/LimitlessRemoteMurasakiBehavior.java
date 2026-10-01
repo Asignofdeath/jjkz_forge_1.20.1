@@ -9,7 +9,9 @@ import com.darkness.jujutsukaisenzone.entity.util.GeometryUtils;
 import com.darkness.jujutsukaisenzone.entity.util.SpecialEffectChunkForce;
 import com.darkness.jujutsukaisenzone.network.ModNetwork;
 import com.darkness.jujutsukaisenzone.registry.ModEntities;
+import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
 import com.darkness.jujutsukaisenzone.technique.config.SkillCombatConfigRegistry;
+import com.darkness.jujutsukaisenzone.technique.development.SkillUpgradeLogic;
 import com.darkness.jujutsukaisenzone.technique.skillset.LimitlessTechniqueSkillSet;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.BlockPos;
@@ -557,7 +559,12 @@ public class LimitlessRemoteMurasakiBehavior extends EffectBehavior
         AABB query = new AABB(cx, cy, cz, cx, cy, cz).inflate(r);
 
         LivingEntity owner = resolveOwner(entity, this.ownerUuid);
-        float dmg = SkillDamageResolver.technique(owner, LimitlessRemoteMurasakiConfig.ARROW_SPHERE_DAMAGE_PER_TICK);
+        float ratio = SkillUpgradeLogic.scaleRatio(
+                owner,
+                PlayerTechniqueData.TECHNIQUE_LIMITLESS,
+                LimitlessTechniqueSkillSet.SKILL_REMOTE_PURPLE,
+                LimitlessRemoteMurasakiConfig.ARROW_SPHERE_DAMAGE_PER_TICK);
+        float dmg = SkillDamageResolver.technique(owner, ratio);
 
         for (LivingEntity target : level.getEntitiesOfClass(LivingEntity.class, query))
         {

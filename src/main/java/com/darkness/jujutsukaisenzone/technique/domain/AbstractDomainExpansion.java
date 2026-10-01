@@ -20,6 +20,7 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.item.ItemEntity;
@@ -28,6 +29,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 
+import javax.annotation.Nullable;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.HashMap;
@@ -76,6 +78,9 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
 
     /** 领域同时存在数量上限 */
     private static final int MAX_ACTIVE_BARRIER_COUNT = 1;
+
+    /** 瞬发领域构建完成后的完成态保持时长（2 秒 = 40 tick）。 */
+    private static final int INSTANT_AUTO_CLOSE_HOLD_TICKS = 40;
 
     /** 维持领域每秒消耗的咒力基数 */
     private static final double MAINTAIN_COST_BASE_PER_SECOND = 2.0;
@@ -233,6 +238,16 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
     protected void onBarrierClosed(ServerPlayer player, BarrierInstance instance)
     {
         deferredSkyboxPlacementDelayByCaster.remove(player.getUUID());
+        ServerLevel level = player.server.getLevel(instance.getDimension());
+        if (instance.isAutoCloseOnComplete() || instance.isSkyboxOnlyExpand())
+        {
+            /* 瞬发：关域后按停留时长 ×6 延续控制（施术者立刻解除）。 */
+            InstantDomainSlowMo.beginAftermath(level, instance.getInstantSlowMoTargets(), player.getUUID());
+        }
+        else
+        {
+            InstantDomainSlowMo.clearActive(level, instance.getInstantSlowMoTargets());
+        }
         if (shouldApplyMeltdownOnBarrierClosed(player, instance))
         {
             TechniqueMeltdownEffect.applyOnDomainClosed(player);
@@ -260,6 +275,13 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
     protected boolean shouldApplyMeltdownOnBarrierClosed(ServerPlayer player, BarrierInstance instance)
     {
         return true;
+    }
+
+    /**
+     * 领域实例入队后的钩子：子类可标记瞬发共展天空盒 / 构建完即关等。
+     */
+    protected void configureDomainInstance(ServerPlayer player, BarrierInstance instance)
+    {
     }
 
     // ==================== 领域方块 ====================
@@ -398,6 +420,12 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
         PlayerBrainDamageData.onDomainExpanded(player);
         PlayerDomainGaugeData.consumeOnExpand(player);
 
+        configureDomainInstance(player, instance);
+        if (instance.isAutoCloseOnComplete())
+        {
+            InstantDomainSlowMo.refresh(level, instance.getCenter(), instance.getInstantSlowMoTargets());
+        }
+
         // 领域只能同时存在一个
         while (queue.size() > MAX_ACTIVE_BARRIER_COUNT)
         {
@@ -419,6 +447,10 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
             // 即时展开：放置所有方块、生成地板、填充地板以下、清空地板以上
             placeAllDomainBlocks(level, shellBlocks, removedBlocks, center, radius, playerFootY);
             completeDomainShellExpansion(player, level, instance, shellBlocks, center, radius, playerFootY, removedBlocks);
+            if (instance.isDiscardAfterTick())
+            {
+                return;
+            }
             String nameDisplay = domainName.isEmpty() ? "" : "「" + domainName + "」";
             player.displayClientMessage(
                     Component.literal(nameDisplay + "领域展开完成（半径 " + radius + "）")
@@ -548,6 +580,29 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
             if (instance.isExpanding())
             {
                 tickDomainExpand(player, level, instance);
+                if (instance.isAutoCloseOnComplete() && !instance.isDiscardAfterTick())
+                {
+                    InstantDomainSlowMo.refresh(level, instance.getCenter(), instance.getInstantSlowMoTargets());
+                }
+                if (instance.isDiscardAfterTick())
+                {
+                    continue;
+                }
+                kept.addLast(instance);
+                continue;
+            }
+
+            // 瞬发：构建完成后保持完成态若干 tick，再自动关闭（期间不跑完整度/咒力维持，避免天空盒-only 误崩）
+            if (instance.getAutoCloseHoldTicksRemaining() > 0)
+            {
+                InstantDomainSlowMo.refresh(level, instance.getCenter(), instance.getInstantSlowMoTargets());
+                int remaining = instance.getAutoCloseHoldTicksRemaining() - 1;
+                instance.setAutoCloseHoldTicksRemaining(remaining);
+                if (remaining <= 0)
+                {
+                    finishInstantAutoClose(player, instance);
+                    continue;
+                }
                 kept.addLast(instance);
                 continue;
             }
@@ -622,6 +677,59 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
     {
         Deque<BarrierInstance> queue = ACTIVE_DOMAINS.get(owner.getUUID());
         return queue != null && !queue.isEmpty();
+    }
+
+    /**
+     * 释放本领域实现持有的全部会话级运行态（活跃领域队列 + 延迟天空盒倒计时）。
+     * <p>
+     * 领域实现是进程级静态单例（见 {@link DomainExpansionRouter}），退出世界 / 切换存档不会重新加载类；
+     * 世界退出时若领域仍活跃，其自然关闭路径 {@code clearBarrierInstance} 不会执行，条目会跨会话残留。
+     * 故由 {@link DomainExpansionRouter#resetAllSessionState()} 在服务器停机时统一调用此方法。
+     */
+    public void resetSessionState()
+    {
+        ACTIVE_DOMAINS.clear();
+        deferredSkyboxPlacementDelayByCaster.clear();
+        InstantDomainSlowMo.clearAll(null);
+    }
+
+    /**
+     * 关闭该施术者当前持有的全部领域（含 {@link #onBarrierClosed} 回调与方块还原），并从活跃表移除。
+     * <p>
+     * 用于玩家登出等「会话结束」场合：既还原被领域替换的方块，又触发子类回调清理按施术者
+     * UUID 记录的各种状态，避免「没有领域却仍然必中 / 仍然连锁」的幽灵状态。
+     */
+    public void closeAllForPlayer(ServerPlayer player)
+    {
+        Deque<BarrierInstance> queue = ACTIVE_DOMAINS.remove(player.getUUID());
+        if (queue == null)
+        {
+            return;
+        }
+        for (BarrierInstance instance : queue)
+        {
+            clearBarrierInstance(player, instance);
+        }
+    }
+
+    /**
+     * 对仍残留在活跃表中的全部领域实例做世界侧方块还原（不触发回调、不移除条目）。
+     * <p>
+     * 供服务器停机兜底：所有者已离线、来不及走正常关闭路径的实例仍能被还原。
+     * 调用后应由 {@link #resetSessionState()} 清空活跃表。
+     */
+    public void restoreAllWorld(MinecraftServer server)
+    {
+        for (Deque<BarrierInstance> queue : ACTIVE_DOMAINS.values())
+        {
+            for (BarrierInstance instance : queue)
+            {
+                ServerLevel level = server.getLevel(instance.getDimension());
+                InstantDomainSlowMo.clearActive(level, instance.getInstantSlowMoTargets());
+                restoreBarrierWorld(level, instance);
+            }
+        }
+        InstantDomainSlowMo.clearAll(server);
     }
 
     @Override
@@ -922,7 +1030,7 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
                 BlockState existingFloor = level.getBlockState(mutablePos);
                 if (!existingFloor.is(getBarrierBlockState().getBlock()))
                 {
-                    removedBlocks.putIfAbsent(mutablePos.immutable(), existingFloor);
+                    rememberRemovedBlock(level, mutablePos, removedBlocks);
                     level.setBlock(mutablePos, getBarrierBlockState(), BLOCK_UPDATE_FLAGS);
                 }
 
@@ -939,7 +1047,7 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
                     BlockState existing = level.getBlockState(mutablePos);
                     if (!existing.is(getBarrierBlockState().getBlock()))
                     {
-                        removedBlocks.putIfAbsent(mutablePos.immutable(), existing);
+                        rememberRemovedBlock(level, mutablePos, removedBlocks);
                         level.setBlock(mutablePos, getBarrierBlockState(), BLOCK_UPDATE_FLAGS);
                     }
                 }
@@ -1045,7 +1153,7 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
         BlockState existingFloor = level.getBlockState(mutablePos);
         if (!existingFloor.is(getBarrierBlockState().getBlock()))
         {
-            removedBlocks.putIfAbsent(mutablePos.immutable(), existingFloor);
+            rememberRemovedBlock(level, mutablePos, removedBlocks);
             level.setBlock(mutablePos, getBarrierBlockState(), BLOCK_UPDATE_FLAGS);
         }
 
@@ -1062,7 +1170,7 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
             BlockState existing = level.getBlockState(mutablePos);
             if (!existing.is(getBarrierBlockState().getBlock()))
             {
-                removedBlocks.putIfAbsent(mutablePos.immutable(), existing);
+                rememberRemovedBlock(level, mutablePos, removedBlocks);
                 level.setBlock(mutablePos, getBarrierBlockState(), BLOCK_UPDATE_FLAGS);
             }
         }
@@ -1099,11 +1207,19 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
         BlockPos center = instance.getCenter();
         int radius = instance.getRadius();
 
-        // 每tick放置一批方块
+        // 每 tick 放置一批
+        int batchLimit = resolveExpandBatchLimit(instance);
         int placedThisTick = 0;
         int newProgress = currentProgress;
 
-        while (newProgress < allBlocks.size() && placedThisTick < BLOCKS_PER_BATCH)
+        if (instance.isSkyboxOnlyExpand())
+        {
+            tickSkyboxOnlyExpand(player, level, instance, allBlocks, processedColumns,
+                    center, radius, playerFootY, batchLimit, currentProgress);
+            return;
+        }
+
+        while (newProgress < allBlocks.size() && placedThisTick < batchLimit)
         {
             BlockPos pos = allBlocks.get(newProgress);
 
@@ -1146,15 +1262,87 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
                     radius,
                     instance.getPlayerFootY(),
                     instance.getRemovedBlocks());
-            nameDisplay = domainName.isEmpty() ? "" : "「" + domainName + "」";
-            player.displayClientMessage(
-                    Component.literal(nameDisplay + "领域构建完成")
-                            .withStyle(ChatFormatting.GOLD), true);
+            if (!instance.isDiscardAfterTick())
+            {
+                nameDisplay = domainName.isEmpty() ? "" : "「" + domainName + "」";
+                player.displayClientMessage(
+                        Component.literal(nameDisplay + "领域构建完成")
+                                .withStyle(ChatFormatting.GOLD), true);
+            }
         }
     }
 
     /**
+     * 瞬发：按球壳顺序只放天空盒（内侧 + 地板），不放结界/领域壳与填充。
+     */
+    private void tickSkyboxOnlyExpand(
+            ServerPlayer player,
+            ServerLevel level,
+            BarrierInstance instance,
+            List<BlockPos> allBlocks,
+            Set<Long> processedColumns,
+            BlockPos center,
+            int radius,
+            int playerFootY,
+            int batchLimit,
+            int currentProgress)
+    {
+        ResourceLocation texture = instance.getCustomSkyboxTexture() != null
+                ? instance.getCustomSkyboxTexture()
+                : getDomainSkyboxTexture();
+        instance.setCustomSkyboxTexture(texture);
+        Set<BlockPos> shellSet = instance.getOrCreateShellBlockSet();
+
+        int placedThisTick = 0;
+        int newProgress = currentProgress;
+        while (newProgress < allBlocks.size() && placedThisTick < batchLimit)
+        {
+            BlockPos shellPos = allBlocks.get(newProgress);
+            placeSkyboxOnlyForShellStep(level, shellPos, center, radius, playerFootY, instance, shellSet, processedColumns, texture);
+            placedThisTick++;
+            newProgress++;
+        }
+
+        instance.setExpansionProgress(newProgress);
+
+        int totalBlocks = allBlocks.size();
+        int percent = (int) Math.round(100.0 * newProgress / totalBlocks);
+        String nameDisplay = domainName.isEmpty() ? "" : "「" + domainName + "」";
+        player.displayClientMessage(
+                Component.literal(nameDisplay + "构建中: " + percent + "%")
+                        .withStyle(ChatFormatting.LIGHT_PURPLE), true);
+
+        if (newProgress >= allBlocks.size())
+        {
+            instance.setExpanding(false);
+            completeDomainShellExpansion(
+                    player,
+                    level,
+                    instance,
+                    allBlocks,
+                    center,
+                    radius,
+                    playerFootY,
+                    instance.getRemovedBlocks());
+        }
+    }
+
+    /**
+     * 瞬发领域（天空盒-only / 构建完即关）用 {@link #INSTANT_BLOCKS_PER_BATCH}；
+     * 常规领域仍用 {@link #BLOCKS_PER_BATCH}。
+     */
+    private static int resolveExpandBatchLimit(BarrierInstance instance)
+    {
+        if (instance.isSkyboxOnlyExpand() || instance.isAutoCloseOnComplete())
+        {
+            return INSTANT_BLOCKS_PER_BATCH;
+        }
+        return BLOCKS_PER_BATCH;
+    }
+
+    /**
      * 结界壳构建完成：放置天空盒（或登记延迟放置）并触发领域专属完成效果。
+     * 瞬发模式进入完成态保持，倒计时结束后自动关闭。
      */
     private void completeDomainShellExpansion(
             ServerPlayer player,
@@ -1166,15 +1354,159 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
             int playerFootY,
             Map<BlockPos, BlockState> removedBlocks)
     {
-        if (deferDomainSkyboxPlacement())
+        if (!instance.isSkyboxOnlyExpand())
         {
-            scheduleDeferredDomainSkyboxPlacement(player);
+            if (deferDomainSkyboxPlacement())
+            {
+                scheduleDeferredDomainSkyboxPlacement(player);
+            }
+            else
+            {
+                placeDomainSkybox(level, shellBlocks, center, radius, playerFootY, removedBlocks, instance);
+            }
         }
         else
         {
-            placeDomainSkybox(level, shellBlocks, center, radius, playerFootY, removedBlocks, instance);
+            /* 天空盒-only 路径已在展开过程中放置完毕。 */
+            if (instance.getCustomSkyboxTexture() == null)
+            {
+                instance.setCustomSkyboxTexture(getDomainSkyboxTexture());
+            }
         }
+
+        if (instance.isAutoCloseOnComplete())
+        {
+            /* 进入完成态保持，慢镜头继续；倒计时结束后再关。 */
+            instance.setAutoCloseHoldTicksRemaining(INSTANT_AUTO_CLOSE_HOLD_TICKS);
+            String nameDisplay = domainName.isEmpty() ? "" : "「" + domainName + "」";
+            player.displayClientMessage(
+                    Component.literal(nameDisplay + "领域构建完成")
+                            .withStyle(ChatFormatting.GOLD), true);
+            return;
+        }
+
         applyDomainSpecificEffect(player, instance);
+    }
+
+    /** 瞬发完成态倒计时结束：关域、熔断路径走 {@link #clearBarrierInstance}。 */
+    private void finishInstantAutoClose(ServerPlayer player, BarrierInstance instance)
+    {
+        String nameDisplay = domainName.isEmpty() ? "" : "「" + domainName + "」";
+        clearBarrierInstance(player, instance);
+        instance.setDiscardAfterTick(true);
+        player.displayClientMessage(
+                Component.literal(nameDisplay + "瞬发领域已关闭")
+                        .withStyle(ChatFormatting.AQUA), true);
+    }
+
+    private void removeDomainInstanceFromActive(UUID ownerUuid, BarrierInstance instance)
+    {
+        Deque<BarrierInstance> queue = ACTIVE_DOMAINS.get(ownerUuid);
+        if (queue == null)
+        {
+            return;
+        }
+        queue.remove(instance);
+        if (queue.isEmpty())
+        {
+            ACTIVE_DOMAINS.remove(ownerUuid);
+        }
+    }
+
+    /**
+     * 瞬发单步：为当前壳格放置内侧天空盒；该列首次处理时再铺地板天空盒。
+     * 不放置任何结界/领域壳或地下填充。
+     */
+    private void placeSkyboxOnlyForShellStep(
+            ServerLevel level,
+            BlockPos shellPos,
+            BlockPos center,
+            int radius,
+            int playerFootY,
+            BarrierInstance instance,
+            Set<BlockPos> shellSet,
+            Set<Long> processedColumns,
+            ResourceLocation texture)
+    {
+        BlockPos innerPos = resolveShellInnerSkyboxPos(shellPos, center);
+        if (innerPos != null)
+        {
+            tryPlaceSkyboxAt(level, innerPos, texture, instance, shellSet);
+        }
+
+        int dx = shellPos.getX() - center.getX();
+        int dz = shellPos.getZ() - center.getZ();
+        long columnKey = ((long) dx << 32) | (dz & 0xFFFFFFFFL);
+        if (!processedColumns.add(columnKey))
+        {
+            return;
+        }
+
+        int innerRadius = radius - 1;
+        int distXZSq = dx * dx + dz * dz;
+        int dyFloor = playerFootY - center.getY();
+        if (distXZSq + dyFloor * dyFloor >= innerRadius * innerRadius)
+        {
+            return;
+        }
+
+        BlockPos floorPos = new BlockPos(shellPos.getX(), playerFootY, shellPos.getZ());
+        tryPlaceSkyboxAt(level, floorPos, texture, instance, shellSet);
+    }
+
+    /**
+     * 在指定位置放置天空盒（跳过壳格几何点与已有天空盒）；原地形记入还原表。
+     */
+    private void tryPlaceSkyboxAt(
+            ServerLevel level,
+            BlockPos pos,
+            ResourceLocation texture,
+            BarrierInstance instance,
+            Set<BlockPos> shellSet)
+    {
+        BlockPos immutable = pos.immutable();
+        if (shellSet.contains(immutable))
+        {
+            return;
+        }
+        BlockState existing = level.getBlockState(immutable);
+        if (ShaderedCompat.isSkyboxBlock(existing))
+        {
+            instance.trackSkyboxBlock(immutable);
+            return;
+        }
+
+        var jjkzSkyblock = net.minecraftforge.registries.ForgeRegistries.BLOCKS.getValue(
+                ResourceLocation.fromNamespaceAndPath(JuJutsuKaisenZone.MODID, "jjkz_skyblock"));
+        if (jjkzSkyblock == null)
+        {
+            return;
+        }
+
+        rememberRemovedBlockForPos(level, immutable, instance.getRemovedBlocks());
+        level.setBlock(immutable, jjkzSkyblock.defaultBlockState(), BLOCK_UPDATE_FLAGS);
+        if (level.getBlockEntity(immutable) instanceof com.darkness.jujutsukaisenzone.blockentity.JJKZSkyblockEntity sky)
+        {
+            sky.setTextureFolder(texture);
+        }
+        instance.trackSkyboxBlock(immutable);
+    }
+
+    @Nullable
+    private static BlockPos resolveShellInnerSkyboxPos(BlockPos shellPos, BlockPos center)
+    {
+        int dx = shellPos.getX() - center.getX();
+        int dy = shellPos.getY() - center.getY();
+        int dz = shellPos.getZ() - center.getZ();
+        double length = Math.sqrt((double) dx * dx + (double) dy * dy + (double) dz * dz);
+        if (length < 0.001D)
+        {
+            return null;
+        }
+        int innerX = shellPos.getX() - (int) Math.round(dx / length);
+        int innerY = shellPos.getY() - (int) Math.round(dy / length);
+        int innerZ = shellPos.getZ() - (int) Math.round(dz / length);
+        return new BlockPos(innerX, innerY, innerZ);
     }
 
     private void scheduleDeferredDomainSkyboxPlacement(ServerPlayer player)

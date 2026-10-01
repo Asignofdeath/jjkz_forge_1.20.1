@@ -1,6 +1,8 @@
 package com.darkness.jujutsukaisenzone.technique.development;
 
 import com.darkness.jujutsukaisenzone.network.ModNetwork;
+import com.darkness.jujutsukaisenzone.player.BarrierTechniqueLevel;
+import com.darkness.jujutsukaisenzone.player.PlayerBarrierTechniqueData;
 import com.darkness.jujutsukaisenzone.player.PlayerCursedGradeData;
 import com.darkness.jujutsukaisenzone.player.PlayerSeanceTechniqueData;
 import com.darkness.jujutsukaisenzone.player.PlayerShrineBlackFlashMilestoneData;
@@ -122,6 +124,10 @@ public final class SkillUnlockLogic
         if (node.referenceKind() == SkillTreeReferenceKind.SEANCE_TECHNIQUE_LEVEL)
         {
             return isSeanceTechniqueLevelMet(player, node.referenceId());
+        }
+        if (node.referenceKind() == SkillTreeReferenceKind.BARRIER_TECHNIQUE_LEVEL)
+        {
+            return isBarrierTechniqueLevelMet(player, node.referenceId());
         }
         if (node.referenceKind() == SkillTreeReferenceKind.CURSED_GRADE)
         {
@@ -530,6 +536,16 @@ public final class SkillUnlockLogic
             return false;
         }
         return PlayerSeanceTechniqueData.getLevel(player).getTier() >= required.getTier();
+    }
+
+    private static boolean isBarrierTechniqueLevelMet(Player player, String referenceId)
+    {
+        BarrierTechniqueLevel required = BarrierTechniqueLevel.fromString(referenceId);
+        if (required == BarrierTechniqueLevel.UNLEARNED)
+        {
+            return false;
+        }
+        return PlayerBarrierTechniqueData.getLevel(player).getTier() >= required.getTier();
     }
 
     private static boolean isSkillNodeUnlocked(Player player, String techniqueId, SkillTreeNodeDef node)

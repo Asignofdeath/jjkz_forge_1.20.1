@@ -347,6 +347,11 @@ public final class ShrineTechniqueSkillSet extends AbstractInnateTechniqueSkillS
         {
             setSkillCooldown(player, skill, now + skill.cooldownTicks());
         }
+        if (abortCastIfBrainDamageFailed(player))
+        {
+            discardFugaChargeEntity(player, entityUuid);
+            return;
+        }
         launchFugaHoldRelease(player, entityUuid);
     }
 

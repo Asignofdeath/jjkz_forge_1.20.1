@@ -3,7 +3,10 @@ package com.darkness.jujutsukaisenzone.technique.development;
 /**
  * 主动技能等级规则：满级门槛与倍率曲线。
  * <p>
- * 等级写在各技能的 {@code levelTag} 上；倍率只乘技能自身基值，不与战斗力面板叠乘二次。
+ * 等级写在各技能的 {@code levelTag} 上。出伤时应先得到
+ * {@code 有效技能倍率 = 技能倍率 × powerMultiplier(等级)}，再交给
+ * {@link com.darkness.jujutsukaisenzone.technique.SkillDamageResolver}
+ *（{@code 强度 × 有效技能倍率}），不要在 Resolver 之后再乘本倍率。
  */
 public final class SkillLevelRules
 {

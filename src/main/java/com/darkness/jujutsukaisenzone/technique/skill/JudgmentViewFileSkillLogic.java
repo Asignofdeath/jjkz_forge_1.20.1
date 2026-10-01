@@ -1,6 +1,9 @@
 package com.darkness.jujutsukaisenzone.technique.skill;
 
 import com.darkness.jujutsukaisenzone.player.JjkzPlayerDataDisplay;
+import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
+import com.darkness.jujutsukaisenzone.technique.development.SkillUpgradeLogic;
+import com.darkness.jujutsukaisenzone.technique.skillset.JudgmentTechniqueSkillSet;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
@@ -14,7 +17,7 @@ import net.minecraft.world.phys.Vec3;
  */
 public final class JudgmentViewFileSkillLogic
 {
-    /** 准星选目标最大距离（格）。 */
+    /** 准星选目标最大距离（格）——Lv1 基值。 */
     private static final double TARGET_MAX_DISTANCE = 32.0D;
 
     private JudgmentViewFileSkillLogic()
@@ -23,12 +26,12 @@ public final class JudgmentViewFileSkillLogic
 
     public static boolean hasCrosshairPlayerTarget(ServerPlayer caster)
     {
-        return resolveCrosshairPlayer(caster, TARGET_MAX_DISTANCE) != null;
+        return resolveCrosshairPlayer(caster, targetMaxDistance(caster)) != null;
     }
 
     public static boolean tryViewFile(ServerPlayer caster)
     {
-        ServerPlayer target = resolveCrosshairPlayer(caster, TARGET_MAX_DISTANCE);
+        ServerPlayer target = resolveCrosshairPlayer(caster, targetMaxDistance(caster));
         if (target == null)
         {
             caster.displayClientMessage(Component.literal("请对准一名玩家").withStyle(ChatFormatting.YELLOW), true);
@@ -37,6 +40,14 @@ public final class JudgmentViewFileSkillLogic
 
         JjkzPlayerDataDisplay.sendToViewer(caster, target);
         return true;
+    }
+
+    /** 准星距离：Lv1=32，每级 +2。 */
+    public static double targetMaxDistance(ServerPlayer caster)
+    {
+        return TARGET_MAX_DISTANCE
+                + 2.0D * SkillUpgradeLogic.upgradeSteps(
+                caster, PlayerTechniqueData.TECHNIQUE_JUDGMENT, JudgmentTechniqueSkillSet.SKILL_VIEW_FILE);
     }
 
     private static ServerPlayer resolveCrosshairPlayer(ServerPlayer player, double maxDistance)

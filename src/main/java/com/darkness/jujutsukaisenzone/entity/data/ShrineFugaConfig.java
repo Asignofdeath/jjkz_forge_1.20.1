@@ -30,7 +30,7 @@ public final class ShrineFugaConfig
     /** 每 tick 最多替换为空气的方块数，避免卡顿 */
     public static final int BOOM_BLOCK_CLEAR_MAX_BLOCKS_PER_TICK = 600;
     /** 爆炸区域每 tick 伤害 */
-    public static final float BOOM_DAMAGE_PER_TICK = 400.0F;
+    public static final float BOOM_DAMAGE_PER_TICK = 20.0F;
     /** 爆炸持续时长（tick） */
     public static final int BOOM_LIFETIME_TICKS = 60;
     /** 爆炸屏幕振动半径（格） */

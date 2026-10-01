@@ -19,6 +19,7 @@ import org.jetbrains.annotations.Nullable;
  * <p>
  * 作为 Shadered 模组的附属，使用自定义纹理渲染天空盒效果。
  * 纹理路径存储在 BlockEntity 中，支持不同术式使用不同天空盒纹理。
+ * 不阻挡光线，避免领域内因壳层/内壁过暗。
  */
 public class JJKZSkyblock extends Block implements EntityBlock
 {
@@ -30,6 +31,24 @@ public class JJKZSkyblock extends Block implements EntityBlock
                 .isValidSpawn((state, level, pos, entityType) -> false)
                 .pushReaction(PushReaction.BLOCK)
         );
+    }
+
+    @Override
+    public boolean propagatesSkylightDown(BlockState state, BlockGetter level, BlockPos pos)
+    {
+        return true;
+    }
+
+    @Override
+    public int getLightBlock(BlockState state, BlockGetter level, BlockPos pos)
+    {
+        return 0;
+    }
+
+    @Override
+    public boolean useShapeForLightOcclusion(BlockState state)
+    {
+        return false;
     }
 
     @Override

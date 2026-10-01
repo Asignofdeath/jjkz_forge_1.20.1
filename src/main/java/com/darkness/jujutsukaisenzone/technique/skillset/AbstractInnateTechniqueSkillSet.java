@@ -1,6 +1,7 @@
 package com.darkness.jujutsukaisenzone.technique.skillset;
 
 import com.darkness.jujutsukaisenzone.compat.EpicFightCompat;
+import com.darkness.jujutsukaisenzone.player.PlayerBrainDamageData;
 import com.darkness.jujutsukaisenzone.player.PlayerCursedEnergyData;
 import com.darkness.jujutsukaisenzone.player.PlayerMaxOutputChargeData;
 import com.darkness.jujutsukaisenzone.gameplay.ModRules;
@@ -201,6 +202,10 @@ public abstract class AbstractInnateTechniqueSkillSet implements IInnateTechniqu
             setSlotCooldown(player, slot, now + getSlotCooldownTicks(player, slot));
         }
 
+        if (abortCastIfBrainDamageFailed(player))
+        {
+            return;
+        }
         castSkillSlotMaxOutput(player, slot);
     }
 
@@ -265,6 +270,10 @@ public abstract class AbstractInnateTechniqueSkillSet implements IInnateTechniqu
             setSlotCooldown(player, slot, now + getSlotCooldownTicks(player, slot));
         }
 
+        if (abortCastIfBrainDamageFailed(player))
+        {
+            return;
+        }
         cast.run();
     }
 
@@ -483,6 +492,10 @@ public abstract class AbstractInnateTechniqueSkillSet implements IInnateTechniqu
         {
             setSkillCooldown(player, skill, now + getSkillCooldownTicks(player, skill));
         }
+        if (abortCastIfBrainDamageFailed(player))
+        {
+            return;
+        }
         castSkill(player, skillId);
     }
 
@@ -522,7 +535,26 @@ public abstract class AbstractInnateTechniqueSkillSet implements IInnateTechniqu
         {
             setSkillCooldown(player, skill, now + getSkillCooldownTicks(player, skill));
         }
+        if (abortCastIfBrainDamageFailed(player))
+        {
+            return;
+        }
         cast.run();
+    }
+
+    /**
+     * 咒力 / 冷却已结算后：高脑损可能使术式释放失败（仍耗费，不执行演出）。
+     *
+     * @return {@code true} 表示应中止招式效果
+     */
+    protected final boolean abortCastIfBrainDamageFailed(ServerPlayer player)
+    {
+        if (!PlayerBrainDamageData.rollInnateSkillCastFailure(player))
+        {
+            return false;
+        }
+        PlayerBrainDamageData.notifyInnateSkillCastFailed(player);
+        return true;
     }
 
     protected boolean isSkillUnlocked(Player player, TechniqueSkill skill)

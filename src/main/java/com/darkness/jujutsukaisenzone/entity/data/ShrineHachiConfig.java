@@ -16,9 +16,9 @@ public final class ShrineHachiConfig
      * <p>
      * 运行时真值由 {@code ShrineSkillGrowth#hachiDamage} 给出，⛔ 业务代码不要直接引用本常量。
      */
-    public static final float DAMAGE = 5.0F;
+    public static final float DAMAGE = 0.25F;
     /** 【配置项·默认值】捌伤害每升一级咒术等级的增量。 */
-    public static final float DAMAGE_PER_RANK = 2.0F;
+    public static final float DAMAGE_PER_RANK = 0.10F;
     /** 捌 Photon 挂载命令 */
     public static final String PHOTON_MOUNT = "photon fx photon:slash_hachi entity @s 0 0 0 0 0 0 0.5 0.5 0.5 0 false false none";
     /** 捌 Photon 移除命令 */

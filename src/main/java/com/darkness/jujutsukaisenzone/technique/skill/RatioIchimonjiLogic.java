@@ -6,6 +6,7 @@ import com.darkness.jujutsukaisenzone.player.PlayerRatioBreakData;
 import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
 import com.darkness.jujutsukaisenzone.registry.ModItemTags;
 import com.darkness.jujutsukaisenzone.technique.TechniqueDamageSources;
+import com.darkness.jujutsukaisenzone.technique.development.SkillUpgradeLogic;
 import com.darkness.jujutsukaisenzone.technique.skillset.RatioTechniqueSkillSet;
 import com.darkness.jujutsukaisenzone.technique.skillset.SkillDamageType;
 import net.minecraft.ChatFormatting;
@@ -35,7 +36,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class RatioIchimonjiLogic
 {
     /** 四级体术基准点数（每段）。 */
-    public static final float DAMAGE_PER_HIT = 5.0F;
+    public static final float DAMAGE_PER_HIT = 0.25F;
     public static final double RANGE = 3.5D;
     public static final double HALF_WIDTH = 1.35D;
     /** 单次最多消耗的击破。 */
@@ -167,7 +168,13 @@ public final class RatioIchimonjiLogic
             {
                 continue;
             }
-            if (TechniqueDamageSources.deal(living, player, DAMAGE_PER_HIT, SkillDamageType.MARTIAL,
+            if (TechniqueDamageSources.deal(living, player,
+                    SkillUpgradeLogic.scaleRatio(
+                            player,
+                            PlayerTechniqueData.TECHNIQUE_RATIO,
+                            RatioTechniqueSkillSet.SKILL_ICHIMONJI,
+                            DAMAGE_PER_HIT),
+                    SkillDamageType.MARTIAL,
                     RatioTechniqueSkillSet.SKILL_ICHIMONJI))
             {
                 hitCount++;

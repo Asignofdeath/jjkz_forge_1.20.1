@@ -34,6 +34,9 @@ import java.util.Map;
  * ⚠️ 按强度面板接管的项：{@code damage} 一类的 {@code perRank} 在
  * {@code Config.combatPowerScalingEnabled} 为 true 时会被乘 0（等级成长改由「术式强度」承担），
  * 所以配置文件里能看到该项、但它当下不生效。这是刻意的，不是 bug。
+ * <p>
+ * 伤害类 baseline / perRank 的单位是<b>技能倍率</b>（1.0 = 100% 对应通道强度），
+ * 不是旧版绝对伤害点数。若沿用改造前的 toml 数值（如 8.0），请除以 20 再写入。
  */
 public final class SkillCombatConfigRegistry
 {

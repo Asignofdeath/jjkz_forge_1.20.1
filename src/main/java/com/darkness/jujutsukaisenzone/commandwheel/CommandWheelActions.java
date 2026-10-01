@@ -2,9 +2,11 @@ package com.darkness.jujutsukaisenzone.commandwheel;
 
 import com.darkness.jujutsukaisenzone.compat.EpicFightCompat;
 import com.darkness.jujutsukaisenzone.entity.MahoragaEntity;
+import com.darkness.jujutsukaisenzone.player.PlayerDomainModeData;
 import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
 import com.darkness.jujutsukaisenzone.player.PlayerTenShadowsModeData;
 import com.darkness.jujutsukaisenzone.player.PlayerTenShadowsStanceData;
+import com.darkness.jujutsukaisenzone.technique.domain.DomainExpansionRouter;
 import com.darkness.jujutsukaisenzone.technique.skill.TenShadowsShikigamiAiLogic;
 import com.darkness.jujutsukaisenzone.technique.skill.TenShadowsSummonLogic;
 import net.minecraft.ChatFormatting;
@@ -17,7 +19,7 @@ import javax.annotation.Nullable;
 import java.util.UUID;
 
 /**
- * 指令圆盘 C2S 服务端分发（仅术式专用指令）。
+ * 指令圆盘 C2S 服务端分发（通用页 + 术式专属页）。
  */
 public final class CommandWheelActions
 {
@@ -48,6 +50,8 @@ public final class CommandWheelActions
         }
         switch (entryId)
         {
+            case CommandWheelIds.DOMAIN_EXPANSION -> DomainExpansionRouter.getDomainForPlayer(player).cast(player);
+            case CommandWheelIds.DOMAIN_MODE -> toggleDomainMode(player);
             case CommandWheelIds.TEN_SHADOWS_SHIKIGAMI_MODE -> toggleShikigamiMode(player);
             case CommandWheelIds.TEN_SHADOWS_STANCE_TOGGLE -> toggleStance(player);
             case CommandWheelIds.TEN_SHADOWS_ATTACK_ORDER -> attackOrder(player, targetUuid);
@@ -55,6 +59,22 @@ public final class CommandWheelActions
             {
             }
         }
+    }
+
+    private static void toggleDomainMode(ServerPlayer player)
+    {
+        if (!PlayerDomainModeData.canUseInstantMode(player))
+        {
+            return;
+        }
+        PlayerDomainModeData.Mode mode = PlayerDomainModeData.toggle(player);
+        boolean instant = mode == PlayerDomainModeData.Mode.INSTANT;
+        player.displayClientMessage(
+                Component.translatable(instant
+                                ? "command_wheel.jujutsukaisenzone.domain_mode_instant"
+                                : "command_wheel.jujutsukaisenzone.domain_mode_normal")
+                        .withStyle(instant ? ChatFormatting.AQUA : ChatFormatting.GRAY),
+                true);
     }
 
     /**

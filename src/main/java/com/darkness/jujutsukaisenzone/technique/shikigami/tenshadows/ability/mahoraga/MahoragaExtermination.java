@@ -1,6 +1,8 @@
 package com.darkness.jujutsukaisenzone.technique.shikigami.tenshadows.ability.mahoraga;
 
 import com.darkness.jujutsukaisenzone.player.PlayerFactionData;
+import com.darkness.jujutsukaisenzone.technique.TechniqueDamageSources;
+import com.darkness.jujutsukaisenzone.technique.skillset.SkillDamageType;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
@@ -42,12 +44,15 @@ public final class MahoragaExtermination
         return true;
     }
 
-    public static void applySwordHit(Mob mahoraga, LivingEntity target, float fallbackDamage)
+    /**
+     * @param fallbackSkillRatio 非秒杀目标时的体术技能倍率
+     */
+    public static void applySwordHit(Mob mahoraga, LivingEntity target, float fallbackSkillRatio)
     {
         if (tryKill(target))
         {
             return;
         }
-        target.hurt(mahoraga.damageSources().mobAttack(mahoraga), fallbackDamage);
+        TechniqueDamageSources.deal(target, mahoraga, fallbackSkillRatio, SkillDamageType.MARTIAL);
     }
 }

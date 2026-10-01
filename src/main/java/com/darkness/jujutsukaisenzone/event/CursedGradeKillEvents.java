@@ -21,7 +21,7 @@ import java.util.List;
  * <p>
  * 属于"咒术师"、"诅咒师"、"咒灵"阵营的玩家击杀生物时获得咒术经验。
  * <ul>
- *   <li>原版生物：按最大生命值计算，上限由配置控制</li>
+ *   <li>原版生物：按 {@code log10(最大生命)} 计算，上限由配置控制（避免均血缩放后经验爆炸）</li>
  *   <li>玩家互杀：根据对方咒术等级给予 30~300 经验</li>
  *   <li>最后一击者获得主要比例，周围同阵营玩家平分剩余部分</li>
  * </ul>
@@ -117,10 +117,10 @@ public final class CursedGradeKillEvents
             return PLAYER_KILL_EXP[rank];
         }
 
-        // 原版生物：按最大生命值计算，向上取整，上限由配置控制
-        float maxHealth = victim.getMaxHealth();
-        int exp = (int) Math.ceil(maxHealth / 10.0F);
-        return Math.min(exp, Config.killExpMaxFromMob);
+        // 原版 / 缩放后生物：按 log10(最大生命) 给经验，避免万血怪线性爆炸；仍受配置上限约束
+        float maxHealth = Math.max(1.0F, victim.getMaxHealth());
+        int exp = (int) Math.ceil(2.0D + Math.log10(maxHealth) * 4.0D);
+        return Math.min(Math.max(1, exp), Config.killExpMaxFromMob);
     }
 
     /**

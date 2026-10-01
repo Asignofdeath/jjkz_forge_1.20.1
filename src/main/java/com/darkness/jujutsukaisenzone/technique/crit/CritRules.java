@@ -28,6 +28,8 @@ public final class CritRules
     public static final double CHANCE_HARD_CAP_POINTS = 60.0D;
 
     private static final Map<UUID, Integer> FORCED_NEXT = new HashMap<>();
+    /** 强制暴击时若 &gt;0，用固定倍率代替随机浮动。 */
+    private static final Map<UUID, Float> FORCED_FIXED_MULT = new HashMap<>();
 
     private CritRules()
     {
@@ -62,10 +64,24 @@ public final class CritRules
         return (float) (points / 100.0D);
     }
 
-    /** 标记下一次可暴击伤害强制暴击（可叠层）。 */
+    /** 标记下一次可暴击伤害强制暴击（可叠层）；乘区仍走随机浮动。 */
     public static void forceNext(ServerPlayer player)
     {
         FORCED_NEXT.merge(player.getUUID(), 1, Integer::sum);
+    }
+
+    /**
+     * 标记下一次强制暴击，并用固定倍率结算（例如十划弱点）。
+     * {@code fixedMult <= 0} 时与 {@link #forceNext(ServerPlayer)} 相同。
+     */
+    public static void forceNext(ServerPlayer player, float fixedMult)
+    {
+        UUID id = player.getUUID();
+        FORCED_NEXT.merge(id, 1, Integer::sum);
+        if (fixedMult > 0.0F)
+        {
+            FORCED_FIXED_MULT.put(id, fixedMult);
+        }
     }
 
     public static boolean consumeForced(ServerPlayer player)
@@ -89,7 +105,9 @@ public final class CritRules
 
     public static void clearForced(ServerPlayer player)
     {
-        FORCED_NEXT.remove(player.getUUID());
+        UUID id = player.getUUID();
+        FORCED_NEXT.remove(id);
+        FORCED_FIXED_MULT.remove(id);
     }
 
     /**
@@ -123,7 +141,10 @@ public final class CritRules
         {
             HitCritState.markForced();
         }
-        float variance = rollVarianceMultiplier(random);
+        Float fixed = FORCED_FIXED_MULT.remove(attacker.getUUID());
+        float variance = (fixed != null && fixed > 0.0F)
+                ? fixed
+                : rollVarianceMultiplier(random);
         // 记下本击分型：SE 只认体术暴击、黑闪也只从体术系暴击升级（见 HitCritState#critType）。
         HitCritState.markCrit(type, variance);
         return amount * variance;

@@ -162,12 +162,15 @@ public class Config
             .defineInRange("combatPower.perRank", 10.0D, 0.0D, 100000.0D);
 
     private static final ForgeConfigSpec.DoubleValue COMBAT_POWER_TECHNIQUE_BASELINE = BUILDER
-            .comment("术式强度换算基准：描述中的百分比 = 四级基准点数 / 本值 × 100")
+            .comment("术式参考强度：无面板/关闭强度缩放时，技能倍率×本值=绝对伤；"
+                    + "近战以外的部分公式（如蟾蜍加成）也用它当参考。"
+                    + "默认 20 约等于旧「四级」强度锚点。技能出伤本身是 强度×倍率，不再除以本值。")
             .defineInRange("combatPower.techniqueBaseline", 20.0D, 0.001D, 100000.0D);
 
     private static final ForgeConfigSpec.DoubleValue COMBAT_POWER_PHYSICAL_BASELINE = BUILDER
-            .comment("体术强度换算基准：体术伤害 = 原始伤害 × 体术强度 / 本值。"
-                    + "与 techniqueBaseline 取同一个值，才有「四级时伤害 = 现状数值」这个不变量")
+            .comment("体术参考强度：① 技能体术倍率在无面板时 ×本值；"
+                    + "② EF/原版近战绝对伤缩放分母（绝对伤×体术强度/本值）。"
+                    + "与 techniqueBaseline 取同一值时，参考强度下的手感与改造前对齐。")
             .defineInRange("combatPower.physicalBaseline", 20.0D, 0.001D, 100000.0D);
 
     private static final ForgeConfigSpec.DoubleValue COMBAT_POWER_HEAVENLY_MULTIPLIER = BUILDER
@@ -363,11 +366,11 @@ public class Config
      */
 
     private static final ForgeConfigSpec.DoubleValue LIMITLESS_BLUE_DAMAGE_BASELINE = BUILDER
-            .comment("苍：伤害基准值")
+            .comment("苍：技能伤害倍率（1.0=100% 术式强度）")
             .defineInRange("skillCombat.limitlessBlue.damageBaseline",
                     LimitlessBlueConfig.DAMAGE, 0.0D, 10000.0D);
     private static final ForgeConfigSpec.DoubleValue LIMITLESS_BLUE_DAMAGE_PER_RANK = BUILDER
-            .comment("苍：伤害每升一级咒术等级的增量")
+            .comment("苍：伤害倍率每升一级咒术等级的增量（强度面板开启时通常为 0）")
             .defineInRange("skillCombat.limitlessBlue.damagePerRank",
                     LimitlessBlueConfig.DAMAGE_PER_RANK, 0.0D, 10000.0D);
     private static final ForgeConfigSpec.DoubleValue LIMITLESS_BLUE_PULL_RADIUS_BASELINE = BUILDER

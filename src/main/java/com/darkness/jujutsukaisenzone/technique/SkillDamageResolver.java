@@ -8,17 +8,16 @@ import net.minecraft.world.entity.player.Player;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * 强度面板 → 实际伤害的<b>唯一换算点</b>。所有术式 / 体术出伤都必须经过这里，
- * 否则强度面板就是个空数字。
- * <ul>
- *   <li>术式：实际伤害 = 四级基准点数 × 术式强度 / 术式基准强度（8 点 ⇒ 40% × 强度）</li>
- *   <li>体术：实际伤害 = 原始伤害 × 体术强度 / 体术基准强度</li>
- * </ul>
- * 这样现有 {@code *Config} 里的常量（8.0 / 10.0 / 5.0 / 3.0 / 400.0 …）语义保持不变，
- * 只是从「四级时的固定伤害」变成「四级基准点数」，之后随强度线性放大。
+ * 强度面板 → 实际伤害的唯一换算点。所有术式 / 体术<b>技能</b>出伤都必须经过这里。
+ * <p>
+ * <b>技能出伤公式</b>：{@code 伤害 = 术/体强度 × 技能倍率}（再经 {@code TechniqueDamageZoneEvents} 等乘区）。
+ * 技能常量应为显式倍率（如 {@code 0.40F} = 40%），不要再写旧的「绝对伤害点数」。
+ * <p>
+ * <b>近战绝对伤</b>（EpicFight / 原版挥击）走 {@link #scaleMeleeAbsolute}：已是 HP 量，再按
+ * {@code × 体术强度 / physicalBaseline} 缩放；与技能倍率不是同一条 API。
  * <p>
  * 攻击者优先级：玩家 {@link PlayerCombatPowerData} → 实体 {@link LivingCombatStats}
- * （十影式神等）→ 无面板则原样返回。
+ * （十影式神等）→ 无面板则按「参考强度」把倍率换成绝对伤（见 {@link Config#combatPowerTechniqueBaseline}）。
  */
 public final class SkillDamageResolver
 {
@@ -34,34 +33,52 @@ public final class SkillDamageResolver
         return Config.combatPowerScalingEnabled;
     }
 
-    /** 术式：把「四级基准点数」换算成施术者当前强度下的实际伤害。 */
-    public static float technique(@Nullable LivingEntity owner, float baselinePoints)
+    /**
+     * 术式技能：{@code 术式强度 × skillRatio}。
+     *
+     * @param skillRatio 技能倍率（1.0 = 100% 术式强度）；不是旧「点数」
+     */
+    public static float technique(@Nullable LivingEntity owner, float skillRatio)
     {
-        if (!enabled())
-        {
-            return baselinePoints;
-        }
         int power = resolveTechniquePower(owner);
-        if (power < 0)
+        if (!enabled() || power < 0)
         {
-            return baselinePoints;
+            return skillRatio * (float) Config.combatPowerTechniqueBaseline;
         }
-        return baselinePoints * power / (float) Config.combatPowerTechniqueBaseline;
+        return skillRatio * power;
     }
 
-    /** 体术：对 EpicFight / 原版近战的原始伤害施加体术强度倍率。 */
-    public static float physical(@Nullable LivingEntity attacker, float rawAmount)
+    /**
+     * 体术技能（经 {@code deal(..., MARTIAL)}）：{@code 体术强度 × skillRatio}。
+     *
+     * @param skillRatio 技能倍率（1.0 = 100% 体术强度）
+     */
+    public static float physical(@Nullable LivingEntity attacker, float skillRatio)
+    {
+        int power = resolvePhysicalPower(attacker);
+        if (!enabled() || power < 0)
+        {
+            return skillRatio * (float) Config.combatPowerPhysicalBaseline;
+        }
+        return skillRatio * power;
+    }
+
+    /**
+     * EpicFight / 原版近战：对已是绝对伤害的挥击量施加体术强度缩放。
+     * {@code 绝对伤 × 体术强度 / physicalBaseline}；勿用于技能倍率路径。
+     */
+    public static float scaleMeleeAbsolute(@Nullable LivingEntity attacker, float rawAbsoluteDamage)
     {
         if (!enabled())
         {
-            return rawAmount;
+            return rawAbsoluteDamage;
         }
         int power = resolvePhysicalPower(attacker);
         if (power < 0)
         {
-            return rawAmount;
+            return rawAbsoluteDamage;
         }
-        return rawAmount * power / (float) Config.combatPowerPhysicalBaseline;
+        return rawAbsoluteDamage * power / (float) Config.combatPowerPhysicalBaseline;
     }
 
     private static int resolvePhysicalPower(@Nullable LivingEntity attacker)
@@ -82,22 +99,22 @@ public final class SkillDamageResolver
         return LivingCombatStats.techniquePower(owner);
     }
 
-    /** 技能描述用的百分比：四级基准点数 → 倍率百分数（8 点 = 40%）。 */
-    public static int ratioPercent(float baselinePoints)
+    /** 技能倍率 → 描述用百分数（0.40 → 40）。 */
+    public static int ratioPercent(float skillRatio)
     {
-        return Math.round(baselinePoints * 100.0F / (float) Config.combatPowerTechniqueBaseline);
+        return Math.round(skillRatio * 100.0F);
     }
 
-    /** 技能描述直接用的文本（如 {@code "40%"}）；把 % 放在参数里，lang 就不必写 {@code %%}。 */
-    public static String ratioText(float baselinePoints)
+    /** 技能描述文本（如 {@code "40%"}）。 */
+    public static String ratioText(float skillRatio)
     {
-        return ratioPercent(baselinePoints) + "%";
+        return ratioPercent(skillRatio) + "%";
     }
 
-    /** 同 {@link #ratioText}，用于体术通道（除以体术基准）。 */
-    public static String martialRatioText(float baselinePoints)
+    /** 同 {@link #ratioText}（体术技能倍率）。 */
+    public static String martialRatioText(float skillRatio)
     {
-        return Math.round(baselinePoints * 100.0F / (float) Config.combatPowerPhysicalBaseline) + "%";
+        return ratioPercent(skillRatio) + "%";
     }
 
     /** 体术伤害被强度放大前，记下原始值。 */

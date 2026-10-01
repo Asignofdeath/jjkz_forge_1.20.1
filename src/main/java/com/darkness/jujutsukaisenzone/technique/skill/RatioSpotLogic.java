@@ -1,6 +1,9 @@
 package com.darkness.jujutsukaisenzone.technique.skill;
 
 import com.darkness.jujutsukaisenzone.player.PlayerRatioBreakData;
+import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
+import com.darkness.jujutsukaisenzone.technique.development.SkillUpgradeLogic;
+import com.darkness.jujutsukaisenzone.technique.skillset.RatioTechniqueSkillSet;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
@@ -80,7 +83,7 @@ public final class RatioSpotLogic
         }
 
         RatioBodyPart part = RatioBodyPart.random(caster.getRandom());
-        long expire = caster.level().getGameTime() + SPOT_DURATION_TICKS;
+        long expire = caster.level().getGameTime() + spotDurationTicks(caster);
         CompoundTag spot = new CompoundTag();
         spot.putUUID(TAG_CASTER, caster.getUUID());
         spot.putString(TAG_PART, part.name());
@@ -196,13 +199,29 @@ public final class RatioSpotLogic
         return true;
     }
 
+    /** 光点持续：Lv1=8s，每级 +1s。 */
+    public static int spotDurationTicks(ServerPlayer caster)
+    {
+        return SPOT_DURATION_TICKS
+                + 20 * SkillUpgradeLogic.upgradeSteps(
+                caster, PlayerTechniqueData.TECHNIQUE_RATIO, RatioTechniqueSkillSet.SKILL_RATIO_MARK);
+    }
+
+    /** 破点暴击倍率：Lv1=1.50，每级 +0.05。 */
+    public static float forcedCritMult(ServerPlayer caster)
+    {
+        return FORCED_CRIT_MULT
+                + 0.05F * SkillUpgradeLogic.upgradeSteps(
+                caster, PlayerTechniqueData.TECHNIQUE_RATIO, RatioTechniqueSkillSet.SKILL_RATIO_MARK);
+    }
+
     /**
-     * @deprecated 改用 {@link #tryBreakSpot}；倍率由通用暴击浮动乘区承担。
+     * @deprecated 改用 {@link #tryBreakSpot}；倍率由 {@link #forcedCritMult} 注入强制暴击。
      */
     @Deprecated
     public static float resolveSpotBreak(ServerPlayer attacker, LivingEntity target, float currentDamage)
     {
-        return tryBreakSpot(attacker, target) ? FORCED_CRIT_MULT : 1.0F;
+        return tryBreakSpot(attacker, target) ? forcedCritMult(attacker) : 1.0F;
     }
 
     public static void tickSpotParticles(LivingEntity target)

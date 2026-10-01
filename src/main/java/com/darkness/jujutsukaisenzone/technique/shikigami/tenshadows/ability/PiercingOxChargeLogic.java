@@ -1,9 +1,12 @@
 package com.darkness.jujutsukaisenzone.technique.shikigami.tenshadows.ability;
 
+import com.darkness.jujutsukaisenzone.technique.TechniqueDamageSources;
 import com.darkness.jujutsukaisenzone.technique.shikigami.ShikigamiAbility;
 import com.darkness.jujutsukaisenzone.technique.shikigami.ShikigamiAbilitySource;
 import com.darkness.jujutsukaisenzone.technique.skill.TenShadowsRitualLogic;
 import com.darkness.jujutsukaisenzone.technique.skill.TenShadowsSummonLogic;
+import com.darkness.jujutsukaisenzone.technique.skill.tenshadows.TenShadowsShikigamiSkillRatios;
+import com.darkness.jujutsukaisenzone.technique.skillset.SkillDamageType;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.ListTag;
@@ -34,7 +37,6 @@ public final class PiercingOxChargeLogic
     private static final double MAX_RANGE = 22.0D;
     private static final int CHARGE_TICKS = 18;
     private static final double SPEED = 1.55D;
-    private static final float DAMAGE = 12.0F;
     private static final double HIT_INFLATE = 1.15D;
 
     private PiercingOxChargeLogic()
@@ -169,7 +171,8 @@ public final class PiercingOxChargeLogic
                         && !TenShadowsSummonLogic.isOwnedBy(e, ownerId)
                         && !already.contains(e.getUUID())))
         {
-            living.hurt(ox.damageSources().mobAttack(ox), DAMAGE);
+            TechniqueDamageSources.deal(living, ox, TenShadowsShikigamiSkillRatios.PIERCING_OX_CHARGE,
+                    SkillDamageType.MARTIAL);
             Vec3 knock = living.position().subtract(ox.position());
             if (knock.lengthSqr() < 1.0E-4D)
             {

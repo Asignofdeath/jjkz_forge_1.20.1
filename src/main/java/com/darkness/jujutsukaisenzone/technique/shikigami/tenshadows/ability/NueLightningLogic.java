@@ -1,11 +1,14 @@
 package com.darkness.jujutsukaisenzone.technique.shikigami.tenshadows.ability;
 
 import com.darkness.jujutsukaisenzone.registry.ModEffects;
+import com.darkness.jujutsukaisenzone.technique.TechniqueDamageSources;
 import com.darkness.jujutsukaisenzone.technique.shikigami.ShikigamiAbility;
 import com.darkness.jujutsukaisenzone.technique.shikigami.ShikigamiAbilitySource;
 import com.darkness.jujutsukaisenzone.technique.shikigami.tenshadows.TenShadowsFieldQuery;
 import com.darkness.jujutsukaisenzone.technique.skill.TenShadowsShikigami;
 import com.darkness.jujutsukaisenzone.technique.skill.TenShadowsSummonLogic;
+import com.darkness.jujutsukaisenzone.technique.skill.tenshadows.TenShadowsShikigamiSkillRatios;
+import com.darkness.jujutsukaisenzone.technique.skillset.SkillDamageType;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.chat.Component;
@@ -30,7 +33,6 @@ public final class NueLightningLogic
 {
     private static final double AUTO_RANGE = 12.0D;
     private static final double AOE_RADIUS = 4.5D;
-    private static final float DAMAGE = 8.0F;
     private static final int DEBUFF_TICKS = 20 * 5;
 
     private NueLightningLogic()
@@ -76,7 +78,8 @@ public final class NueLightningLogic
         for (LivingEntity living : level.getEntitiesOfClass(LivingEntity.class, box, e ->
                 e.isAlive() && e != owner && !TenShadowsSummonLogic.isOwnedBy(e, owner.getUUID())))
         {
-            living.hurt(owner.damageSources().magic(), DAMAGE);
+            TechniqueDamageSources.deal(living, nue, TenShadowsShikigamiSkillRatios.NUE_LIGHTNING,
+                    SkillDamageType.TECHNIQUE);
             living.addEffect(new MobEffectInstance(ModEffects.ELECTRIFIED.get(), DEBUFF_TICKS, 0, false, true, true));
             living.addEffect(new MobEffectInstance(ModEffects.VULNERABILITY.get(), DEBUFF_TICKS, 0, false, true, true));
             hit++;

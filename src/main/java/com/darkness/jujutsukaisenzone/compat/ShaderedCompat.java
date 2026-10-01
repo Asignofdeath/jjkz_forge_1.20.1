@@ -132,8 +132,8 @@ public final class ShaderedCompat
                 continue;
             }
 
-            /* 记录原始领域方块状态 */
-            removedBlocks.putIfAbsent(pos.immutable(), existing);
+            /* 原地形若尚未登记，不要把施工中的领域方块记成「原地形」 */
+            removedBlocks.putIfAbsent(pos.immutable(), net.minecraft.world.level.block.Blocks.AIR.defaultBlockState());
             level.setBlock(pos, customSkyboxState, 3);
 
             /* 设置 BlockEntity 的纹理路径 */
@@ -207,10 +207,22 @@ public final class ShaderedCompat
                 continue;
             }
 
-            /* 记录被替换的方块 */
+            /* 记录被替换的方块：领域壳等同施工临时方块，不能记成原地形 */
             if (removedBlocks != null && !existingState.isAir())
             {
-                removedBlocks.putIfAbsent(innerPos.immutable(), existingState);
+                ResourceLocation existingKey = ForgeRegistries.BLOCKS.getKey(existingState.getBlock());
+                boolean isDomainBlock = existingKey != null
+                        && existingKey.getNamespace().equals(JuJutsuKaisenZone.MODID)
+                        && existingKey.getPath().equals("domain_block");
+                if (!isDomainBlock && !isSkyboxBlock(existingState))
+                {
+                    removedBlocks.putIfAbsent(innerPos.immutable(), existingState);
+                }
+                else
+                {
+                    removedBlocks.putIfAbsent(innerPos.immutable(),
+                            net.minecraft.world.level.block.Blocks.AIR.defaultBlockState());
+                }
             }
 
             level.setBlock(innerPos, customSkyboxState, 3);

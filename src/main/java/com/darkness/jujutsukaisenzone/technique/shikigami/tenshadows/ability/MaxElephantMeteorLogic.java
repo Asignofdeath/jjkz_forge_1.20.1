@@ -5,6 +5,8 @@ import com.darkness.jujutsukaisenzone.technique.shikigami.ShikigamiAbility;
 import com.darkness.jujutsukaisenzone.technique.shikigami.ShikigamiAbilitySource;
 import com.darkness.jujutsukaisenzone.technique.skill.TenShadowsRitualLogic;
 import com.darkness.jujutsukaisenzone.technique.skill.TenShadowsSummonLogic;
+import com.darkness.jujutsukaisenzone.technique.skill.tenshadows.TenShadowsShikigamiSkillRatios;
+import com.darkness.jujutsukaisenzone.technique.skillset.SkillDamageType;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
@@ -26,7 +28,6 @@ public final class MaxElephantMeteorLogic
     public static final String TAG_METEOR_TARGET = "jujutsukaisenzone_elephant_meteor_target";
     public static final String TAG_METEOR_OWNER = "jujutsukaisenzone_elephant_meteor_owner";
 
-    private static final float DAMAGE = 22.0F;
     private static final int FALL_TICKS = 18;
     private static final int DROP_HEIGHT = 16;
 
@@ -113,17 +114,13 @@ public final class MaxElephantMeteorLogic
             return;
         }
         Entity targetEntity = level.getEntity(elephant.getPersistentData().getUUID(TAG_METEOR_TARGET));
-        Entity ownerEntity = level.getEntity(elephant.getPersistentData().getUUID(TAG_METEOR_OWNER));
         clear(elephant);
         if (!(targetEntity instanceof LivingEntity target) || !target.isAlive())
         {
             return;
         }
-        if (!(ownerEntity instanceof LivingEntity owner))
-        {
-            return;
-        }
-        TechniqueDamageSources.deal(target, owner, DAMAGE);
+        TechniqueDamageSources.deal(target, elephant, TenShadowsShikigamiSkillRatios.MAX_ELEPHANT_METEOR,
+                SkillDamageType.MARTIAL);
         level.sendParticles(
                 ParticleTypes.EXPLOSION,
                 target.getX(), target.getY() + 0.4D, target.getZ(),

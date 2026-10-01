@@ -5,6 +5,7 @@ import com.darkness.jujutsukaisenzone.commandwheel.TenShadowsCommandWheelProvide
 import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
 import com.darkness.jujutsukaisenzone.technique.development.SkillTreeNodeDef;
 import com.darkness.jujutsukaisenzone.technique.development.SkillUnlockLogic;
+import com.darkness.jujutsukaisenzone.technique.development.SkillUpgradeLogic;
 import com.darkness.jujutsukaisenzone.technique.development.TechniqueSkillTree;
 import com.darkness.jujutsukaisenzone.technique.development.UnlockCondition;
 import com.darkness.jujutsukaisenzone.technique.skill.TenShadowsShikigami;
@@ -154,7 +155,7 @@ public final class TenShadowsTechniqueSkillSet extends AbstractInnateTechniqueSk
     {
         player.addEffect(new MobEffectInstance(
                 MobEffects.INVISIBILITY,
-                HAND_SHADOW_INVIS_TICKS,
+                handShadowInvisTicks(player),
                 0,
                 false,
                 false,
@@ -162,6 +163,14 @@ public final class TenShadowsTechniqueSkillSet extends AbstractInnateTechniqueSk
         player.displayClientMessage(
                 Component.literal("手之影 · 遁入影子（占位）").withStyle(ChatFormatting.DARK_GRAY),
                 true);
+    }
+
+    /** 隐身时长：Lv1=3s，每级 +1s。 */
+    public static int handShadowInvisTicks(ServerPlayer player)
+    {
+        return HAND_SHADOW_INVIS_TICKS
+                + 20 * SkillUpgradeLogic.upgradeSteps(
+                player, PlayerTechniqueData.TECHNIQUE_TEN_SHADOWS, SKILL_HAND_SHADOW);
     }
 
     @Override

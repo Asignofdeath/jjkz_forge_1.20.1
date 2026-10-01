@@ -13,6 +13,7 @@ import net.minecraft.core.particles.DustParticleOptions;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.Level;
@@ -88,6 +89,52 @@ public final class BarrierTechniqueServerLogic extends AbstractBarrierTechnique
 
     /** 静态委托方法，保持向后兼容。 */
     public static void staticUpdateBarrierRules(ServerPlayer player) { INSTANCE.updateBarrierRules(player); }
+
+    /**
+     * 清空普通结界术的全部会话级运行态（活跃结界队列 + 结界半径档位）。
+     * <p>
+     * 这两个容器是静态的，且 Forge 在退出世界 / 切换存档时不会重新加载模组类，故必须由服务器停机事件
+     * 统一清理：否则旧存档的结界实例会残留（同维度同坐标被判定为「幽灵结界」并继续生效），
+     * 结界半径档位跨存档串档，且 {@code removedBlocks} 等方块快照会永久驻留内存。
+     */
+    public static void resetSessionState()
+    {
+        ACTIVE_BARRIERS.clear();
+        BARRIER_RADIUS_TIER.clear();
+    }
+
+    /**
+     * 关闭该施术者当前持有的全部普通结界（含方块还原），并从活跃表移除。用于玩家登出。
+     * <p>
+     * 不重置结界半径档位 {@link #BARRIER_RADIUS_TIER}——它是玩家偏好，仅在服务器停机时随会话清空。
+     */
+    public static void closeAllForPlayer(ServerPlayer player)
+    {
+        Deque<BarrierInstance> queue = ACTIVE_BARRIERS.remove(player.getUUID());
+        if (queue == null)
+        {
+            return;
+        }
+        for (BarrierInstance instance : queue)
+        {
+            INSTANCE.clearBarrierInstance(player, instance);
+        }
+    }
+
+    /**
+     * 对仍残留在活跃表中的全部结界实例做世界侧方块还原（不触发回调、不移除条目）。
+     * 供服务器停机兜底；调用后应由 {@link #resetSessionState()} 清空活跃表。
+     */
+    public static void restoreAllWorld(MinecraftServer server)
+    {
+        for (Deque<BarrierInstance> queue : ACTIVE_BARRIERS.values())
+        {
+            for (BarrierInstance instance : queue)
+            {
+                INSTANCE.restoreBarrierWorld(server.getLevel(instance.getDimension()), instance);
+            }
+        }
+    }
 
     // ==================== 配置参数 ====================
 

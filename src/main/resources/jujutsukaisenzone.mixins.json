@@ -5,7 +5,9 @@
   "compatibilityLevel": "JAVA_17",
   "refmap": "jujutsukaisenzone.refmap.json",
   "plugin": "",
-  "mixins": [],
+  "mixins": [
+    "RangedAttributeAccessor"
+  ],
   "client": [
     "client.AbstractClientPlayerMixin",
     "client.CreativeModeInventoryScreenMixin"

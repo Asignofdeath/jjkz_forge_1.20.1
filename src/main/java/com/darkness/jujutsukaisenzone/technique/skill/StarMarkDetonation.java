@@ -5,8 +5,10 @@ import com.darkness.jujutsukaisenzone.player.StarMark;
 import com.darkness.jujutsukaisenzone.player.StarMarkType;
 import com.darkness.jujutsukaisenzone.registry.ModEffects;
 import com.darkness.jujutsukaisenzone.technique.TechniqueDamageSources;
+import com.darkness.jujutsukaisenzone.technique.development.SkillUpgradeLogic;
 import com.darkness.jujutsukaisenzone.technique.shikigami.tenshadows.ability.mahoraga.MahoragaAdaptation;
 import com.darkness.jujutsukaisenzone.technique.skillset.LoveRendezvousTechniqueSkillSet;
+import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
@@ -68,13 +70,12 @@ public final class StarMarkDetonation
      * 引爆是这套术式前置成本最高的动作：叠满 {@link StarMark#MAX_STACKS} 级要在星位衰减的时限内连叠 5 次
      * （约 150 咒力），而且引爆会清空全部层数、必须从头再叠。所以它比「踢足球」的常态撞击更痛。
      * <p>
-     * 参照系：黑闪冲击波 10 点、撞击 5 ~ 34 点（速度 × 12）、猪 10 血、玩家 20 血。取 22 ⇒
-     * 一击毙猪、玩家去掉一整条命。
+     * 爆心技能倍率（1.0 = 100% 术式强度）。默认 1.10 ≈ 旧绝对伤 22 在参考强度 20 下的倍率。
      * <p>
      * 刻意做成常数而不是「随星位递增」：引爆的触发条件本身就是 {@code stacks == MAX_STACKS}，
      * 星位在这个语境下恒为满级，没有变化空间。真正的成长曲线在「叠满要多久」上，不在伤害数字上。
      */
-    public static final float DETONATION_DAMAGE = 22.0F;
+    public static final float DETONATION_DAMAGE = 1.10F;
 
     /** 负面效果的持续时间（5 秒）。 */
     public static final int EFFECT_DURATION_TICKS = 100;
@@ -199,7 +200,12 @@ public final class StarMarkDetonation
          * 返回值沿用 hurt 的语义（伤害是否真正生效），因此无敌帧、创造模式目标等情况会被如实报成「没打到」。
          */
         // 引爆是一次结算（不是逐 tick 灼烧）⇒ 放行暴击
-        return TechniqueDamageSources.dealCrit(living, owner, DETONATION_DAMAGE,
+        float ratio = SkillUpgradeLogic.scaleRatio(
+                owner,
+                PlayerTechniqueData.TECHNIQUE_LOVE_RENDEZVOUS,
+                LoveRendezvousTechniqueSkillSet.SKILL_STAR_MARK,
+                DETONATION_DAMAGE);
+        return TechniqueDamageSources.dealCrit(living, owner, ratio,
                 LoveRendezvousTechniqueSkillSet.SKILL_STAR_MARK);
     }
 

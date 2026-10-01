@@ -129,9 +129,8 @@ public final class TechniqueDamageZoneEvents
 
 
         // —— 区 0：施术者面板换算 ——
-        // 术式伤害已由出伤点（SkillDamageResolver#technique）在进 deal 之前算成绝对值，
-        // 这里只接管走 EF / 原版近战通道的体术伤害：它们到 LivingHurtEvent 时已经是绝对值，
-        // 只能在此按「体术强度 / 体术基准」补一道线性倍率。
+        // 技能出伤已在 deal / 出伤点用 SkillDamageResolver 按「强度×技能倍率」算成绝对值。
+        // 这里只接管 EF / 原版近战通道的绝对伤：再按「体术强度 / physicalBaseline」缩放。
         // ⚠️ 前提是 CursedGradeBonuses 已不再给 ATTACK_DAMAGE 加等级值，否则双计。
         // 覆盖体术与复合：复合在近战里只有「EF 基础攻击 + 必定黑闪（Rush Into The ZONE）」这一条
         // （另一条处刑必杀见下），它的原始伤害同样是近战挥击，必须与「随机」黑闪拿到一致的倍率——
@@ -155,7 +154,7 @@ public final class TechniqueDamageZoneEvents
             // 实测口径：50% 体抗在黑闪里会变成等效 82% 减伤，而且只惩罚 k == 1 的玩家
             //（强度正好等于基准 / 面板未同步 power < 0 / scalingEnabled = false），方向是反的。
             SkillDamageResolver.markRawBeforePower(raw);
-            float scaled = SkillDamageResolver.physical(attacker, raw);
+            float scaled = SkillDamageResolver.scaleMeleeAbsolute(attacker, raw);
             if (attacker instanceof ServerPlayer serverAttacker
                     && TenShadowsPresenceBonuses.hasToad(serverAttacker)
                     && type == SkillDamageType.MARTIAL)
@@ -456,7 +455,7 @@ public final class TechniqueDamageZoneEvents
         }
         if (RatioSpotLogic.tryBreakSpot(attacker, target))
         {
-            CritRules.forceNext(attacker);
+            CritRules.forceNext(attacker, RatioSpotLogic.forcedCritMult(attacker));
         }
     }
 

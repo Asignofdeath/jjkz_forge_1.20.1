@@ -26,7 +26,10 @@ import net.minecraft.util.Mth;
 import net.minecraft.server.level.ServerPlayer;
 import com.darkness.jujutsukaisenzone.api.screen.ScreenShakeKind;
 import com.darkness.jujutsukaisenzone.network.ModNetwork;
+import com.darkness.jujutsukaisenzone.technique.TechniqueDamageSources;
 import com.darkness.jujutsukaisenzone.technique.skill.TenShadowsSummonLogic;
+import com.darkness.jujutsukaisenzone.technique.skill.tenshadows.TenShadowsShikigamiSkillRatios;
+import com.darkness.jujutsukaisenzone.technique.skillset.SkillDamageType;
 import software.bernie.geckolib.animatable.GeoEntity;
 import software.bernie.geckolib.core.animatable.instance.AnimatableInstanceCache;
 import software.bernie.geckolib.core.animation.AnimatableManager;
@@ -554,12 +557,10 @@ public class MahoragaEntity extends PathfinderMob implements GeoEntity
             return;
         }
         this.getLookControl().setLookAt(target, 30.0F, 30.0F);
-        float damage = (float) this.getAttributeValue(Attributes.ATTACK_DAMAGE);
-        if (launch)
-        {
-            damage *= 0.85F;
-        }
-        target.hurt(this.damageSources().mobAttack(this), damage);
+        float skillRatio = launch
+                ? TenShadowsShikigamiSkillRatios.MAHORAGA_RIDE_KICK
+                : TenShadowsShikigamiSkillRatios.MAHORAGA_RIDE_PUNCH;
+        TechniqueDamageSources.deal(target, this, skillRatio, SkillDamageType.MARTIAL);
         if (launch)
         {
             Vec3 away = target.position().subtract(this.position());

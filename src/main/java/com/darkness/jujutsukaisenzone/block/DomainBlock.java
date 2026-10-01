@@ -11,7 +11,7 @@ import net.minecraft.world.level.material.PushReaction;
  * 领域展开结界方块。
  * <p>
  * 与普通结界方块类似，但用于领域展开场景。
- * 不可挖掘、可被爆破、不可推动、阻止生物生成。
+ * 不可挖掘、可被爆破、不可推动、阻止生物生成；不阻挡光线。
  */
 public class DomainBlock extends Block
 {
@@ -23,6 +23,24 @@ public class DomainBlock extends Block
                 .isValidSpawn((state, level, pos, entityType) -> false)
                 .pushReaction(PushReaction.BLOCK)
         );
+    }
+
+    @Override
+    public boolean propagatesSkylightDown(BlockState state, BlockGetter level, BlockPos pos)
+    {
+        return true;
+    }
+
+    @Override
+    public int getLightBlock(BlockState state, BlockGetter level, BlockPos pos)
+    {
+        return 0;
+    }
+
+    @Override
+    public boolean useShapeForLightOcclusion(BlockState state)
+    {
+        return false;
     }
 
     @Override

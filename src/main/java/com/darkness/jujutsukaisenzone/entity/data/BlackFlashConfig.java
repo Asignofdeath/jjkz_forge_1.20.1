@@ -16,7 +16,7 @@ public final class BlackFlashConfig
     /** 黑闪冲击波方块破坏概率 */
     public static final double SHOCKWAVE_DESTROY_CHANCE = 0.30;
     /** 黑闪冲击波伤害值 */
-    public static final float SHOCKWAVE_DAMAGE = 10.0F;
+    public static final float SHOCKWAVE_DAMAGE = 0.50F;
     /** 黑闪 Photon 命令 */
     public static final String PHOTON_COMMAND = "photon fx photon:black_flash entity @s 0 0 0 0 0 0 1 1 1 0 false false look";
     /** 黑闪屏幕振动持续 tick（40 = 2 秒） */

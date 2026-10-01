@@ -225,6 +225,14 @@ public final class TechniqueSkillDescriptions
                                 "max_flight_chunks",
                                 player))
                 });
+
+        /*
+         * 机制型：「0.2秒的领域展开」——不占槽位；解锁后可用通用圆盘切换领域瞬发模式。
+         * 描述无动态数值占位。
+         */
+        TechniqueSkillDescriptionRegistry.register(
+                LimitlessTechniqueSkillSet.SKILL_INSTANT_DOMAIN,
+                (player, techniqueId, skill) -> new Object[0]);
     }
 
     private static void registerShrineSkills()

@@ -637,7 +637,8 @@ public final class LoveRendezvousTechniqueSkillSet extends AbstractInnateTechniq
         player.displayClientMessage(
                 Component.literal("★" + existing.type().displayName() + " 星位满溢 · " + targetName + " 引爆"
                         + (result.damaged()
-                        ? "；单体 " + (int) StarMarkDetonation.DETONATION_DAMAGE + " 伤害" : "")
+                        ? "；单体 " + com.darkness.jujutsukaisenzone.technique.SkillDamageResolver.ratioText(
+                                StarMarkDetonation.DETONATION_DAMAGE) : "")
                         + "；波及 " + result.affected() + " 个目标"
                         + (result.spread() > 0 ? "，标记传染 " + result.spread() + " 个" : "")
                         + (result.empowered() > 0 ? "，同星拉满 " + result.empowered() + " 个" : "")

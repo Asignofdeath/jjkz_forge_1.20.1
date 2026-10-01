@@ -7,6 +7,8 @@ import com.darkness.jujutsukaisenzone.network.ModNetwork;
 import com.darkness.jujutsukaisenzone.player.JudgmentTrialTargetData;
 import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
 import com.darkness.jujutsukaisenzone.registry.ModEntities;
+import com.darkness.jujutsukaisenzone.technique.development.SkillUpgradeLogic;
+import com.darkness.jujutsukaisenzone.technique.skillset.JudgmentTechniqueSkillSet;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
@@ -88,7 +90,7 @@ public final class JudgmentAccuseSkillLogic
 
     public static boolean hasCrosshairTarget(ServerPlayer caster)
     {
-        return resolveCrosshairTarget(caster, TARGET_MAX_DISTANCE) != null;
+        return resolveCrosshairTarget(caster, targetMaxDistance(caster)) != null;
     }
 
     /** 施法者当前「指控」技能随行的审判者；不存在或已失效时返回 null。 */
@@ -148,7 +150,7 @@ public final class JudgmentAccuseSkillLogic
             return false;
         }
 
-        LivingEntity target = resolveCrosshairTarget(caster, TARGET_MAX_DISTANCE);
+        LivingEntity target = resolveCrosshairTarget(caster, targetMaxDistance(caster));
         if (target == null)
         {
             caster.displayClientMessage(Component.literal("请对准指控目标").withStyle(ChatFormatting.YELLOW), true);
@@ -370,12 +372,28 @@ public final class JudgmentAccuseSkillLogic
 
     private static JudgmentAccuseEvidence rollEvidence(ServerPlayer caster, LivingEntity target, RandomSource random)
     {
-        double confirmedChance = EVIDENCE_CONFIRMED_CHANCE_PERCENT
+        double confirmedChance = evidenceConfirmedChancePercent(caster)
                 + JudgmentTrialTargetData.getGuiltyBonusPercent(caster, target.getUUID());
         confirmedChance = Math.min(100.0D, confirmedChance);
         return random.nextDouble() * 100.0D < confirmedChance
                 ? JudgmentAccuseEvidence.CONFIRMED
                 : JudgmentAccuseEvidence.CANNOT_CONFIRM;
+    }
+
+    /** 证据成立率：Lv1=30%，每级 +3。 */
+    public static double evidenceConfirmedChancePercent(ServerPlayer caster)
+    {
+        return EVIDENCE_CONFIRMED_CHANCE_PERCENT
+                + 3.0D * SkillUpgradeLogic.upgradeSteps(
+                caster, PlayerTechniqueData.TECHNIQUE_JUDGMENT, JudgmentTechniqueSkillSet.SKILL_ACCUSE);
+    }
+
+    /** 准星选目标距离：Lv1=32，每级 +2。 */
+    public static double targetMaxDistance(ServerPlayer caster)
+    {
+        return TARGET_MAX_DISTANCE
+                + 2.0D * SkillUpgradeLogic.upgradeSteps(
+                caster, PlayerTechniqueData.TECHNIQUE_JUDGMENT, JudgmentTechniqueSkillSet.SKILL_ACCUSE);
     }
 
     private static void endSession(ServerPlayer caster, AccuseSession session)
@@ -505,8 +523,8 @@ public final class JudgmentAccuseSkillLogic
         {
             return null;
         }
-        double maxDistSq = TARGET_MAX_DISTANCE * TARGET_MAX_DISTANCE;
-        if (caster.distanceToSqr(living) > maxDistSq)
+        double maxDist = targetMaxDistance(caster);
+        if (caster.distanceToSqr(living) > maxDist * maxDist)
         {
             return null;
         }

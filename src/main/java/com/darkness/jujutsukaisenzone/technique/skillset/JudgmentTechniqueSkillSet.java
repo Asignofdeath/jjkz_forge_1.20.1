@@ -395,6 +395,10 @@ public final class JudgmentTechniqueSkillSet extends AbstractInnateTechniqueSkil
                 player.getPersistentData().putLong(key, now + getSkillCooldownTicks(player, skill));
             }
         }
+        if (abortCastIfBrainDamageFailed(player))
+        {
+            return false;
+        }
         return true;
     }
 

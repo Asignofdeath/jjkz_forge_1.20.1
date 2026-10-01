@@ -11,8 +11,10 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
+import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
 import com.darkness.jujutsukaisenzone.technique.SkillDamageResolver;
 import com.darkness.jujutsukaisenzone.technique.TechniqueDamageSources;
+import com.darkness.jujutsukaisenzone.technique.development.SkillUpgradeLogic;
 import com.darkness.jujutsukaisenzone.technique.skillset.ShrineTechniqueSkillSet;
 import com.darkness.jujutsukaisenzone.technique.skillset.SkillDamageType;
 import net.minecraft.world.damagesource.DamageSource;
@@ -183,7 +185,12 @@ public class ShrineFugaBoomBehavior extends EffectBehavior
 
         LivingEntity owner = resolveOwner(entity, this.ownerUuid);
         // 强度面板换算：调用 throttled hurt 的站点无法走 deal，这里手动包一层。
-        float damage = SkillDamageResolver.technique(owner, ShrineFugaConfig.BOOM_DAMAGE_PER_TICK);
+        float ratio = SkillUpgradeLogic.scaleRatio(
+                owner,
+                PlayerTechniqueData.TECHNIQUE_SHRINE,
+                ShrineTechniqueSkillSet.SKILL_FUGA,
+                ShrineFugaConfig.BOOM_DAMAGE_PER_TICK);
+        float damage = SkillDamageResolver.technique(owner, ratio);
 
         for (LivingEntity target : level.getEntitiesOfClass(LivingEntity.class, query))
         {

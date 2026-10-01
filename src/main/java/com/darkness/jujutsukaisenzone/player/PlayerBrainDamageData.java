@@ -28,6 +28,11 @@ public final class PlayerBrainDamageData
     private static final UUID SPEED_DEBUFF_UUID = UUID.fromString("6b2c9a01-4001-4000-8000-000000000001");
     private static final UUID ATTACK_DEBUFF_UUID = UUID.fromString("6b2c9a01-4002-4000-8000-000000000002");
 
+    /** 术式主动技失败几率：脑损达到该值后开始线性上涨。 */
+    private static final int SKILL_FAIL_BRAIN_THRESHOLD = 50;
+    /** 满脑损时术式主动技失败几率（50%）；中间按 (脑损-50)/(上限-50) 插值。 */
+    private static final double SKILL_FAIL_CHANCE_AT_FULL = 0.50D;
+
     private PlayerBrainDamageData()
     {
     }
@@ -307,6 +312,94 @@ public final class PlayerBrainDamageData
         markDirty(player);
         refreshDebuffs(player);
         syncToClient(player);
+    }
+
+    /**
+     * 无量空处后遗症脑损：按领域内停留秒数（{@code dwellTicks / 20}）增加；瞬发再 ×2。
+     * 无聊天提示。脑损未启用 / 创造模式 / 增益为 0 时跳过。
+     *
+     * @return 实际增加的脑损量
+     */
+    public static int addFromLimitlessDomainDwell(ServerPlayer player, int dwellTicks, boolean instantDomain)
+    {
+        if (!Config.domainBrainEnabled || player.isCreative() || dwellTicks <= 0)
+        {
+            return 0;
+        }
+        int gain = dwellTicks / 20;
+        if (instantDomain)
+        {
+            gain *= 2;
+        }
+        if (gain <= 0)
+        {
+            return 0;
+        }
+        JjkzPlayerDataStorage.PlayerDataEntry data = getData(player);
+        int before = data.brainDamage;
+        data.brainDamage = clampDamage(player, data.brainDamage + gain);
+        int actual = data.brainDamage - before;
+        if (actual > 0)
+        {
+            markDirty(player);
+            refreshDebuffs(player);
+            syncToClient(player);
+        }
+        return actual;
+    }
+
+    /**
+     * 术式主动技 / 特别招式释放失败掷骰（脑损 ≥ 50 起线性上涨，满脑损 50%）。
+     * <p>
+     * 创造模式 / 脑损未启用：永不失败。领域逻辑不走此方法。
+     * 调用方须在<strong>已扣咒力、已上冷却之后</strong>调用：失败则跳过演出即可。
+     *
+     * @return {@code true} 表示本次释放失败（不应执行招式效果）
+     */
+    public static boolean rollInnateSkillCastFailure(ServerPlayer player)
+    {
+        if (!Config.domainBrainEnabled || player.isCreative())
+        {
+            return false;
+        }
+        int damage = getBrainDamage(player);
+        if (damage < SKILL_FAIL_BRAIN_THRESHOLD)
+        {
+            return false;
+        }
+        int brainMax = getBrainMax(player);
+        int span = brainMax - SKILL_FAIL_BRAIN_THRESHOLD;
+        double chance;
+        if (span <= 0)
+        {
+            chance = SKILL_FAIL_CHANCE_AT_FULL;
+        }
+        else
+        {
+            chance = (damage - SKILL_FAIL_BRAIN_THRESHOLD) / (double) span * SKILL_FAIL_CHANCE_AT_FULL;
+            if (chance < 0.0D)
+            {
+                chance = 0.0D;
+            }
+            else if (chance > SKILL_FAIL_CHANCE_AT_FULL)
+            {
+                chance = SKILL_FAIL_CHANCE_AT_FULL;
+            }
+        }
+        if (chance <= 0.0D)
+        {
+            return false;
+        }
+        return player.getRandom().nextDouble() < chance;
+    }
+
+    /** 失败时的动作栏提示（无系统聊天刷屏）。 */
+    public static void notifyInnateSkillCastFailed(ServerPlayer player)
+    {
+        player.displayClientMessage(
+                Component.literal("脑损过重，术式释放失败")
+                        .withStyle(ChatFormatting.DARK_RED),
+                true);
     }
 
     public static void applyClientSnapshot(Player player, int brainDamage, int expandsToday, int meltdownRepairsToday)

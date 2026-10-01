@@ -1,8 +1,11 @@
 package com.darkness.jujutsukaisenzone.technique.shikigami.tenshadows.ability;
 
+import com.darkness.jujutsukaisenzone.technique.TechniqueDamageSources;
 import com.darkness.jujutsukaisenzone.technique.shikigami.ShikigamiAbility;
 import com.darkness.jujutsukaisenzone.technique.shikigami.ShikigamiAbilitySource;
 import com.darkness.jujutsukaisenzone.technique.skill.TenShadowsSummonLogic;
+import com.darkness.jujutsukaisenzone.technique.skill.tenshadows.TenShadowsShikigamiSkillRatios;
+import com.darkness.jujutsukaisenzone.technique.skillset.SkillDamageType;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -13,14 +16,13 @@ import net.minecraft.world.entity.Mob;
 import net.minecraft.world.phys.Vec3;
 
 /**
- * 蝦蟇 · 牵制（自动）：吐舌控制敌人（占位——粒子舌线 + 强减速 + 轻拉）。
+ * 蝦蟇 · 牵制（自动）：吐舌控制敌人（粒子舌线 + 强减速 + 轻拉）。
  */
 public final class ToadRestrainLogic
 {
     private static final double MIN_RANGE = 2.5D;
     private static final double MAX_RANGE = 12.0D;
     private static final int CONTROL_TICKS = 20 * 3;
-    private static final float DAMAGE = 2.0F;
 
     private ToadRestrainLogic()
     {
@@ -49,7 +51,8 @@ public final class ToadRestrainLogic
 
         target.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, CONTROL_TICKS, 4, false, true, true));
         target.addEffect(new MobEffectInstance(MobEffects.DIG_SLOWDOWN, CONTROL_TICKS, 0, false, true, true));
-        target.hurt(toad.damageSources().magic(), DAMAGE);
+        TechniqueDamageSources.deal(target, toad, TenShadowsShikigamiSkillRatios.TOAD_RESTRAIN,
+                SkillDamageType.TECHNIQUE);
 
         Vec3 pull = toad.position().subtract(target.position());
         if (pull.lengthSqr() > 1.0E-4D)

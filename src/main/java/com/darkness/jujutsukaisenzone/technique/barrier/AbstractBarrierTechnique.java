@@ -45,6 +45,10 @@ public abstract class AbstractBarrierTechnique implements IBarrierTechnique
     protected static final int EXPAND_LAYERS_PER_TICK = 1;
     /** 大半径结界(>8)展开时每层最多放置的方块数（分批放置防卡顿） */
     protected static final int BLOCKS_PER_BATCH = 256;
+    /**
+     * 瞬发领域每 tick 放置天空盒对应的壳格进度（大于 {@link #BLOCKS_PER_BATCH}，只求比常规快）。
+     */
+    protected static final int INSTANT_BLOCKS_PER_BATCH = 640;
     /** 大半径阈值：超过此值使用延迟展开动画 */
     protected static final int ANIMATED_EXPAND_THRESHOLD = 8;
     /** 结界修补每tick消耗的咒力 */
@@ -290,9 +294,29 @@ public abstract class AbstractBarrierTechnique implements IBarrierTechnique
         private Set<Long> processedColumns;
         /** 天空盒方块位置列表（领域展开时 jjkz_skyblock 方块的位置）；空列表表示未启用天空盒 */
         private List<BlockPos> skyboxBlocks = new ArrayList<>();
+        /** 与 {@link #skyboxBlocks} 同步的查重集合。 */
+        private Set<BlockPos> skyboxBlockSet = new HashSet<>();
+        /** {@link #shellBlocks} 的查重缓存（瞬发天空盒展开用，避免每格重建）。 */
+        @Nullable
+        private Set<BlockPos> shellBlockSet;
         /** 自定义天空盒纹理路径；非 null 时表示领域使用了 jjkz_skyblock，修补时需要此信息 */
         @Nullable
         private net.minecraft.resources.ResourceLocation customSkyboxTexture = null;
+        /**
+         * 瞬发：只按球壳顺序展开天空盒，不放置结界/领域壳方块。
+         */
+        private boolean skyboxOnlyExpand;
+        /** 结界构建完成后立刻关闭（瞬发领域模式）。 */
+        private boolean autoCloseOnComplete;
+        /**
+         * 瞬发：构建完成后的「完成态」剩余 tick；&gt;0 时保持实例、刷新慢镜头，倒计时结束再关。
+         * 0 表示未进入完成态保持。
+         */
+        private int autoCloseHoldTicksRemaining;
+        /** 本场瞬发慢镜头曾施加过的实体（关域时统一移除效果）。 */
+        private final Set<UUID> instantSlowMoTargets = new HashSet<>();
+        /** 本 tick 内已执行 auto-close 清理，维持循环应丢弃该实例。 */
+        private boolean discardAfterTick;
 
         public BarrierInstance(
                 ResourceKey<Level> dimension,
@@ -357,8 +381,22 @@ public abstract class AbstractBarrierTechnique implements IBarrierTechnique
         public int getPlayerFootY() { return playerFootY; }
         public Set<Long> getProcessedColumns() { return processedColumns; }
         public List<BlockPos> getSkyboxBlocks() { return skyboxBlocks; }
+        public Set<BlockPos> getSkyboxBlockSet() { return skyboxBlockSet; }
+        public Set<BlockPos> getOrCreateShellBlockSet()
+        {
+            if (shellBlockSet == null)
+            {
+                shellBlockSet = new HashSet<>(shellBlocks);
+            }
+            return shellBlockSet;
+        }
         @Nullable
         public net.minecraft.resources.ResourceLocation getCustomSkyboxTexture() { return customSkyboxTexture; }
+        public boolean isSkyboxOnlyExpand() { return skyboxOnlyExpand; }
+        public boolean isAutoCloseOnComplete() { return autoCloseOnComplete; }
+        public boolean isDiscardAfterTick() { return discardAfterTick; }
+        public int getAutoCloseHoldTicksRemaining() { return autoCloseHoldTicksRemaining; }
+        public Set<UUID> getInstantSlowMoTargets() { return instantSlowMoTargets; }
 
         // Setters
         public void setBlockMobSpawn(boolean blockMobSpawn) { this.blockMobSpawn = blockMobSpawn; }
@@ -367,8 +405,39 @@ public abstract class AbstractBarrierTechnique implements IBarrierTechnique
         public void setExpanding(boolean expanding) { this.isExpanding = expanding; }
         public void setPendingBatchIndex(int index) { this.pendingBatchIndex = index; }
         public void setProcessedColumns(Set<Long> processedColumns) { this.processedColumns = processedColumns; }
-        public void setSkyboxBlocks(List<BlockPos> skyboxBlocks) { this.skyboxBlocks = skyboxBlocks; }
+        public void setSkyboxBlocks(List<BlockPos> skyboxBlocks)
+        {
+            this.skyboxBlocks = skyboxBlocks == null ? new ArrayList<>() : skyboxBlocks;
+            this.skyboxBlockSet = new HashSet<>(this.skyboxBlocks);
+        }
         public void setCustomSkyboxTexture(@Nullable net.minecraft.resources.ResourceLocation texture) { this.customSkyboxTexture = texture; }
+        public void setSkyboxOnlyExpand(boolean skyboxOnlyExpand) { this.skyboxOnlyExpand = skyboxOnlyExpand; }
+        public void setAutoCloseOnComplete(boolean autoCloseOnComplete) { this.autoCloseOnComplete = autoCloseOnComplete; }
+        public void setDiscardAfterTick(boolean discardAfterTick) { this.discardAfterTick = discardAfterTick; }
+        public void setAutoCloseHoldTicksRemaining(int ticks) { this.autoCloseHoldTicksRemaining = Math.max(0, ticks); }
+
+        public void trackInstantSlowMoTarget(UUID id)
+        {
+            if (id != null)
+            {
+                instantSlowMoTargets.add(id);
+            }
+        }
+
+        public void clearInstantSlowMoTargets()
+        {
+            instantSlowMoTargets.clear();
+        }
+
+        /** 登记一处天空盒位置（列表 + 查重集）。 */
+        public void trackSkyboxBlock(BlockPos pos)
+        {
+            BlockPos immutable = pos.immutable();
+            if (skyboxBlockSet.add(immutable))
+            {
+                skyboxBlocks.add(immutable);
+            }
+        }
     }
 
     // ==================== 共享实现方法 ====================
@@ -499,11 +568,13 @@ public abstract class AbstractBarrierTechnique implements IBarrierTechnique
 
     /**
      * 记录被删除方块的原状态。
+     * <p>
+     * 本模组结界 / 领域 / 天空盒属于施工临时方块，不得记入「原地形」——否则关域还原时会把它们摆回去。
      */
     protected final void rememberRemovedBlock(ServerLevel level, BlockPos.MutableBlockPos mutablePos, Map<BlockPos, BlockState> removedBlocks)
     {
         BlockPos immutablePos = mutablePos.immutable();
-        removedBlocks.putIfAbsent(immutablePos, level.getBlockState(immutablePos));
+        removedBlocks.putIfAbsent(immutablePos, originalStateForRestore(level.getBlockState(immutablePos)));
     }
 
     /**
@@ -511,7 +582,17 @@ public abstract class AbstractBarrierTechnique implements IBarrierTechnique
      */
     protected final void rememberRemovedBlockForPos(ServerLevel level, BlockPos pos, Map<BlockPos, BlockState> removedBlocks)
     {
-        removedBlocks.putIfAbsent(pos.immutable(), level.getBlockState(pos));
+        removedBlocks.putIfAbsent(pos.immutable(), originalStateForRestore(level.getBlockState(pos)));
+    }
+
+    /** 施工临时方块（结界壳 / 天空盒）按空气记入还原表。 */
+    private BlockState originalStateForRestore(BlockState existing)
+    {
+        if (existing.is(getBarrierBlockState().getBlock()) || ShaderedCompat.isSkyboxBlock(existing))
+        {
+            return Blocks.AIR.defaultBlockState();
+        }
+        return existing;
     }
 
     /**
@@ -580,18 +661,28 @@ public abstract class AbstractBarrierTechnique implements IBarrierTechnique
     /**
      * 清理单个结界实例。
      * <p>
-     * 先移除天空盒方块（避免天空盒位置与 removedBlocks 冲突），
-     * 再清理球壳方块，最后恢复被替换的原方块。
+     * 先触发 {@link #onBarrierClosed} 回调，再执行世界侧还原
+     * （先移除天空盒方块，再清理球壳方块，最后恢复被替换的原方块）。
      */
     protected final void clearBarrierInstance(ServerPlayer player, BarrierInstance instance)
     {
         onBarrierClosed(player, instance);
-        ServerLevel level = player.server.getLevel(instance.getDimension());
+        restoreBarrierWorld(player.server.getLevel(instance.getDimension()), instance);
+    }
+
+    /**
+     * 仅执行世界侧还原：天空盒方块 → 球壳方块 → 被替换的原方块。
+     * <p>
+     * 不触发 {@link #onBarrierClosed} 回调，供拿不到在线施术者对象的场合使用
+     * （如服务器停机时对残留实例做兜底还原）。{@code level} 为 null（维度已不可用）时静默跳过。
+     */
+    protected final void restoreBarrierWorld(@Nullable ServerLevel level, BarrierInstance instance)
+    {
         if (level == null)
         {
             return;
         }
-        /* 先移除天空盒方块 */
+        /* 先移除天空盒方块（避免天空盒位置与 removedBlocks 冲突） */
         ShaderedCompat.removeSkyboxLayer(level, instance.getSkyboxBlocks(), instance.getRemovedBlocks());
 
         for (BlockPos pos : instance.getShellBlocks())
@@ -602,6 +693,20 @@ public abstract class AbstractBarrierTechnique implements IBarrierTechnique
             }
         }
         restoreRemovedBlocks(level, instance);
+
+        /*
+         * 兜底：还原表若曾误记天空盒 / 结界为「原地形」，restore 会把它们摆回球壳。
+         * 球壳位与已登记天空盒位必须最终为空或真正原地形，再清一遍施工方块。
+         */
+        ShaderedCompat.removeSkyboxLayer(level, instance.getSkyboxBlocks(), null);
+        for (BlockPos pos : instance.getShellBlocks())
+        {
+            BlockState state = level.getBlockState(pos);
+            if (state.is(getBarrierBlockState().getBlock()) || ShaderedCompat.isSkyboxBlock(state))
+            {
+                level.setBlock(pos, Blocks.AIR.defaultBlockState(), BLOCK_UPDATE_FLAGS);
+            }
+        }
     }
 
     // ==================== 辅助方法 ====================

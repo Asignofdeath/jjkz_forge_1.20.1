@@ -8,6 +8,7 @@ import com.darkness.jujutsukaisenzone.player.StarMarkType;
 import com.darkness.jujutsukaisenzone.technique.TechniqueDamageSources;
 import com.darkness.jujutsukaisenzone.technique.skillset.SkillDamageType;
 import com.darkness.jujutsukaisenzone.technique.development.SkillUnlockLogic;
+import com.darkness.jujutsukaisenzone.technique.development.SkillUpgradeLogic;
 import com.darkness.jujutsukaisenzone.technique.skillset.LoveRendezvousTechniqueSkillSet;
 import net.minecraft.commands.arguments.EntityAnchorArgument;
 import net.minecraft.core.BlockPos;
@@ -80,8 +81,8 @@ public final class StarFlightSkillLogic
     /** 施术者与目标的最大距离（格）：超出就连「相会」也无从谈起。 */
     public static final double CAST_RANGE = 20.0D;
 
-    /** 撞上目标那一刻的冲撞伤害（点）。引爆的爆心伤害另计，见 {@link StarMarkDetonation#DETONATION_DAMAGE}。 */
-    public static final float RAM_DAMAGE = 12.0F;
+    /** 撞上目标那一刻的冲撞伤害倍率（体术通道）。引爆爆心另计，见 {@link StarMarkDetonation#DETONATION_DAMAGE}。 */
+    public static final float RAM_DAMAGE = 0.60F;
 
     /**
      * 「依次穿越」每穿过一颗星位给踢击伤害的加成（比例）。
@@ -99,8 +100,8 @@ public final class StarFlightSkillLogic
      */
     public static final double PASS_BONUS_CAP = 2.00D;
 
-    /** 飞行途中撞到挡路实体时结算的伤害（点）。同一个实体整趟只挨一次。 */
-    public static final float PATH_DAMAGE = 6.0F;
+    /** 飞行途中撞到挡路实体时的伤害倍率（体术通道）。同一个实体整趟只挨一次。 */
+    public static final float PATH_DAMAGE = 0.30F;
 
     /** 路径击退的力度：刻意小于弹射初速，这是「绕路撞人」，不是「踢飞」。 */
     private static final double PATH_KNOCK = 0.80D;
@@ -672,7 +673,12 @@ public final class StarFlightSkillLogic
             }
             if (entity instanceof LivingEntity living)
             {
-                TechniqueDamageSources.deal(living, player, PATH_DAMAGE, SkillDamageType.MARTIAL,
+                float pathRatio = SkillUpgradeLogic.scaleRatio(
+                        player,
+                        PlayerTechniqueData.TECHNIQUE_LOVE_RENDEZVOUS,
+                        LoveRendezvousTechniqueSkillSet.SKILL_STAR_FLIGHT,
+                        PATH_DAMAGE);
+                TechniqueDamageSources.deal(living, player, pathRatio, SkillDamageType.MARTIAL,
                         LoveRendezvousTechniqueSkillSet.SKILL_STAR_FLIGHT);
             }
             StarMarkRules.flightRam(player, entity, from, PATH_KNOCK);
@@ -714,7 +720,11 @@ public final class StarFlightSkillLogic
         player.resetFallDistance();
 
         /* 穿越加成只作用于冲撞这一脚；引爆的爆心伤害是标记自己的账，与飞了几段无关 */
-        float damage = (float) (RAM_DAMAGE * damageScale(passes));
+        float damage = SkillUpgradeLogic.scaleRatio(
+                player,
+                PlayerTechniqueData.TECHNIQUE_LOVE_RENDEZVOUS,
+                LoveRendezvousTechniqueSkillSet.SKILL_STAR_FLIGHT,
+                (float) (RAM_DAMAGE * damageScale(passes)));
         String name = target.getName().getString();
         StarMark mark = PlayerStarMarkData.findTarget(player,
                 StarMarkSkillLogic.markOfEntity(player, target));
@@ -757,11 +767,14 @@ public final class StarFlightSkillLogic
         message.append(mark.type().displayName()).append(" 引爆");
         if (result.damaged())
         {
-            message.append(" 单体 ").append(Math.round(StarMarkDetonation.DETONATION_DAMAGE));
+            message.append(" 单体 ").append(
+                    com.darkness.jujutsukaisenzone.technique.SkillDamageResolver.ratioText(
+                            StarMarkDetonation.DETONATION_DAMAGE));
         }
         if (hit)
         {
-            message.append("；冲撞 ").append(Math.round(damage));
+            message.append("；冲撞 ").append(
+                    com.darkness.jujutsukaisenzone.technique.SkillDamageResolver.martialRatioText(damage));
         }
         message.append("；").append(applied.displayName()).append(" 印记叠加");
         if (self == null)

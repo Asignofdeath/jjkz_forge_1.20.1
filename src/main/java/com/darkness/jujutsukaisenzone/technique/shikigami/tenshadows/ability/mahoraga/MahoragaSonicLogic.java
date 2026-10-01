@@ -2,8 +2,10 @@ package com.darkness.jujutsukaisenzone.technique.shikigami.tenshadows.ability.ma
 
 import com.darkness.jujutsukaisenzone.technique.TechniqueDamageSources;
 import com.darkness.jujutsukaisenzone.technique.shikigami.ShikigamiAbility;
+import com.darkness.jujutsukaisenzone.technique.skillset.SkillDamageType;
 import com.darkness.jujutsukaisenzone.technique.shikigami.ShikigamiAbilitySource;
 import com.darkness.jujutsukaisenzone.technique.skill.TenShadowsSummonLogic;
+import com.darkness.jujutsukaisenzone.technique.skill.tenshadows.TenShadowsShikigamiSkillRatios;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.chat.Component;
@@ -24,7 +26,6 @@ import net.minecraft.world.phys.Vec3;
 public final class MahoragaSonicLogic
 {
     private static final double RANGE = 12.0D;
-    private static final float DAMAGE = 18.0F;
     /** 自动索敌时实际出手概率。 */
     private static final float AUTO_CAST_CHANCE = 0.08F;
 
@@ -79,7 +80,8 @@ public final class MahoragaSonicLogic
             {
                 continue;
             }
-            TechniqueDamageSources.deal(living, owner, DAMAGE);
+            TechniqueDamageSources.deal(living, mahoraga, TenShadowsShikigamiSkillRatios.MAHORAGA_SONIC,
+                    SkillDamageType.TECHNIQUE);
             living.setDeltaMovement(to.normalize().scale(1.35D).add(0.0D, 0.35D, 0.0D));
             living.hurtMarked = true;
             hit++;

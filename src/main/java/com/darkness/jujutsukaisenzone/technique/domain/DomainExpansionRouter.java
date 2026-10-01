@@ -2,6 +2,7 @@ package com.darkness.jujutsukaisenzone.technique.domain;
 
 import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
 import com.darkness.jujutsukaisenzone.technique.DomainExpansionServerLogic;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.core.BlockPos;
@@ -156,6 +157,43 @@ public final class DomainExpansionRouter
         for (AbstractDomainExpansion domain : ALL_DOMAINS)
         {
             domain.updateBarrierRules(player);
+        }
+    }
+
+    /**
+     * 清空所有领域实例的会话级运行态（活跃领域队列、延迟天空盒倒计时等）。
+     * <p>
+     * 领域实现是进程级静态单例，退出世界 / 切换存档不会重新加载类，故必须在服务器停机时显式清理；
+     * 否则残留的 {@code BarrierInstance} 会在新会话中以「幽灵领域」形式匹配同维度同坐标并继续生效，
+     * 且方块快照永久驻留内存。由 {@code SessionStateCleanupEvents} 在服务器停机时调用。
+     */
+    public static void resetAllSessionState()
+    {
+        for (AbstractDomainExpansion domain : ALL_DOMAINS)
+        {
+            domain.resetSessionState();
+        }
+    }
+
+    /**
+     * 关闭该玩家在所有领域实现中的活跃领域（含回调与方块还原）。用于玩家登出。
+     */
+    public static void closeAllForPlayer(ServerPlayer player)
+    {
+        for (AbstractDomainExpansion domain : ALL_DOMAINS)
+        {
+            domain.closeAllForPlayer(player);
+        }
+    }
+
+    /**
+     * 对仍残留在各领域实现活跃表中的实例做世界侧方块还原（服务器停机兜底）。
+     */
+    public static void restoreAllWorldAll(MinecraftServer server)
+    {
+        for (AbstractDomainExpansion domain : ALL_DOMAINS)
+        {
+            domain.restoreAllWorld(server);
         }
     }
 }

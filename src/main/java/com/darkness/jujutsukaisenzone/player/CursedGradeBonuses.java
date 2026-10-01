@@ -41,14 +41,21 @@ public final class CursedGradeBonuses
 
     /** 原版基础上限，属性修饰符在此基础上叠加 */
     public static final double BASE_MAX_HEALTH = 20.0;
-    /** 生命上限绝对 cap（含基础上限与所有加成） */
-    public static final double ABSOLUTE_MAX_HEALTH = 500.0;
 
     /**
      * 四级~特级累计生命加成（index = {@link PlayerCursedGradeData#getRank}）。
-     * 四级 +20 → 三级累计 +50 → 二级 +90 → 一级 +170 → 特级 +270。
+     * 目标总生命：未入级 20 / 四级 300 / 三级 1200 / 二级 5000 / 一级 20000 / 特级 60000。
+     * <p>
+     * 已废除玩法向绝对生命硬顶；仅由此表与其它修饰符（强化术等）共同决定上限。
      */
-    private static final double[] HEALTH_BONUS_BY_RANK = {0.0, 20.0, 50.0, 90.0, 170.0, 270.0};
+    private static final double[] HEALTH_BONUS_BY_RANK = {
+            0.0,
+            280.0,
+            1_180.0,
+            4_980.0,
+            19_980.0,
+            59_980.0
+    };
 
     /** 仅疾跑时生效：每级移动速度 ADDITION（略高于旧常驻值） */
     private static final double SPRINT_SPEED_PER_RANK = 0.026;
@@ -57,8 +64,8 @@ public final class CursedGradeBonuses
     private static final double HEAVENLY_SPRINT_SPEED_BONUS = 0.24;
     private static final double HEAVENLY_SPRINT_BURST_BONUS = 0.85;
     private static final int HEAVENLY_SPRINT_BURST_TICKS = 20;
-    /** 天与咒缚：基础上限 20 + 300 = 320 */
-    private static final double HEAVENLY_HEALTH_BONUS = 300.0;
+    /** 天与咒缚：总生命约 48000（略弱于特级 60000）→ 加成 47980 */
+    private static final double HEAVENLY_HEALTH_BONUS = 47_980.0;
     private static final double HEAVENLY_ARMOR_BONUS = 30.0;
 
     private CursedGradeBonuses()
@@ -84,13 +91,14 @@ public final class CursedGradeBonuses
         return HEALTH_BONUS_BY_RANK[rank];
     }
 
-    /** 在 ABSOLUTE_MAX_HEALTH cap 下，实际施加到 MAX_HEALTH 属性上的加成值 */
+    /** 咒术等级 / 天与对应的累计生命加成（不含基础上限 20）；无玩法硬顶。 */
     public static double getEffectiveHealthBonus(net.minecraft.world.entity.player.Player player)
     {
-        double bonus = PlayerCursedEnergyData.isHeavenlyRestricted(player)
-                ? HEAVENLY_HEALTH_BONUS
-                : getHealthBonusForRank(PlayerCursedGradeData.getRank(player));
-        return Math.min(bonus, ABSOLUTE_MAX_HEALTH - BASE_MAX_HEALTH);
+        if (PlayerCursedEnergyData.isHeavenlyRestricted(player))
+        {
+            return HEAVENLY_HEALTH_BONUS;
+        }
+        return getHealthBonusForRank(PlayerCursedGradeData.getRank(player));
     }
 
     private static double resolveHealthBonus(ServerPlayer player)

@@ -1,6 +1,8 @@
 package com.darkness.jujutsukaisenzone.client.gui.technique;
 
 import com.darkness.jujutsukaisenzone.JuJutsuKaisenZone;
+import com.darkness.jujutsukaisenzone.player.BarrierTechniqueLevel;
+import com.darkness.jujutsukaisenzone.player.PlayerBarrierTechniqueData;
 import com.darkness.jujutsukaisenzone.player.PlayerCursedGradeData;
 import com.darkness.jujutsukaisenzone.player.PlayerSeanceTechniqueData;
 import com.darkness.jujutsukaisenzone.player.PlayerShrineBlackFlashMilestoneData;
@@ -134,6 +136,11 @@ public final class TechniqueSkillTreeViewHelper
             if (node.referenceKind() == SkillTreeReferenceKind.SEANCE_TECHNIQUE_LEVEL)
             {
                 return Component.literal("降灵术完全掌握");
+            }
+            if (node.referenceKind() == SkillTreeReferenceKind.BARRIER_TECHNIQUE_LEVEL)
+            {
+                BarrierTechniqueLevel required = BarrierTechniqueLevel.fromString(node.referenceId());
+                return Component.literal("结界术" + getBarrierLevelDisplayName(required));
             }
             if (node.referenceKind() == SkillTreeReferenceKind.CURSED_GRADE)
             {
@@ -272,6 +279,16 @@ public final class TechniqueSkillTreeViewHelper
                 return getSeanceLevelDisplayName(PlayerSeanceTechniqueData.getLevel(player))
                         + " / " + getSeanceLevelDisplayName(required);
             }
+            if (node.referenceKind() == SkillTreeReferenceKind.BARRIER_TECHNIQUE_LEVEL)
+            {
+                if (state == NodeVisualState.REFERENCE_SATISFIED)
+                {
+                    return "已达成";
+                }
+                BarrierTechniqueLevel required = BarrierTechniqueLevel.fromString(node.referenceId());
+                return getBarrierLevelDisplayName(PlayerBarrierTechniqueData.getLevel(player))
+                        + " / " + getBarrierLevelDisplayName(required);
+            }
             if (node.referenceKind() == SkillTreeReferenceKind.CURSED_GRADE)
             {
                 int required = SkillUnlockLogic.parseRequiredCount(node.referenceId());
@@ -390,6 +407,17 @@ public final class TechniqueSkillTreeViewHelper
     }
 
     private static String getSeanceLevelDisplayName(SeanceTechniqueLevel level)
+    {
+        return switch (level)
+        {
+            case UNLEARNED -> "未习得";
+            case BEGINNER -> "初习";
+            case MASTERED -> "掌握";
+            case COMPLETE -> "完全掌握";
+        };
+    }
+
+    private static String getBarrierLevelDisplayName(BarrierTechniqueLevel level)
     {
         return switch (level)
         {

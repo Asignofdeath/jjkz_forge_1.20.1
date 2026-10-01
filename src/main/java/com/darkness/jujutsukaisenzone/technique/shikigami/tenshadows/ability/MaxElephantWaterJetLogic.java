@@ -4,6 +4,8 @@ import com.darkness.jujutsukaisenzone.technique.TechniqueDamageSources;
 import com.darkness.jujutsukaisenzone.technique.shikigami.ShikigamiAbility;
 import com.darkness.jujutsukaisenzone.technique.shikigami.ShikigamiAbilitySource;
 import com.darkness.jujutsukaisenzone.technique.skill.TenShadowsSummonLogic;
+import com.darkness.jujutsukaisenzone.technique.skill.tenshadows.TenShadowsShikigamiSkillRatios;
+import com.darkness.jujutsukaisenzone.technique.skillset.SkillDamageType;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.chat.Component;
@@ -19,7 +21,6 @@ import net.minecraft.world.phys.Vec3;
 public final class MaxElephantWaterJetLogic
 {
     private static final double AUTO_RANGE = 14.0D;
-    private static final float DAMAGE = 10.0F;
 
     private MaxElephantWaterJetLogic()
     {
@@ -46,7 +47,8 @@ public final class MaxElephantWaterJetLogic
 
         ServerLevel level = owner.serverLevel();
         sprayParticles(level, elephant.position().add(0.0D, 1.6D, 0.0D), focus.position().add(0.0D, focus.getBbHeight() * 0.5D, 0.0D));
-        TechniqueDamageSources.deal(focus, owner, DAMAGE);
+        TechniqueDamageSources.deal(focus, elephant, TenShadowsShikigamiSkillRatios.MAX_ELEPHANT_WATER_JET,
+                SkillDamageType.TECHNIQUE);
         if (source == ShikigamiAbilitySource.PLAYER)
         {
             owner.displayClientMessage(

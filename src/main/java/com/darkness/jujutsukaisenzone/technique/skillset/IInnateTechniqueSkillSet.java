@@ -251,9 +251,9 @@ public interface IInnateTechniqueSkillSet
     }
 
     /**
-     * 指令圆盘上的术式专用条目；无则空列表。
+     * 指令圆盘「术式专属页」条目；无则空列表。
      * <p>
-     * 有独立快捷键的共通技能（反转 / 结界等）不进圆盘。
+     * 全术式共用指令（如领域展开）放在通用页，不由本方法提供。
      */
     default List<CommandWheelEntry> commandWheelEntries()
     {

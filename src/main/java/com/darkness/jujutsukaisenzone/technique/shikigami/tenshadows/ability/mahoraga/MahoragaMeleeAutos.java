@@ -1,8 +1,11 @@
 package com.darkness.jujutsukaisenzone.technique.shikigami.tenshadows.ability.mahoraga;
 
+import com.darkness.jujutsukaisenzone.technique.TechniqueDamageSources;
 import com.darkness.jujutsukaisenzone.technique.shikigami.ShikigamiAbility;
 import com.darkness.jujutsukaisenzone.technique.shikigami.ShikigamiAbilitySource;
 import com.darkness.jujutsukaisenzone.technique.skill.TenShadowsSummonLogic;
+import com.darkness.jujutsukaisenzone.technique.skill.tenshadows.TenShadowsShikigamiSkillRatios;
+import com.darkness.jujutsukaisenzone.technique.skillset.SkillDamageType;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -32,7 +35,8 @@ public final class MahoragaMeleeAutos
         for (LivingEntity living : level.getEntitiesOfClass(LivingEntity.class, box, e ->
                 e.isAlive() && e != owner && e != m && !TenShadowsSummonLogic.isOwnedBy(e, owner.getUUID())))
         {
-            living.hurt(m.damageSources().mobAttack(m), 14.0F);
+            TechniqueDamageSources.deal(living, m, TenShadowsShikigamiSkillRatios.MAHORAGA_SLAM,
+                    SkillDamageType.MARTIAL);
             living.setDeltaMovement(living.getDeltaMovement().add(0.0D, 0.55D, 0.0D));
             living.hurtMarked = true;
         }
@@ -47,7 +51,8 @@ public final class MahoragaMeleeAutos
         {
             return false;
         }
-        t.hurt(m.damageSources().mobAttack(m), 10.0F);
+        TechniqueDamageSources.deal(t, m, TenShadowsShikigamiSkillRatios.MAHORAGA_LAUNCH,
+                SkillDamageType.MARTIAL);
         t.setDeltaMovement(t.getDeltaMovement().add(0.0D, 1.15D, 0.0D));
         t.hurtMarked = true;
         return true;
@@ -62,7 +67,8 @@ public final class MahoragaMeleeAutos
             return false;
         }
         Vec3 dir = m.getLookAngle().normalize().scale(1.8D).add(0.0D, 0.55D, 0.0D);
-        t.hurt(m.damageSources().mobAttack(m), 12.0F);
+        TechniqueDamageSources.deal(t, m, TenShadowsShikigamiSkillRatios.MAHORAGA_THROW,
+                SkillDamageType.MARTIAL);
         t.setDeltaMovement(dir);
         t.hurtMarked = true;
         return true;
@@ -78,7 +84,8 @@ public final class MahoragaMeleeAutos
         }
         for (int i = 0; i < 3; i++)
         {
-            t.hurt(m.damageSources().mobAttack(m), 5.0F);
+            TechniqueDamageSources.deal(t, m, TenShadowsShikigamiSkillRatios.MAHORAGA_PUNCH_HIT,
+                    SkillDamageType.MARTIAL);
         }
         t.setDeltaMovement(t.getDeltaMovement().add(m.getLookAngle().scale(0.4D)));
         t.hurtMarked = true;
@@ -100,7 +107,7 @@ public final class MahoragaMeleeAutos
         for (LivingEntity living : level.getEntitiesOfClass(LivingEntity.class, box, e ->
                 e.isAlive() && e != owner && e != m && !TenShadowsSummonLogic.isOwnedBy(e, owner.getUUID())))
         {
-            MahoragaExtermination.applySwordHit(m, living, 8.0F);
+            MahoragaExtermination.applySwordHit(m, living, TenShadowsShikigamiSkillRatios.MAHORAGA_SWORD);
             any = true;
         }
         return any;
@@ -139,7 +146,7 @@ public final class MahoragaMeleeAutos
             {
                 continue;
             }
-            MahoragaExtermination.applySwordHit(m, living, 16.0F);
+            MahoragaExtermination.applySwordHit(m, living, TenShadowsShikigamiSkillRatios.MAHORAGA_WHEEL_SLASH);
             any = true;
         }
         return any;

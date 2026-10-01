@@ -3,6 +3,7 @@ package com.darkness.jujutsukaisenzone.technique.skill;
 import com.darkness.jujutsukaisenzone.player.PlayerRatioOvertimeData;
 import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
 import com.darkness.jujutsukaisenzone.technique.development.SkillUnlockLogic;
+import com.darkness.jujutsukaisenzone.technique.development.SkillUpgradeLogic;
 import com.darkness.jujutsukaisenzone.technique.skillset.RatioTechniqueSkillSet;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
@@ -68,6 +69,14 @@ public final class RatioOvertimeLogic
         {
             return WORK_DAMAGE_MULT;
         }
-        return OVERTIME_DAMAGE_MULT;
+        return overtimeDamageMult(attacker);
+    }
+
+    /** 加班伤倍率：Lv1=1.10，每级 +0.02。 */
+    public static float overtimeDamageMult(Player attacker)
+    {
+        return OVERTIME_DAMAGE_MULT
+                + 0.02F * SkillUpgradeLogic.upgradeSteps(
+                attacker, PlayerTechniqueData.TECHNIQUE_RATIO, RatioTechniqueSkillSet.SKILL_OVERTIME);
     }
 }

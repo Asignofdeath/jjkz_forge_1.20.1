@@ -1,5 +1,6 @@
 package com.darkness.jujutsukaisenzone.technique;
 
+import com.darkness.jujutsukaisenzone.Config;
 import com.darkness.jujutsukaisenzone.JuJutsuKaisenZone;
 import com.darkness.jujutsukaisenzone.technique.skillset.SkillDamageType;
 import net.minecraft.core.Holder;
@@ -347,8 +348,8 @@ public final class TechniqueDamageSources
      * <p>
      * ⚠️ <b>强度面板换算在这里统一完成</b>：调用方一律传「四级基准点数」（就是原来写死的那个数，
      * 例如 {@code LimitlessBlueConfig.DAMAGE} = 8.0F），本方法按施术者当前的体术 / 术式强度
-     * 换算成实际伤害（见 {@link SkillDamageResolver}）。
-     * 因此调用方<b>不要</b>自己再乘强度，否则重复放大。
+     * {@code amount} 为<b>技能倍率</b>（如 {@code 0.40F} = 40% 对应通道强度），由
+     * {@link SkillDamageResolver} 换成实际伤害。调用方不要自己再乘强度。
      *
      * @param damageType 这一击的叙事分型；传 {@link SkillDamageType#TECHNIQUE} 与旧三参重载等价
      */
@@ -380,11 +381,17 @@ public final class TechniqueDamageSources
         float resolvedAmount = resolvePowerScaled(owner, amount, damageType);
         boolean previousScaledFlag = POWER_ALREADY_SCALED.get();
         POWER_ALREADY_SCALED.set(true);
-        // 把「强度放大前」的原始点数交给黑闪：黑闪要对原始值取幂，否则 pow 会把面板倍率一起指数放大。
-        // 标记只在本次 hurt 调用栈内存活（LivingHurtEvent 是同步派发的），finally 里必定清掉。
-        if (Math.abs(resolvedAmount - amount) > 0.0001F)
+        // 黑闪幂底数：技能路径传入的是倍率；还原为「倍率 × 参考强度」以保持与旧点数底数一致。
+        // （黑闪实际只吃 EF 近战；此处标记防残留/边缘路径。）
+        float reference = switch (damageType)
         {
-            SkillDamageResolver.markRawBeforePower(amount);
+            case MARTIAL, COMPOSITE -> (float) Config.combatPowerPhysicalBaseline;
+            case TECHNIQUE -> (float) Config.combatPowerTechniqueBaseline;
+        };
+        float legacyPointsEquivalent = amount * reference;
+        if (Math.abs(resolvedAmount - legacyPointsEquivalent) > 0.0001F)
+        {
+            SkillDamageResolver.markRawBeforePower(legacyPointsEquivalent);
         }
         try
         {
@@ -530,22 +537,23 @@ public final class TechniqueDamageSources
     }
 
     /**
-     * 强度面板换算：把「四级基准点数」变成施术者当前强度下的实际伤害。
+     * 强度面板换算（见 {@link SkillDamageResolver}）：
+     * {@code 强度 × skillRatio}。{@code amount} 必须是技能倍率（如 0.40），不是旧绝对点数。
      * <ul>
      *   <li>术式 → 术式强度</li>
      *   <li>体术 → 体术强度</li>
      *   <li>复合 → 两者各算一次取平均（避免黑闪这类同时动用两种能力的技能吃双倍面板）</li>
      * </ul>
-     * 非玩家（没有面板）一律原样返回。
+     * 非玩家（没有面板）按参考强度把倍率换成绝对伤。
      */
-    private static float resolvePowerScaled(@Nullable LivingEntity owner, float baselinePoints, SkillDamageType damageType)
+    private static float resolvePowerScaled(@Nullable LivingEntity owner, float skillRatio, SkillDamageType damageType)
     {
         return switch (damageType)
         {
-            case TECHNIQUE -> SkillDamageResolver.technique(owner, baselinePoints);
-            case MARTIAL -> SkillDamageResolver.physical(owner, baselinePoints);
-            case COMPOSITE -> (SkillDamageResolver.technique(owner, baselinePoints)
-                    + SkillDamageResolver.physical(owner, baselinePoints)) * 0.5F;
+            case TECHNIQUE -> SkillDamageResolver.technique(owner, skillRatio);
+            case MARTIAL -> SkillDamageResolver.physical(owner, skillRatio);
+            case COMPOSITE -> (SkillDamageResolver.technique(owner, skillRatio)
+                    + SkillDamageResolver.physical(owner, skillRatio)) * 0.5F;
         };
     }
 

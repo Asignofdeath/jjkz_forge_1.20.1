@@ -7,6 +7,8 @@ import com.lowdragmc.lowdraglib.utils.Size;
 import com.darkness.jujutsukaisenzone.client.TechniqueSkillTooltipHelper;
 import com.darkness.jujutsukaisenzone.network.ModNetwork;
 import com.darkness.jujutsukaisenzone.technique.crit.CritSkillPolicy;
+import com.darkness.jujutsukaisenzone.technique.development.SkillLevelRules;
+import com.darkness.jujutsukaisenzone.technique.development.SkillUpgradeCost.CursedObjectIngredient;
 import com.darkness.jujutsukaisenzone.technique.development.SkillUpgradeCostRegistry;
 import com.darkness.jujutsukaisenzone.technique.development.SkillUpgradeLogic;
 import com.darkness.jujutsukaisenzone.technique.description.TechniqueSkillDescriptionKeys;
@@ -20,6 +22,7 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import org.joml.Vector4f;
@@ -237,10 +240,69 @@ public final class SkillTreeNodeWidget extends com.lowdragmc.lowdraglib.gui.widg
 
         SkillUnlockLogic.findSkillDefinition(techniqueId, nodeDef.skillId()).ifPresentOrElse(
                 skill -> {
-                    List<Component> tooltip = TechniqueSkillTooltipHelper.build(player, techniqueId, skill);
+                    List<Component> tooltip = new ArrayList<>(
+                            TechniqueSkillTooltipHelper.build(player, techniqueId, skill));
+                    if (state == TechniqueSkillTreeViewHelper.NodeVisualState.SKILL_UNLOCKED)
+                    {
+                        appendUpgradeCostLines(tooltip, player, nodeDef.skillId());
+                    }
                     setHoverTooltips(tooltip.toArray(Component[]::new));
                 },
                 () -> clearHoverTooltips());
+    }
+
+    /** 已解锁且可升级时，追加下一级 XP / 咒物需求与背包数量。 */
+    private void appendUpgradeCostLines(List<Component> tooltip, Player player, String skillId)
+    {
+        if (!SkillUpgradeCostRegistry.isUpgradeable(skillId))
+        {
+            return;
+        }
+        int level = SkillUpgradeLogic.getSkillLevel(player, techniqueId, skillId);
+        tooltip.add(Component.empty());
+        tooltip.add(Component.translatable("gui.jujutsukaisenzone.skill_tree.upgrade_level", level)
+                .withStyle(ChatFormatting.AQUA));
+        if (SkillLevelRules.isMaxLevel(level))
+        {
+            tooltip.add(Component.translatable("gui.jujutsukaisenzone.skill_tree.upgrade_max")
+                    .withStyle(ChatFormatting.GOLD));
+            return;
+        }
+        SkillUpgradeCostRegistry.costForNextLevel(skillId, level).ifPresent(cost -> {
+            tooltip.add(Component.translatable("gui.jujutsukaisenzone.skill_tree.upgrade_header")
+                    .withStyle(ChatFormatting.YELLOW));
+            if (player.isCreative())
+            {
+                tooltip.add(Component.translatable("gui.jujutsukaisenzone.skill_tree.upgrade_creative_free")
+                        .withStyle(ChatFormatting.GREEN));
+                tooltip.add(Component.translatable("gui.jujutsukaisenzone.skill_tree.upgrade_hint")
+                        .withStyle(ChatFormatting.GRAY));
+                return;
+            }
+            boolean xpOk = player.experienceLevel >= cost.vanillaXpLevels();
+            tooltip.add(Component.translatable(
+                            "gui.jujutsukaisenzone.skill_tree.upgrade_xp",
+                            cost.vanillaXpLevels(),
+                            player.experienceLevel)
+                    .withStyle(xpOk ? ChatFormatting.GREEN : ChatFormatting.RED));
+            for (CursedObjectIngredient ingredient : cost.cursedObjects())
+            {
+                ItemStack stack = ingredient.createStack();
+                int owned = SkillUpgradeLogic.countItem(player, ingredient.item().get());
+                boolean ok = owned >= ingredient.count();
+                tooltip.add(Component.translatable(
+                                "gui.jujutsukaisenzone.skill_tree.upgrade_item",
+                                stack.getHoverName(),
+                                ingredient.count(),
+                                owned)
+                        .withStyle(ok ? ChatFormatting.GREEN : ChatFormatting.RED));
+            }
+            if (SkillUpgradeLogic.meetsCost(player, cost))
+            {
+                tooltip.add(Component.translatable("gui.jujutsukaisenzone.skill_tree.upgrade_hint")
+                        .withStyle(ChatFormatting.GRAY));
+            }
+        });
     }
 
     /**
@@ -335,12 +397,18 @@ public final class SkillTreeNodeWidget extends com.lowdragmc.lowdraglib.gui.widg
         }
         TechniqueSkillTreeViewHelper.NodeVisualState state =
                 TechniqueSkillTreeViewHelper.getVisualState(player, techniqueId, nodeDef);
-        if (state == TechniqueSkillTreeViewHelper.NodeVisualState.SKILL_UNLOCKED
-                && SkillUpgradeCostRegistry.isUpgradeable(nodeDef.skillId())
-                && SkillUpgradeLogic.canUpgradeSkill(player, techniqueId, nodeDef.skillId()))
+        if (state != TechniqueSkillTreeViewHelper.NodeVisualState.SKILL_UNLOCKED
+                || !SkillUpgradeCostRegistry.isUpgradeable(nodeDef.skillId()))
         {
-            ModNetwork.sendUpgradeSkillRequest(techniqueId, nodeDef.skillId());
+            return true;
         }
+        int level = SkillUpgradeLogic.getSkillLevel(player, techniqueId, nodeDef.skillId());
+        if (SkillLevelRules.isMaxLevel(level))
+        {
+            return true;
+        }
+        // 材料不足也发请求，由服务端回传 MISSING_* 提示。
+        ModNetwork.sendUpgradeSkillRequest(techniqueId, nodeDef.skillId());
         return true;
     }
 }

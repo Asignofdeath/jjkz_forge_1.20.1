@@ -1,6 +1,9 @@
 package com.darkness.jujutsukaisenzone.technique.shikigami.tenshadows.ability;
 
+import com.darkness.jujutsukaisenzone.technique.TechniqueDamageSources;
 import com.darkness.jujutsukaisenzone.technique.skill.TenShadowsSummonLogic;
+import com.darkness.jujutsukaisenzone.technique.skill.tenshadows.TenShadowsShikigamiSkillRatios;
+import com.darkness.jujutsukaisenzone.technique.skillset.SkillDamageType;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.BlockParticleOption;
 import net.minecraft.core.particles.ParticleTypes;
@@ -18,7 +21,6 @@ import java.util.UUID;
 /** 大蛇突袭：钻地计时结束后在目标脚下破土。 */
 public final class GreatSerpentAmbushTicker
 {
-    private static final float DAMAGE = 12.0F;
     private static final int CONTROL_TICKS = 20 * 3;
 
     private GreatSerpentAmbushTicker()
@@ -73,7 +75,8 @@ public final class GreatSerpentAmbushTicker
         mob.getPersistentData().putBoolean(GreatSerpentAmbushLogic.TAG_ALLOW_STRIKE, true);
         try
         {
-            target.hurt(mob.damageSources().mobAttack(mob), DAMAGE);
+            TechniqueDamageSources.deal(target, mob, TenShadowsShikigamiSkillRatios.GREAT_SERPENT_AMBUSH,
+                    SkillDamageType.MARTIAL);
             /* 控制占位：强减速 + 缓慢坠落感（挖掘疲劳作「缚住」观感） */
             target.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, CONTROL_TICKS, 4, false, true, true));
             target.addEffect(new MobEffectInstance(MobEffects.DIG_SLOWDOWN, CONTROL_TICKS, 1, false, true, true));

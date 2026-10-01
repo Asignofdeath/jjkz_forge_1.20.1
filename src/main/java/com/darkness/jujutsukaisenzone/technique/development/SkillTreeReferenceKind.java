@@ -11,6 +11,8 @@ public enum SkillTreeReferenceKind
     BLACK_FLASH_COUNT,
     /** 降灵术等级：{@code referenceId} 为 {@link com.darkness.jujutsukaisenzone.player.SeanceTechniqueLevel} 枚举名。 */
     SEANCE_TECHNIQUE_LEVEL,
+    /** 结界术等级：{@code referenceId} 为 {@link com.darkness.jujutsukaisenzone.player.BarrierTechniqueLevel} 枚举名。 */
+    BARRIER_TECHNIQUE_LEVEL,
     /** 咒术等级：{@code referenceId} 为 {@link com.darkness.jujutsukaisenzone.player.PlayerCursedGradeData} 的 rank 整数字符串。 */
     CURSED_GRADE
 }

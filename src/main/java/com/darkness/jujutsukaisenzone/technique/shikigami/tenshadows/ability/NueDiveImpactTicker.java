@@ -1,7 +1,10 @@
 package com.darkness.jujutsukaisenzone.technique.shikigami.tenshadows.ability;
 
+import com.darkness.jujutsukaisenzone.technique.TechniqueDamageSources;
 import com.darkness.jujutsukaisenzone.technique.skill.TenShadowsShikigami;
 import com.darkness.jujutsukaisenzone.technique.skill.TenShadowsSummonLogic;
+import com.darkness.jujutsukaisenzone.technique.skill.tenshadows.TenShadowsShikigamiSkillRatios;
+import com.darkness.jujutsukaisenzone.technique.skillset.SkillDamageType;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
@@ -14,7 +17,6 @@ public final class NueDiveImpactTicker
 {
     public static final String TAG_DIVE_TARGET = "jujutsukaisenzone_nue_dive_target";
     public static final String TAG_DIVE_TICKS = "jujutsukaisenzone_nue_dive_ticks";
-    private static final float DAMAGE = 10.0F;
     private static final double HIT_RANGE_SQ = 3.5D * 3.5D;
 
     private NueDiveImpactTicker()
@@ -56,7 +58,8 @@ public final class NueDiveImpactTicker
         }
         if (mob.distanceToSqr(target) <= HIT_RANGE_SQ)
         {
-            target.hurt(mob.damageSources().mobAttack(mob), DAMAGE);
+            TechniqueDamageSources.deal(target, mob, TenShadowsShikigamiSkillRatios.NUE_DIVE,
+                    SkillDamageType.MARTIAL);
             clear(mob);
         }
     }

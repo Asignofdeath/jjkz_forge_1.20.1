@@ -1,5 +1,6 @@
 package com.darkness.jujutsukaisenzone.technique.development;
 
+import com.darkness.jujutsukaisenzone.player.BarrierTechniqueLevel;
 import net.minecraft.world.entity.player.Player;
 
 /**
@@ -45,6 +46,14 @@ public record UnlockCondition(UnlockConditionType type, String arg)
     public static UnlockCondition hasTamedShikigami(String shikigamiId)
     {
         return new UnlockCondition(UnlockConditionType.HAS_TAMED_SHIKIGAMI, shikigamiId == null ? "" : shikigamiId);
+    }
+
+    /** 结界术等级至少达到指定档（含更高等级）。 */
+    public static UnlockCondition minBarrierTechniqueLevel(BarrierTechniqueLevel level)
+    {
+        return new UnlockCondition(
+                UnlockConditionType.MIN_BARRIER_TECHNIQUE_LEVEL,
+                level == null ? BarrierTechniqueLevel.UNLEARNED.name() : level.name());
     }
 
     public boolean evaluate(Player player)

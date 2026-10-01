@@ -5,6 +5,7 @@ import com.darkness.jujutsukaisenzone.event.LimitlessPurpleShiftSpecialEvents;
 import com.darkness.jujutsukaisenzone.entity.SpecialEffectEntity;
 import com.darkness.jujutsukaisenzone.entity.behavior.LimitlessRemoteMurasakiBehavior;
 import com.darkness.jujutsukaisenzone.entity.data.LimitlessRemoteMurasakiConfig;
+import com.darkness.jujutsukaisenzone.player.BarrierTechniqueLevel;
 import com.darkness.jujutsukaisenzone.player.PlayerCursedEnergyData;
 import com.darkness.jujutsukaisenzone.player.PlayerHoldReleaseChargeData;
 import com.darkness.jujutsukaisenzone.player.PlayerCursedGradeData;
@@ -34,6 +35,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 /**
  * 无下限术式：招式槽与苍、赫、茈（槽位3）等具体演出。
@@ -83,7 +85,19 @@ public final class LimitlessTechniqueSkillSet extends AbstractInnateTechniqueSki
     public static final String SKILL_RED = "limitless_red";
     public static final String SKILL_PURPLE = "limitless_purple";
     public static final String SKILL_REMOTE_PURPLE = "limitless_remote_murasaki";
+    /** 机制型：解锁「领域模式 · 瞬发」（0.2 秒领域展开，叙事名）。 */
+    public static final String SKILL_INSTANT_DOMAIN = "limitless_instant_domain";
     public static final String REF_CURSED_GRADE_SPECIAL = "ref_cursed_grade_special";
+    public static final String REF_BARRIER_MASTERED = "ref_barrier_mastered";
+
+    private static final String TAG_INSTANT_DOMAIN_UNLOCK = "jujutsukaisenzone_limitless_instant_domain_unlock";
+    private static final String ICON_INSTANT_DOMAIN = "textures/item/innate_technique_limitless.png";
+
+    private static final TechniqueSkill MECHANIC_INSTANT_DOMAIN = new TechniqueSkill(
+            SKILL_INSTANT_DOMAIN, 0, Component.literal("0.2秒的领域展开"), ICON_INSTANT_DOMAIN,
+            0, 0, 0, "", TAG_INSTANT_DOMAIN_UNLOCK, "");
+
+    private static final List<TechniqueSkill> MECHANICS = List.of(MECHANIC_INSTANT_DOMAIN);
 
     private static final List<TechniqueSkill> SKILLS = Arrays.asList(
             new TechniqueSkill(SKILL_BLUE, 1, net.minecraft.network.chat.Component.literal("苍"),
@@ -136,6 +150,22 @@ public final class LimitlessTechniqueSkillSet extends AbstractInnateTechniqueSki
                     .requires("limitless_purple")
                     .visibleWhen(UnlockCondition.hasDomainExpansion())
                     .build())
+            .node(SkillTreeNodeDef.reference(
+                    REF_BARRIER_MASTERED,
+                    SkillTreeReferenceKind.BARRIER_TECHNIQUE_LEVEL,
+                    BarrierTechniqueLevel.MASTERED.name()
+            ).requires("limitless_purple").build())
+            /*
+             * 机制型：「0.2秒的领域展开」——解锁通用圆盘「领域模式」的瞬发档。
+             * 条件：已习得领域展开 + 结界术达到掌握（熟练）；前置节点用引用节点展示结界等级。
+             */
+            .node(SkillTreeNodeDef.skill("limitless_instant_domain", SKILL_INSTANT_DOMAIN)
+                    .requires("limitless_purple", REF_BARRIER_MASTERED)
+                    .conditions(
+                            UnlockCondition.hasDomainExpansion(),
+                            UnlockCondition.minBarrierTechniqueLevel(BarrierTechniqueLevel.MASTERED))
+                    .intelCost(300)
+                    .build())
             .build();
 
     /**
@@ -155,7 +185,7 @@ public final class LimitlessTechniqueSkillSet extends AbstractInnateTechniqueSki
 
     static
     {
-        SKILL_TREE.validateAgainstSkills(SKILLS);
+        SKILL_TREE.validateAgainstSkills(Stream.concat(SKILLS.stream(), MECHANICS.stream()).toList());
     }
 
     @Override
@@ -180,6 +210,12 @@ public final class LimitlessTechniqueSkillSet extends AbstractInnateTechniqueSki
     public List<TechniqueSkill> getConfigurableSkills()
     {
         return SKILLS;
+    }
+
+    @Override
+    public List<TechniqueSkill> getMechanicSkills()
+    {
+        return MECHANICS;
     }
 
     @Override
@@ -364,6 +400,11 @@ public final class LimitlessTechniqueSkillSet extends AbstractInnateTechniqueSki
         if (usesSkillCooldown(player))
         {
             setSkillCooldown(player, skill, now + skill.cooldownTicks());
+        }
+        if (abortCastIfBrainDamageFailed(player))
+        {
+            discardRemoteMurasakiChargeEntity(player, entityUuid);
+            return;
         }
         launchRemoteMurasakiHoldRelease(player, entityUuid);
     }

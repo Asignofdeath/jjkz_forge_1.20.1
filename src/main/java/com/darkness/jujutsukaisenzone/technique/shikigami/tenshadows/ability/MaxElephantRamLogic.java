@@ -1,8 +1,11 @@
 package com.darkness.jujutsukaisenzone.technique.shikigami.tenshadows.ability;
 
+import com.darkness.jujutsukaisenzone.technique.TechniqueDamageSources;
 import com.darkness.jujutsukaisenzone.technique.shikigami.ShikigamiAbility;
 import com.darkness.jujutsukaisenzone.technique.shikigami.ShikigamiAbilitySource;
 import com.darkness.jujutsukaisenzone.technique.skill.TenShadowsSummonLogic;
+import com.darkness.jujutsukaisenzone.technique.skill.tenshadows.TenShadowsShikigamiSkillRatios;
+import com.darkness.jujutsukaisenzone.technique.skillset.SkillDamageType;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
@@ -14,7 +17,6 @@ import net.minecraft.world.phys.Vec3;
 public final class MaxElephantRamLogic
 {
     private static final double RANGE = 3.5D;
-    private static final float DAMAGE = 8.0F;
 
     private MaxElephantRamLogic()
     {
@@ -37,7 +39,8 @@ public final class MaxElephantRamLogic
             return false;
         }
 
-        target.hurt(elephant.damageSources().mobAttack(elephant), DAMAGE);
+        TechniqueDamageSources.deal(target, elephant, TenShadowsShikigamiSkillRatios.MAX_ELEPHANT_RAM,
+                SkillDamageType.MARTIAL);
         Vec3 away = target.position().subtract(elephant.position());
         if (away.lengthSqr() < 1.0E-4D)
         {
