@@ -7,6 +7,7 @@ import com.darkness.jujutsukaisenzone.entity.DemonSubduingShrineEntity;
 import com.darkness.jujutsukaisenzone.entity.JudgeEntity;
 import com.darkness.jujutsukaisenzone.entity.GavelProjectileEntity;
 import com.darkness.jujutsukaisenzone.entity.JadeDogEntity;
+import com.darkness.jujutsukaisenzone.entity.JujutsuCouncilStaffEntity;
 import com.darkness.jujutsukaisenzone.entity.MahoragaEntity;
 import com.darkness.jujutsukaisenzone.entity.SpecialEffectEntity;
 import com.darkness.jujutsukaisenzone.entity.WedgeEntity;
@@ -103,6 +104,16 @@ public final class ModEntities
                             .clientTrackingRange(16)
                             .updateInterval(Integer.MAX_VALUE)
                             .build("wedge"));
+
+    /** 咒术议会工作人员（Steve 体型站桩联络 NPC） */
+    public static final RegistryObject<EntityType<JujutsuCouncilStaffEntity>> JUJUTSU_COUNCIL_STAFF =
+            ENTITY_TYPES.register("jujutsu_council_staff",
+                    () -> EntityType.Builder.<JujutsuCouncilStaffEntity>of(
+                                    JujutsuCouncilStaffEntity::new, MobCategory.MISC)
+                            .sized(0.6F, 1.8F)
+                            .clientTrackingRange(10)
+                            .fireImmune()
+                            .build("jujutsu_council_staff"));
 
     private ModEntities()
     {

@@ -38,6 +38,22 @@
       }
     ]
   },
+  "domain.limitless_instant_domain": {
+    "subtitle": "subtitles.jujutsukaisenzone.domain.limitless_instant_domain",
+    "sounds": [
+      {
+        "name": "jujutsukaisenzone:domain/limitless_instant_domain"
+      }
+    ]
+  },
+  "domain.limitless_open_domain": {
+    "subtitle": "subtitles.jujutsukaisenzone.domain.limitless_open_domain",
+    "sounds": [
+      {
+        "name": "jujutsukaisenzone:domain/limitless_open_domain"
+      }
+    ]
+  },
   "domain.limitless_domain_sound": {
     "subtitle": "subtitles.jujutsukaisenzone.domain.limitless_domain_sound",
     "sounds": [

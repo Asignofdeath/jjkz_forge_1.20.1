@@ -6,25 +6,29 @@ import com.darkness.jujutsukaisenzone.technique.skillset.LimitlessTechniqueSkill
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 领域展开模式：常规 / 瞬发。会话态，默认常规。
+ * 领域展开模式：常规 / 瞬发 / 开放式。会话态，默认常规。
  * <p>
- * 瞬发仅在已解锁无下限「0.2秒的领域展开」时可用；未解锁时强制常规。
+ * 瞬发：已解锁无下限「0.2秒的领域展开」。
+ * 开放式：已解锁无下限「开放式无量空处」。
  */
 public final class PlayerDomainModeData
 {
     public enum Mode
     {
         NORMAL,
-        INSTANT
+        INSTANT,
+        OPEN
     }
 
     private static final Map<UUID, Mode> MODE = new ConcurrentHashMap<>();
-    private static final String CLIENT_TAG = "jujutsukaisenzone_domain_mode_instant";
+    private static final String CLIENT_TAG = "jujutsukaisenzone_domain_mode";
 
     private PlayerDomainModeData()
     {
@@ -36,20 +40,27 @@ public final class PlayerDomainModeData
         {
             return Mode.NORMAL;
         }
-        if (!canUseInstantMode(player))
-        {
-            return Mode.NORMAL;
-        }
+        Mode raw;
         if (player.level().isClientSide)
         {
-            return player.getPersistentData().getBoolean(CLIENT_TAG) ? Mode.INSTANT : Mode.NORMAL;
+            String name = player.getPersistentData().getString(CLIENT_TAG);
+            raw = parseMode(name);
         }
-        return MODE.getOrDefault(player.getUUID(), Mode.NORMAL);
+        else
+        {
+            raw = MODE.getOrDefault(player.getUUID(), Mode.NORMAL);
+        }
+        return sanitize(player, raw);
     }
 
     public static boolean isInstant(Player player)
     {
         return get(player) == Mode.INSTANT;
+    }
+
+    public static boolean isOpen(Player player)
+    {
+        return get(player) == Mode.OPEN;
     }
 
     public static boolean canUseInstantMode(Player player)
@@ -62,23 +73,67 @@ public final class PlayerDomainModeData
                         LimitlessTechniqueSkillSet.SKILL_INSTANT_DOMAIN);
     }
 
-    public static void applyClientSnapshot(Player player, boolean instant)
+    public static boolean canUseOpenMode(Player player)
+    {
+        return player != null
+                && PlayerTechniqueData.isLimitless(player)
+                && SkillUnlockLogic.isSkillUnlockedById(
+                        player,
+                        PlayerTechniqueData.TECHNIQUE_LIMITLESS,
+                        LimitlessTechniqueSkillSet.SKILL_OPEN_DOMAIN);
+    }
+
+    public static boolean canUseDomainModeWheel(Player player)
+    {
+        return canUseInstantMode(player) || canUseOpenMode(player);
+    }
+
+    public static List<Mode> availableModes(Player player)
+    {
+        List<Mode> modes = new ArrayList<>(3);
+        modes.add(Mode.NORMAL);
+        if (canUseInstantMode(player))
+        {
+            modes.add(Mode.INSTANT);
+        }
+        if (canUseOpenMode(player))
+        {
+            modes.add(Mode.OPEN);
+        }
+        return modes;
+    }
+
+    public static void applyClientSnapshot(Player player, Mode mode)
     {
         if (player == null)
         {
             return;
         }
-        player.getPersistentData().putBoolean(CLIENT_TAG, instant);
+        player.getPersistentData().putString(CLIENT_TAG, sanitize(player, mode).name());
+    }
+
+    /** @deprecated 兼容旧包；请用 {@link #applyClientSnapshot(Player, Mode)} */
+    @Deprecated
+    public static void applyClientSnapshot(Player player, boolean instant)
+    {
+        applyClientSnapshot(player, instant ? Mode.INSTANT : Mode.NORMAL);
     }
 
     public static Mode toggle(ServerPlayer player)
     {
-        if (!canUseInstantMode(player))
+        List<Mode> available = availableModes(player);
+        if (available.size() <= 1)
         {
             set(player, Mode.NORMAL);
             return Mode.NORMAL;
         }
-        Mode next = isInstant(player) ? Mode.NORMAL : Mode.INSTANT;
+        Mode current = get(player);
+        int idx = available.indexOf(current);
+        if (idx < 0)
+        {
+            idx = 0;
+        }
+        Mode next = available.get((idx + 1) % available.size());
         set(player, next);
         return next;
     }
@@ -89,15 +144,15 @@ public final class PlayerDomainModeData
         {
             return;
         }
-        Mode resolved = mode == Mode.INSTANT && canUseInstantMode(player) ? Mode.INSTANT : Mode.NORMAL;
+        Mode resolved = sanitize(player, mode == null ? Mode.NORMAL : mode);
         if (resolved == Mode.NORMAL)
         {
             MODE.remove(player.getUUID());
-            CommandWheelNetwork.sendDomainModeSync(player, false);
+            CommandWheelNetwork.sendDomainModeSync(player, Mode.NORMAL);
             return;
         }
-        MODE.put(player.getUUID(), Mode.INSTANT);
-        CommandWheelNetwork.sendDomainModeSync(player, true);
+        MODE.put(player.getUUID(), resolved);
+        CommandWheelNetwork.sendDomainModeSync(player, resolved);
     }
 
     public static void clear(ServerPlayer player)
@@ -106,11 +161,11 @@ public final class PlayerDomainModeData
         {
             return;
         }
-        boolean wasInstant = MODE.containsKey(player.getUUID());
+        boolean had = MODE.containsKey(player.getUUID());
         MODE.remove(player.getUUID());
-        if (wasInstant)
+        if (had)
         {
-            CommandWheelNetwork.sendDomainModeSync(player, false);
+            CommandWheelNetwork.sendDomainModeSync(player, Mode.NORMAL);
         }
     }
 
@@ -127,6 +182,54 @@ public final class PlayerDomainModeData
         if (player != null)
         {
             MODE.remove(player.getUUID());
+        }
+    }
+
+    public static String langKey(Mode mode)
+    {
+        return switch (mode == null ? Mode.NORMAL : mode)
+        {
+            case INSTANT -> "command_wheel.jujutsukaisenzone.domain_mode_instant";
+            case OPEN -> "command_wheel.jujutsukaisenzone.domain_mode_open";
+            default -> "command_wheel.jujutsukaisenzone.domain_mode_normal";
+        };
+    }
+
+    private static Mode sanitize(Player player, Mode mode)
+    {
+        if (mode == Mode.INSTANT && !canUseInstantMode(player))
+        {
+            return Mode.NORMAL;
+        }
+        if (mode == Mode.OPEN && !canUseOpenMode(player))
+        {
+            return Mode.NORMAL;
+        }
+        return mode == null ? Mode.NORMAL : mode;
+    }
+
+    private static Mode parseMode(String name)
+    {
+        if (name == null || name.isEmpty())
+        {
+            return Mode.NORMAL;
+        }
+        /* 兼容旧客户端布尔快照残留 */
+        if ("true".equalsIgnoreCase(name))
+        {
+            return Mode.INSTANT;
+        }
+        if ("false".equalsIgnoreCase(name))
+        {
+            return Mode.NORMAL;
+        }
+        try
+        {
+            return Mode.valueOf(name);
+        }
+        catch (IllegalArgumentException ignored)
+        {
+            return Mode.NORMAL;
         }
     }
 }

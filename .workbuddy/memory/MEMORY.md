@@ -18,7 +18,7 @@
 
 ## 跨模块铁律
 - ⛔ **用户口述文案逐字照写**：不改大小写/引号、不补字顺句、不点评不追问（见用户级 MEMORY.md）。
-- ⛔ **一切伤害乘算只在 `TechniqueDamageZoneEvents` 里落地**（增伤/减伤/易伤/标签抗性…），**别在别的监听器裸写 `setAmount`**。优先级链勿动：处刑人 HIGHEST（改写）→ 管线 HIGH → 罪恶者/黑闪/打断 NORMAL。⚠️ 加新乘区前**先读那个类的注释**（区序与约束都写在那儿）。
+- ⛔ **一切伤害乘算只在 `TechniqueDamageZoneEvents` 里落地**（增伤/减伤/易伤/标签抗性…），**别在别的监听器裸写 `setAmount`**。优先级链勿动：处刑人 HIGHEST（改写）→ 管线 HIGH → 罪恶者/黑闪/打断 NORMAL。⚠️ 加新乘区前**先读那个类的注释**（区序与约束都写在那儿）。**现行段序（2026-10-03）**：`0 强度换算 → 1 增伤 → C 暴击 → [LivingDamageEvent 区 2 防御] → 3 ZONE 减免 → 4 韧性减免 → V 伤害浮动`；**区 V** = 基础随机浮动（`Config.damageVariance.enabled/spread`，默认 ±10%），每次命中独立 roll、直接乘最终落地伤害，**排除处刑人之剑必杀**（致死量改写，浮动低段会让必杀失效）。
 - ⛔ **事件阶段口径**：`LivingHurtEvent` 在**原版护甲之前**；`LivingDamageEvent` 在护甲/附魔/抗性/黄心**之后**（所以区 2 目标防御层挂后者才能对总减伤封顶）。
 - ⚠️ **技能描述必须写「玩家当前做得到的事」**：被门控掉的内容要整段消失，只留「解锁 X 后会怎样」（对照「三式法槌」的写法）。走 `TechniqueSkillDescriptionRegistry#registerVariant`，**`.brief` 简洁页也要换**（它是悬停框默认视图）；后缀键 zh_cn 与 en_us **双侧都写**，缺一侧直接显示键名。
 - ⚠️ **术式伤害走 `TechniqueDamageSources.deal`**（否则无归因：不给经验/不掉情报/不记罪恶者/黑闪击杀检测失效）。但**判据是「有没有归因」不是「有没有走 deal」**——`thrown(direct, owner)` 归因本就通；硬改走 deal 是**回归**（deal 把 `directEntity` 填 null ⇒ 盾挡不住 + 打掉依赖 `getDirectEntity()` 的判定 + 物理伤害变无视护甲）。
@@ -33,6 +33,7 @@
 - ⛔ **强度换算只在 `TechniqueDamageSources.deal` 内做一次**；出伤点再乘就是双计（例外：直连 `hurt` 不走 deal 的茈/远程茈/灶/法槌投掷）。EF / 原版近战由区 0 接管，靠 `POWER_ALREADY_SCALED` 识别。
 - ⛔ `CursedGradeBonuses` **不许**再给 `ATTACK_DAMAGE` 加等级值（改与等级无关的 `ATTACK_BASE_UUID +1.0`）；等级成长全由强度面板承担。强化术的 +40% ATTACK 故意留在属性层。
 - ⚠️ **黑闪 `pow(x, 2.5)` 必须拿「强度放大前」的原始值取幂**，再线性乘回（`pow(raw) × scaled/raw`）；直接对已放大值取幂 ⇒ 特级指数爆炸。
+- ⛔ **技能演出默认不锁操作**（2026-10-02 立）：前摇 / 演出期间**不锁**移动、输入与镜头，除非该演出本身有特殊需求。前摇只用「延后成型」制造时间成本（范例：开放式无量空处的 `openDomainLeadInMap`，70 tick，仅死亡 / 脱离战斗模式 / 切走开放式才中断）。
 
 ## SE 术式侵入 / 咒力特质 / 统一质量池（2026-09-27 落地）
 - **质量 = Σ(已点亮 SP 节点的 spCost) + Σ(已装载 SE 的 quality)**，不是节点个数。上限 = 玩家数据 `spNodeQuality`（默认 6）；宽限 `Config.seQualityAllowance`（默认 2）；**超过上限才吃超载罚**（每点扣体术/术式强度各 `seOverloadPowerPenaltyPerPoint`），越过 上限+宽限 **直接拒装**。SP 点数（购买力）与质量（占位）是两套账。统一入口 `PlayerQualityPoolData`。

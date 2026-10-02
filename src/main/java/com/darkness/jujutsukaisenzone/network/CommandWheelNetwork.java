@@ -62,8 +62,17 @@ public final class CommandWheelNetwork
         CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new SyncTenShadowsStanceS2CPacket(guard));
     }
 
+    public static void sendDomainModeSync(ServerPlayer player, com.darkness.jujutsukaisenzone.player.PlayerDomainModeData.Mode mode)
+    {
+        CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new SyncDomainModeS2CPacket(mode));
+    }
+
+    /** @deprecated 请用 {@link #sendDomainModeSync(ServerPlayer, com.darkness.jujutsukaisenzone.player.PlayerDomainModeData.Mode)} */
+    @Deprecated
     public static void sendDomainModeSync(ServerPlayer player, boolean instant)
     {
-        CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new SyncDomainModeS2CPacket(instant));
+        sendDomainModeSync(player, instant
+                ? com.darkness.jujutsukaisenzone.player.PlayerDomainModeData.Mode.INSTANT
+                : com.darkness.jujutsukaisenzone.player.PlayerDomainModeData.Mode.NORMAL);
     }
 }

@@ -63,17 +63,16 @@ public final class CommandWheelActions
 
     private static void toggleDomainMode(ServerPlayer player)
     {
-        if (!PlayerDomainModeData.canUseInstantMode(player))
+        if (!PlayerDomainModeData.canUseDomainModeWheel(player))
         {
             return;
         }
         PlayerDomainModeData.Mode mode = PlayerDomainModeData.toggle(player);
-        boolean instant = mode == PlayerDomainModeData.Mode.INSTANT;
         player.displayClientMessage(
-                Component.translatable(instant
-                                ? "command_wheel.jujutsukaisenzone.domain_mode_instant"
-                                : "command_wheel.jujutsukaisenzone.domain_mode_normal")
-                        .withStyle(instant ? ChatFormatting.AQUA : ChatFormatting.GRAY),
+                Component.translatable(PlayerDomainModeData.langKey(mode))
+                        .withStyle(mode == PlayerDomainModeData.Mode.NORMAL
+                                ? ChatFormatting.GRAY
+                                : ChatFormatting.AQUA),
                 true);
     }
 

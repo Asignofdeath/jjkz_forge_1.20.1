@@ -28,12 +28,10 @@ public final class CommandWheelCatalog
 
     private static final CommandWheelEntry DOMAIN_MODE = new CommandWheelEntry(
             CommandWheelIds.DOMAIN_MODE,
-            player -> Component.translatable(PlayerDomainModeData.isInstant(player)
-                    ? "command_wheel.jujutsukaisenzone.domain_mode_instant"
-                    : "command_wheel.jujutsukaisenzone.domain_mode_normal"),
-            player -> EpicFightCompat.isBattleMode(player) && PlayerDomainModeData.canUseInstantMode(player),
+            player -> Component.translatable(PlayerDomainModeData.langKey(PlayerDomainModeData.get(player))),
+            player -> EpicFightCompat.isBattleMode(player) && PlayerDomainModeData.canUseDomainModeWheel(player),
             player -> true,
-            PlayerDomainModeData::isInstant);
+            player -> PlayerDomainModeData.get(player) != PlayerDomainModeData.Mode.NORMAL);
 
     private static final CommandWheelEntry MAHORAGA_RIDE = new CommandWheelEntry(
             CommandWheelIds.MAHORAGA_RIDE,

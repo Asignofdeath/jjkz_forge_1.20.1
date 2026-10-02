@@ -13,5 +13,7 @@ public enum ScreenShakeKind
     /** 持续开关式振动（伏魔神龛领域攻击期间）。 */
     SUSTAINED,
     /** 低频 sin 波平滑晃动（ghost_face 等）。 */
-    SMOOTH_WOBBLE
+    SMOOTH_WOBBLE,
+    /** 单次冲击：固定方向甩出再收回，不连震。 */
+    SINGLE
 }

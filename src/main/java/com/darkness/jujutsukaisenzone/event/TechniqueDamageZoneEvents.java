@@ -21,6 +21,7 @@ import com.darkness.jujutsukaisenzone.technique.skill.tenshadows.TenShadowsPrese
 import com.darkness.jujutsukaisenzone.technique.skillset.SkillDamageType;
 import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
@@ -52,6 +53,10 @@ import java.util.Map;
  *   <li><b>区 4 · 韧性条减免</b> —— 怪物韧性未破（{@code stunShield > 0}）时的减伤，
  *       取自 {@code MobPoiseEvents#damageReductionFor}。与区 3 同属「交接之后施加」的一类：
  *       不参与区 2 的封顶基准，语义与 ZONE 减伤一致。</li>
+ *   <li><b>区 V · 伤害浮动</b> —— 每次命中独立 roll，在 {@code [1-spread, 1+spread]} 内均匀随机。
+ *       与区 3 / 区 4 同属「交接之后施加」的最后一道乘区，直接落在最终伤害上。
+ *       与暴击浮动（{@code CritRules#rollVarianceMultiplier}）<b>互相独立、叠加生效</b>：
+ *       暴击是偶发的大幅偏斜，本区是每次都有的基础抖动。</li>
  * </ol>
  * 以上三区在 {@link LivingHurtEvent}（{@link EventPriority#HIGH}）内完成；<b>区 2 · 目标防御层</b>
  * （护甲 → 体术抗性 / 术式抗性，见 {@link SkillDefenseResolver}）单独挂在
@@ -230,6 +235,26 @@ public final class TechniqueDamageZoneEvents
             {
                 event.setAmount((float) (event.getAmount() * (1.0D - poiseReduction)));
             }
+        }
+
+        // —— 区 V：伤害浮动（每次命中独立 roll）——
+        // 最后一道乘区，直接乘在最终落地伤害上：不参与区 2 的封顶基准（与区 3 / 区 4 同属
+        // 「交接之后施加」）。与暴击浮动互相独立、叠加生效——暴击是偶发的大幅偏斜，
+        // 本区是每次都有的基础抖动，两者乘在一起。
+        // ⚠️ 排除处刑人之剑的必杀：它的伤害量是 HIGHEST 优先级改写的固定致死值，
+        //    再乘一道浮动会把它压到致死线以下（roll 到低段时必杀失效），判定复用分型解析的同一方法。
+        // ⚠️ 关闭开关 / spread = 0 时结果不变，整体退回固定出伤。
+        if (Config.damageVarianceEnabled
+                && Config.damageVarianceSpread > 0.0D
+                && event.getAmount() > 0.0F
+                && !isExecutionersLethal(source, target))
+        {
+            RandomSource random = source.getEntity() instanceof LivingEntity livingAttacker
+                    ? livingAttacker.getRandom()
+                    : target.getRandom();
+            float spread = (float) Config.damageVarianceSpread;
+            float multiplier = 1.0F + (random.nextFloat() * 2.0F - 1.0F) * spread;
+            event.setAmount(event.getAmount() * multiplier);
         }
     }
 
@@ -434,6 +459,19 @@ public final class TechniqueDamageZoneEvents
             return true;
         }
         return source.getDirectEntity() == attacker;
+    }
+
+    /**
+     * 是否为处刑人之剑对【死刑】目标的必杀一击。
+     * <p>
+     * 该一击的伤害量在 {@link EventPriority#HIGHEST} 被改写成固定致死值，故区 V 的浮动乘区
+     * 必须排除它——否则 roll 到低段会把致死量乘回致死线以下。判定与区 0 的排除共用
+     * {@link #isExecutionersComposite}，口径一致。
+     */
+    private static boolean isExecutionersLethal(DamageSource source, LivingEntity target)
+    {
+        return source.getEntity() instanceof ServerPlayer attacker
+                && isExecutionersComposite(attacker, target, source);
     }
 
     /** 十划弱点：击破成功则强制本击暴击（浮动乘区仍 roll）。 */

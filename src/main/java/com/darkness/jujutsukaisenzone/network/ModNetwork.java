@@ -463,6 +463,50 @@ public final class ModNetwork
         VisualNetwork.sendDomainWhiteCurtainElevateSync(player);
     }
 
+    public static void sendCinematicLetterboxSync(ServerPlayer player, int totalTicks, int fadeInTicks, int fadeOutTicks, float barFraction)
+    {
+        VisualNetwork.sendCinematicLetterboxSync(player, totalTicks, fadeInTicks, fadeOutTicks, barFraction);
+    }
+
+    public static void sendDomainScanWaveSync(ServerPlayer player, double centerX, double centerY, double centerZ, int totalTicks, float peakRadius)
+    {
+        VisualNetwork.sendDomainScanWaveSync(player, centerX, centerY, centerZ, totalTicks, peakRadius);
+    }
+
+    public static void sendSpaceWarpSync(ServerPlayer player, boolean enabled, float intensity)
+    {
+        VisualNetwork.sendSpaceWarpSync(player, enabled, intensity);
+    }
+
+    public static void sendInstantDomainCrossResidualSync(
+            ServerPlayer player,
+            double x,
+            double y,
+            double z,
+            int durationTicks,
+            float revolutions,
+            ResourceLocation textureFolder)
+    {
+        VisualNetwork.sendInstantDomainCrossResidualSync(player, x, y, z, durationTicks, revolutions, textureFolder);
+    }
+
+    public static void sendOpenDomainCubemapSync(
+            ServerPlayer player,
+            boolean active,
+            double x,
+            double y,
+            double z,
+            int radius,
+            ResourceLocation textureFolder)
+    {
+        VisualNetwork.sendOpenDomainCubemapSync(player, active, x, y, z, radius, textureFolder);
+    }
+
+    public static void sendLimitlessDomainGarbledBurst(ServerPlayer player, double x, double y, double z)
+    {
+        VisualNetwork.sendLimitlessDomainGarbledBurst(player, x, y, z);
+    }
+
     public static void sendFugaBoomFlashSequenceSync(ServerPlayer player)
     {
         VisualNetwork.sendFugaBoomFlashSequenceSync(player);

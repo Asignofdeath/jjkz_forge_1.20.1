@@ -17,6 +17,7 @@ import com.darkness.jujutsukaisenzone.technique.se.LimitlessNearCasterExemptSeMe
 import com.darkness.jujutsukaisenzone.technique.se.SeMechanicRegistry;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.particles.DustParticleOptions;
 import net.minecraft.ChatFormatting;
 import net.minecraft.advancements.Advancement;
 import net.minecraft.network.chat.Component;
@@ -31,8 +32,10 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
+import org.joml.Vector3f;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -69,6 +72,12 @@ public final class LimitlessDomainExpansion extends AbstractTechniqueDomain
 
     /** 领域展开蓄力时间（tick），3 秒 = 60 tick */
     private static final int CAST_DELAY_TICKS = 60;
+    /**
+     * 开放式领域前摇时长（tick），4.5 秒 = 90 tick。
+     * <p>
+     * 开放式无壳、无构建，但不能与瞬发同为「无前摇秒开」；前摇期间<strong>不锁操作</strong>，只延后成型。
+     */
+    private static final int OPEN_DOMAIN_LEAD_IN_TICKS = 90;
     /** 白色滤镜总时长（tick），6 秒 = 120 tick（旧滤镜参数，保留供参考） */
     private static final int WHITE_OVERLAY_TOTAL_TICKS = 120;
     /**
@@ -108,6 +117,54 @@ public final class LimitlessDomainExpansion extends AbstractTechniqueDomain
     /** 结界完成 {@link #LOCK_PLAYER_DURATION_TICKS} 刻后球心水墨 Photon（绑定实体失效时强制清除粒子）。 */
     private static final String PHOTON_INKWASH_COMMAND =
             "photon fx photon:limitless_inkwash entity @s 0 0 0 0 0 0 1 1 1 0 true false none";
+    /**
+     * 瞬发水墨：瞬发领域球体更大（半径 32 vs 常规 24），整体放大到 1.35 倍。
+     */
+    private static final String PHOTON_INKWASH_COMMAND_INSTANT =
+            "photon fx photon:limitless_inkwash entity @s 0 0 0 0 0 0 1.35 1.35 1.35 0 true false none";
+    /**
+     * 开放式水墨：开放式球体最大（半径 64），在此前按半径比取的 2.5 倍基础上再放大到 3.5 倍。
+     */
+    private static final String PHOTON_INKWASH_COMMAND_OPEN =
+            "photon fx photon:limitless_inkwash entity @s 0 0 0 0 0 0 3.5 3.5 3.5 0 true false none";
+    /** 常规无量空处 lightline（球心 south {@link #LIGHT_LINE_SOUTH_DISTANCE} 格，原始尺寸）。 */
+    private static final String PHOTON_LIGHT_LINE_COMMAND =
+            "photon fx photon:limitless_light_line entity @s";
+    /** 开放式 lightline：球体更大，在此前 2 倍基础上再放大到 3 倍。 */
+    private static final String PHOTON_LIGHT_LINE_COMMAND_OPEN =
+            "photon fx photon:limitless_light_line entity @s 0 0 0 0 0 0 3 3 3 0 false false none";
+    /** 开放式 lightline 锚点相对球心的 south 距离（格）；常规为 {@link #LIGHT_LINE_SOUTH_DISTANCE}（配半径 24）。 */
+    private static final double OPEN_DOMAIN_LIGHT_LINE_SOUTH_DISTANCE = 44.0D;
+    /** 开放式前摇内「扫描波」时点（自前摇开始流逝的 tick）。 */
+    private static final int OPEN_DOMAIN_SCAN_WAVE_TICK = 20;
+    /**
+     * 扫描波总时长（tick）：前半程扩张、后半程收回。
+     * <p>
+     * 取 {@link #OPEN_DOMAIN_LEAD_IN_TICKS} - {@link #OPEN_DOMAIN_SCAN_WAVE_TICK}，波收完正好成型。
+     */
+    private static final int OPEN_DOMAIN_SCAN_WAVE_TOTAL_TICKS =
+            OPEN_DOMAIN_LEAD_IN_TICKS - OPEN_DOMAIN_SCAN_WAVE_TICK;
+    /**
+     * 扫描波峰值半径（格）：取开放式领域半径（{@code OPEN_DOMAIN_RADIUS} = 64）的 2 倍。
+     * <p>
+     * 与领域半径一致时扫过范围观感偏小，故让它冲出领域边界一倍 —— 视觉上像结界扩张的气浪。
+     */
+    private static final float OPEN_DOMAIN_SCAN_WAVE_PEAK_RADIUS = 128.0F;
+    /**
+     * 开放式前摇内「电影上下黑条」时点（自前摇开始流逝的 tick）。
+     * <p>
+     * 演出次序：手势动画（t=0）→ 扫描波（{@link #OPEN_DOMAIN_SCAN_WAVE_TICK}）→ 黑条 → 白幕
+     * （{@link #OPEN_DOMAIN_WHITE_CURTAIN_TICK}）→ 成型。
+     */
+    private static final int OPEN_DOMAIN_LETTERBOX_TICK = 28;
+    /** 黑条演出总时长（tick）；需跨过白幕与成型时点，避免上下黑带中途消失。 */
+    private static final int OPEN_DOMAIN_LETTERBOX_TOTAL_TICKS = 64;
+    private static final int OPEN_DOMAIN_LETTERBOX_FADE_IN_TICKS = 10;
+    private static final int OPEN_DOMAIN_LETTERBOX_FADE_OUT_TICKS = 20;
+    /** 单侧黑条占屏幕高度的比例（上下各一条，故黑带合计约占 24%）。 */
+    private static final float OPEN_DOMAIN_LETTERBOX_BAR_FRACTION = 0.12F;
+    /** 开放式前摇内白幕开始铺开的时点（自前摇开始流逝的 tick）。 */
+    private static final int OPEN_DOMAIN_WHITE_CURTAIN_TICK = 40;
     /** 完成演出时锁定施法者时长（tick） */
     private static final int LOCK_PLAYER_DURATION_TICKS = 280;
     /** Minecraft 世界坐标中 north 方向对应的固定 Yaw。 */
@@ -122,6 +179,11 @@ public final class LimitlessDomainExpansion extends AbstractTechniqueDomain
     private static final int PERFECT_CONTROL_LOCKED_TARGET_THRESHOLD = 5;
     /** 「完美控制」{@link ModSounds#SOUND_EFFECTS_IRON_SOUND} 相对默认播放音量（500%）。 */
     private static final float PERFECT_CONTROL_IRON_SOUND_VOLUME = 5.0F;
+    /** 开放式：每 tick 在领域内地板随机刷出的白色尘屑数量。 */
+    private static final int OPEN_DOMAIN_FLOOR_PARTICLES_PER_TICK = 28;
+    /** 开放式地板白色尘屑缩放。 */
+    private static final DustParticleOptions OPEN_DOMAIN_FLOOR_DUST =
+            new DustParticleOptions(new Vector3f(1.0F, 1.0F, 1.0F), 1.15F);
     /** 生物分散摆放的最小间距（格）。 */
     private static final double MOB_SCATTER_SPACING = 1.75D;
     /** 领域关闭后延续锁定的最长时间（tick），90 秒。 */
@@ -150,6 +212,8 @@ public final class LimitlessDomainExpansion extends AbstractTechniqueDomain
 
     /** 正在蓄力中的玩家 UUID → 剩余 tick 数 */
     private final ConcurrentMap<UUID, Integer> castingDelayMap = new ConcurrentHashMap<>();
+    /** 开放式前摇中的玩家 UUID → 剩余 tick 数（不锁操作，仅延后成型）。 */
+    private final ConcurrentMap<UUID, Integer> openDomainLeadInMap = new ConcurrentHashMap<>();
     /** 完成演出后被锁定玩家 UUID → 锁定状态 */
     private final ConcurrentMap<UUID, PlayerLockState> playerLockMap = new ConcurrentHashMap<>();
     /** 领域内被锁定生物 UUID -> 锁定状态（直到该施法者领域关闭）。 */
@@ -172,11 +236,17 @@ public final class LimitlessDomainExpansion extends AbstractTechniqueDomain
      * 施法者 UUID → 应将天空盒切换为 {@link #LIMITLESS_DOMAIN_SKYBOX_TEXTURE_AFTER_280} 的服务器 tick（含等于该 tick 时执行）。
      */
     private final ConcurrentMap<UUID, Integer> limitlessSkyboxSwapAtServerTick = new ConcurrentHashMap<>();
-    /**
-     * 施法者 UUID → 允许再次按键解除 {@link #DOMAIN_NAME} 的最早服务器 tick（领域构建完成后再过 {@link #LOCK_PLAYER_DURATION_TICKS} 刻）。
+    /** 施法者 UUID → 允许再次按键解除 {@link #DOMAIN_NAME} 的最早服务器 tick（领域构建完成后再过 {@link #LOCK_PLAYER_DURATION_TICKS} 刻）。
      * 构建动画进行中另由 {@link BarrierInstance#isExpanding()} 拦截。
      */
     private final ConcurrentMap<UUID, Integer> limitlessDomainDismissUnlockServerTick = new ConcurrentHashMap<>();
+    /**
+     * 开放式：施法者 UUID →（目标 UUID → 域内停留 tick）。
+     * 穿出或关域时结算一次后遗症。
+     */
+    private final ConcurrentMap<UUID, ConcurrentMap<UUID, Integer>> openDomainDwellByCaster = new ConcurrentHashMap<>();
+    /** 开放式：施法者 UUID → 已结算过的目标 UUID（防重复）。 */
+    private final ConcurrentMap<UUID, Set<UUID>> openDomainSettledByCaster = new ConcurrentHashMap<>();
     /** 用于每服务器 tick 只处理一次全服无量空处副作用（延续锁定、近身演出锁定等）。 */
     private static int lastPostDomainLockProcessedServerTick = -1;
 
@@ -192,6 +262,12 @@ public final class LimitlessDomainExpansion extends AbstractTechniqueDomain
     @Override
     protected void applyDomainSpecificEffect(ServerPlayer player, BarrierInstance instance)
     {
+        /* 开放式：无壳、无搬点/朝南演出；仍对球内目标施加必中效果，并追踪穿出结算。 */
+        if (instance.isOpenDomain())
+        {
+            beginOpenDomainSession(player, instance);
+            return;
+        }
         /* 瞬发：不搬生物、不上演出锁，只做天空盒与慢镜头。 */
         if (instance.isAutoCloseOnComplete() || instance.isSkyboxOnlyExpand())
         {
@@ -213,6 +289,16 @@ public final class LimitlessDomainExpansion extends AbstractTechniqueDomain
     protected boolean hasLearnedTechnique(ServerPlayer player)
     {
         return PlayerTechniqueData.isLimitless(player);
+    }
+
+    /**
+     * 瞬发展开过半：在球心补播水墨 Photon（常规走「完成演出后」那条，瞬发用放大 1.35 倍的命令），
+     * 使瞬发也有水墨扩散；关域时随领域内特效实体一并清除。
+     */
+    @Override
+    protected void onInstantDomainHalfProgress(ServerPlayer player, ServerLevel level, BarrierInstance instance)
+    {
+        spawnLimitlessInkwashAnchorAtSphereCenter(level, instance, PHOTON_INKWASH_COMMAND_INSTANT);
     }
 
     @Override
@@ -262,6 +348,10 @@ public final class LimitlessDomainExpansion extends AbstractTechniqueDomain
         }
         broadcastLimitlessDomainAmbientSoundStop(level, player.getUUID());
         removeSpecialEffectEntitiesInsideBarrierSphere(level, instance);
+        if (instance.isOpenDomain())
+        {
+            endOpenDomainSession(player, instance, true);
+        }
         super.onBarrierClosed(player, instance);
     }
 
@@ -324,6 +414,12 @@ public final class LimitlessDomainExpansion extends AbstractTechniqueDomain
     @Override
     protected void configureDomainInstance(ServerPlayer player, BarrierInstance instance)
     {
+        if (PlayerDomainModeData.isOpen(player))
+        {
+            instance.setOpenDomain(true);
+            instance.setCustomSkyboxTexture(LIMITLESS_DOMAIN_SKYBOX_TEXTURE_AFTER_280);
+            return;
+        }
         if (!PlayerDomainModeData.isInstant(player))
         {
             return;
@@ -333,6 +429,8 @@ public final class LimitlessDomainExpansion extends AbstractTechniqueDomain
         instance.setAutoCloseOnComplete(true);
         /* 跳过演出，直接用演出后的第二套天空盒（stat_sky2）。 */
         instance.setCustomSkyboxTexture(LIMITLESS_DOMAIN_SKYBOX_TEXTURE_AFTER_280);
+        /* 瞬发无蓄力阶段：展开瞬间补播无量空处领域手势动画。 */
+        EpicFightCompat.playLimitlessDomainChargeAnimation(player);
     }
 
     /**
@@ -389,21 +487,50 @@ public final class LimitlessDomainExpansion extends AbstractTechniqueDomain
                 EpicFightCompat.stopLimitlessDomainChargeAnimation(player);
                 cancelLimitlessChargeClientPresentation(player);
             }
-            if (DomainExpansionRouter.isPositionInAnyDomain(player.serverLevel(), player.blockPosition()))
-            {
-                player.displayClientMessage(Component.literal("无法展开领域，因为领域对抗还没做").withStyle(ChatFormatting.RED), true);
-                return;
-            }
-            if (!hasLearnedDomainExpansion(player))
-            {
-                player.displayClientMessage(Component.literal("尚未习得领域展开").withStyle(ChatFormatting.RED), true);
-                return;
-            }
-            if (!hasLearnedTechnique(player))
+            if (!canBeginLimitlessDomainCast(player))
             {
                 return;
             }
+            player.serverLevel().playSound(null, player.getX(), player.getY(), player.getZ(),
+                    ModSounds.LIMITLESS_INSTANT_DOMAIN.get(), SoundSource.PLAYERS,
+                    1.0F, 1.0F);
             super.cast(player);
+            return;
+        }
+
+        /*
+         * 开放式：无壳、无构建，但不能与瞬发同为「无前摇秒开」。
+         * 走一段不锁操作的前摇（仅延后成型），倒计时由 {@link #tickOpenDomainLeadIn} 驱动。
+         */
+        if (PlayerDomainModeData.isOpen(player))
+        {
+            /* 前摇中再次按下领域键 → 取消本次展开 */
+            if (openDomainLeadInMap.containsKey(uuid))
+            {
+                openDomainLeadInMap.remove(uuid);
+                EpicFightCompat.stopLimitlessDomainChargeAnimation(player);
+                stopOpenDomainLeadInSound(player);
+                player.displayClientMessage(
+                        Component.literal("「" + DOMAIN_NAME + "」已取消")
+                                .withStyle(ChatFormatting.YELLOW),
+                        true);
+                return;
+            }
+            if (castingDelayMap.containsKey(uuid))
+            {
+                castingDelayMap.remove(uuid);
+                EpicFightCompat.stopLimitlessDomainChargeAnimation(player);
+                cancelLimitlessChargeClientPresentation(player);
+            }
+            if (!canBeginLimitlessDomainCast(player))
+            {
+                return;
+            }
+            openDomainLeadInMap.put(uuid, OPEN_DOMAIN_LEAD_IN_TICKS);
+            player.serverLevel().playSound(null, player.getX(), player.getY(), player.getZ(),
+                    ModSounds.LIMITLESS_OPEN_DOMAIN.get(), SoundSource.PLAYERS,
+                    1.0F, 1.0F);
+            EpicFightCompat.playLimitlessDomainChargeAnimation(player);
             return;
         }
 
@@ -446,15 +573,7 @@ public final class LimitlessDomainExpansion extends AbstractTechniqueDomain
          * 蓄力开场白幕：用 DomainWhiteCurtain shader 代替旧 WhiteOverlay 滤镜。
          * 影响范围同原先：施法者周围 WHITE_OVERLAY_RADIUS 格内玩家。
          */
-        double radiusSqr = WHITE_OVERLAY_RADIUS * WHITE_OVERLAY_RADIUS;
-        for (ServerPlayer nearbyPlayer : level.players())
-        {
-            if (nearbyPlayer.distanceToSqr(player) > radiusSqr)
-            {
-                continue;
-            }
-            ModNetwork.sendDomainWhiteCurtainSync(nearbyPlayer, WHITE_CURTAIN_TOTAL_TICKS);
-        }
+        broadcastDomainWhiteCurtain(player, WHITE_CURTAIN_TOTAL_TICKS);
 
         /* 进入蓄力状态 */
         castingDelayMap.put(uuid, CAST_DELAY_TICKS);
@@ -462,6 +581,114 @@ public final class LimitlessDomainExpansion extends AbstractTechniqueDomain
         /*player.displayClientMessage(
                  Component.literal("「" + DOMAIN_NAME + "」展开蓄力中...")
                         .withStyle(ChatFormatting.LIGHT_PURPLE), true);*/
+    }
+
+    /**
+     * 瞬发 / 开放式共用的施放前置校验（与父类 {@code cast} 同源，但提前检查以免白等一场前摇）。
+     *
+     * @return 校验通过返回 {@code true}；失败时已向玩家发送提示
+     */
+    private boolean canBeginLimitlessDomainCast(ServerPlayer player)
+    {
+        if (DomainExpansionRouter.isPositionInAnyDomain(player.serverLevel(), player.blockPosition()))
+        {
+            player.displayClientMessage(Component.literal("无法展开领域，因为领域对抗还没做").withStyle(ChatFormatting.RED), true);
+            return false;
+        }
+        if (!hasLearnedDomainExpansion(player))
+        {
+            player.displayClientMessage(Component.literal("尚未习得领域展开").withStyle(ChatFormatting.RED), true);
+            return false;
+        }
+        return hasLearnedTechnique(player);
+    }
+
+    /**
+     * 向施法者周围 {@link #WHITE_OVERLAY_RADIUS} 格内玩家同步白幕 shader。
+     * <p>
+     * 常规走蓄力开场（t=0），开放式走前摇中段（{@link #OPEN_DOMAIN_WHITE_CURTAIN_TICK}），两处共用。
+     */
+    private static void broadcastDomainWhiteCurtain(ServerPlayer caster, int durationTicks)
+    {
+        double radiusSqr = WHITE_OVERLAY_RADIUS * WHITE_OVERLAY_RADIUS;
+        for (ServerPlayer nearby : caster.serverLevel().players())
+        {
+            if (nearby.distanceToSqr(caster) > radiusSqr)
+            {
+                continue;
+            }
+            ModNetwork.sendDomainWhiteCurtainSync(nearby, durationTicks);
+        }
+    }
+
+    /**
+     * 向施法者周围 {@link #WHITE_OVERLAY_RADIUS} 格内玩家同步「电影上下黑条」演出（开放式前摇
+     * {@link #OPEN_DOMAIN_LETTERBOX_TICK} 时点）。
+     * <p>
+     * 纯客户端画面效果，<strong>不锁操作</strong>；范围口径与 {@link #broadcastDomainWhiteCurtain} 一致。
+     */
+    private static void broadcastCinematicLetterbox(ServerPlayer caster)
+    {
+        double radiusSqr = WHITE_OVERLAY_RADIUS * WHITE_OVERLAY_RADIUS;
+        for (ServerPlayer nearby : caster.serverLevel().players())
+        {
+            if (nearby.distanceToSqr(caster) > radiusSqr)
+            {
+                continue;
+            }
+            ModNetwork.sendCinematicLetterboxSync(
+                    nearby,
+                    OPEN_DOMAIN_LETTERBOX_TOTAL_TICKS,
+                    OPEN_DOMAIN_LETTERBOX_FADE_IN_TICKS,
+                    OPEN_DOMAIN_LETTERBOX_FADE_OUT_TICKS,
+                    OPEN_DOMAIN_LETTERBOX_BAR_FRACTION);
+        }
+    }
+
+    /**
+     * 向施法者周围 {@link #WHITE_OVERLAY_RADIUS} 格内玩家同步「扫描波」演出（开放式前摇
+     * {@link #OPEN_DOMAIN_SCAN_WAVE_TICK} 时点）。
+     * <p>
+     * 球心锚在施法者当前脚底：前摇期间不锁操作、玩家可自由移动，故用触发瞬间的位置
+     * （与 {@link #broadcastCinematicLetterbox} 同口径，纯画面效果、不锁操作）。
+     * <p>
+     * 取脚底而非身体中心：客户端的「地面扫描环」把球心所在水平面当作地面，
+     * 抬到身体中心会让环浮在膝盖高度。
+     */
+    private static void broadcastDomainScanWave(ServerPlayer caster)
+    {
+        double centerX = caster.getX();
+        double centerY = caster.getY();
+        double centerZ = caster.getZ();
+        double radiusSqr = WHITE_OVERLAY_RADIUS * WHITE_OVERLAY_RADIUS;
+        for (ServerPlayer nearby : caster.serverLevel().players())
+        {
+            if (nearby.distanceToSqr(caster) > radiusSqr)
+            {
+                continue;
+            }
+            ModNetwork.sendDomainScanWaveSync(
+                    nearby,
+                    centerX,
+                    centerY,
+                    centerZ,
+                    OPEN_DOMAIN_SCAN_WAVE_TOTAL_TICKS,
+                    OPEN_DOMAIN_SCAN_WAVE_PEAK_RADIUS);
+        }
+    }
+
+    /**
+     * 开放式前摇取消 / 中断时：停止 {@link ModSounds#LIMITLESS_OPEN_DOMAIN}。
+     */
+    private static void stopOpenDomainLeadInSound(ServerPlayer caster)
+    {
+        ClientboundStopSoundPacket stop = new ClientboundStopSoundPacket(
+                ModSounds.LIMITLESS_OPEN_DOMAIN.get().getLocation(),
+                SoundSource.PLAYERS);
+        for (ServerPlayer sp : caster.serverLevel().players())
+        {
+            sp.connection.send(stop);
+        }
     }
 
     /**
@@ -534,20 +761,148 @@ public final class LimitlessDomainExpansion extends AbstractTechniqueDomain
         }
     }
 
+    // ==================== 开放式前摇倒计时 ====================
+
     /**
-     * 检查指定玩家是否正在蓄力中。
+     * 每 tick 驱动开放式前摇倒计时；到点后调用父类 {@code cast}，此时才真正成型。
+     * <p>
+     * 前摇期间不锁移动 / 输入 / 镜头，仅在玩家死亡或脱离战斗模式时中断。
      */
-    public boolean isCasting(ServerPlayer player)
+    private void tickOpenDomainLeadIn(ServerPlayer player)
     {
-        return castingDelayMap.containsKey(player.getUUID());
+        UUID uuid = player.getUUID();
+        Integer remaining = openDomainLeadInMap.get(uuid);
+        if (remaining == null)
+        {
+            return;
+        }
+
+        /* 前摇期间死亡、脱离战斗模式或切走开放式 → 中断（与蓄力倒计时同口径） */
+        if (!player.isAlive() || !isInBattleMode(player) || !PlayerDomainModeData.isOpen(player))
+        {
+            openDomainLeadInMap.remove(uuid);
+            EpicFightCompat.stopLimitlessDomainChargeAnimation(player);
+            stopOpenDomainLeadInSound(player);
+            player.displayClientMessage(
+                    Component.literal("「" + DOMAIN_NAME + "」展开中断")
+                            .withStyle(ChatFormatting.RED), true);
+            return;
+        }
+
+        int newRemaining = remaining - 1;
+        if (newRemaining <= 0)
+        {
+            openDomainLeadInMap.remove(uuid);
+            /*
+             * 不在此处停 Epic Fight 动画：手势剪辑可长于前摇，提前截断会显得前半段「极慢」
+             * （与 {@link #tickCastingDelay} 同一取舍）。
+             */
+            super.cast(player);
+            /* 成型演出：cast 可能因咒力 / 量表 / 脑损不足而失败，故先确认真的建出了实例。 */
+            BarrierInstance instance = currentOpenDomainInstance(player);
+            if (instance != null)
+            {
+                playOpenDomainCompletionPresentation(player, instance);
+            }
+            return;
+        }
+
+        openDomainLeadInMap.put(uuid, newRemaining);
+        /* 前摇内演出时点（自前摇开始流逝的 tick）。 */
+        int elapsed = OPEN_DOMAIN_LEAD_IN_TICKS - newRemaining;
+        if (elapsed == OPEN_DOMAIN_SCAN_WAVE_TICK)
+        {
+            playOpenDomainScanWave(player);
+        }
+        if (elapsed == OPEN_DOMAIN_LETTERBOX_TICK)
+        {
+            broadcastCinematicLetterbox(player);
+        }
+        if (elapsed == OPEN_DOMAIN_WHITE_CURTAIN_TICK)
+        {
+            broadcastDomainWhiteCurtain(player, WHITE_CURTAIN_TOTAL_TICKS);
+        }
+    }
+
+    /** 当前活跃的开放式领域实例；没有（或不是开放式）时返回 {@code null}。 */
+    private BarrierInstance currentOpenDomainInstance(ServerPlayer player)
+    {
+        java.util.Deque<BarrierInstance> queue = ACTIVE_DOMAINS.get(player.getUUID());
+        if (queue == null || queue.isEmpty())
+        {
+            return null;
+        }
+        BarrierInstance instance = queue.peekLast();
+        return instance != null && instance.isOpenDomain() ? instance : null;
     }
 
     /**
-     * 清除指定玩家的蓄力状态（玩家断线等情况）。
+     * 开放式成型瞬间的演出：白幕提层 + lightline（放大）+ 水墨（放大）。
+     * <p>
+     * 与常规不同，<strong>不锁施法者</strong>：只放锚点，不写 {@code playerLockMap}、不发输入锁。
+     */
+    private void playOpenDomainCompletionPresentation(ServerPlayer player, BarrierInstance instance)
+    {
+        ServerLevel level = player.serverLevel();
+        broadcastDomainWhiteCurtainElevate(player, level);
+        spawnLightLineAnchor(player, instance, OPEN_DOMAIN_LIGHT_LINE_SOUTH_DISTANCE, PHOTON_LIGHT_LINE_COMMAND_OPEN);
+        spawnLimitlessInkwashAnchorAtSphereCenter(level, instance, PHOTON_INKWASH_COMMAND_OPEN);
+    }
+
+    /**
+     * 开放式前摇内「扫描波」时点（{@link #OPEN_DOMAIN_SCAN_WAVE_TICK}）：
+     * 以施法者为球心播一次「扩张 → 收回」的双线白环（客户端 {@code DomainScanWaveRenderer}）。
+     * <p>
+     * 纯画面效果，不锁操作；球体不做折射 / 补色，也不被地形遮挡 —— 详见 shader 注释。
+     */
+    private void playOpenDomainScanWave(ServerPlayer player)
+    {
+        broadcastDomainScanWave(player);
+    }
+
+    /**
+     * 检查指定玩家是否正在施放中（蓄力中或开放式前摇中）。
+     */
+    public boolean isCasting(ServerPlayer player)
+    {
+        return castingDelayMap.containsKey(player.getUUID())
+                || openDomainLeadInMap.containsKey(player.getUUID());
+    }
+
+    /**
+     * 清除指定玩家的施放态（蓄力 / 开放式前摇）；用于玩家断线等情况。
      */
     public void clearCastingState(UUID uuid)
     {
         castingDelayMap.remove(uuid);
+        openDomainLeadInMap.remove(uuid);
+    }
+
+    // ==================== 会话生命周期 ====================
+
+    /**
+     * 服务器停机兜底：除基类状态外，一并清掉本实现按 UUID 记录的施放态容器
+     * （蓄力倒计时 / 开放式前摇倒计时 —— 二者都挂在进程级静态单例上，退出世界不会自行回收）。
+     */
+    @Override
+    public void resetSessionState()
+    {
+        castingDelayMap.clear();
+        openDomainLeadInMap.clear();
+        super.resetSessionState();
+    }
+
+    /**
+     * 玩家登出：先清施放态，再走基类的领域关闭。
+     * <p>
+     * 仅处于开放式前摇中（尚无领域实例、活跃表里没有条目）的玩家不会进入基类的关闭循环，
+     * 故必须在进入基类逻辑前先把倒计时清掉，否则重登后首次按领域键会被残留条目当成「取消」。
+     */
+    @Override
+    public void closeAllForPlayer(ServerPlayer player)
+    {
+        clearCastingState(player.getUUID());
+        super.closeAllForPlayer(player);
     }
 
     // ==================== 覆盖 tickMaintain 以驱动蓄力 ====================
@@ -557,21 +912,48 @@ public final class LimitlessDomainExpansion extends AbstractTechniqueDomain
     {
         tickPostDomainLocksOncePerServerTick(player);
         boolean instant = hasInstantDomainInstance(player);
-        if (!instant)
+        boolean open = hasOpenDomainInstance(player);
+        /* 瞬发：整段演出/锁定都跳过。开放式：跳过搬点与施法者演出，但仍维持域内必中效果。 */
+        if (!instant && !open)
         {
             tickPlayerLockState(player);
             captureNewDomainIntruders(player);
+        }
+        if (!instant)
+        {
             tickLockedMobs(player);
         }
+        /* 必中乱码视觉：常规 / 瞬发 / 开放式均有（后遗症阶段另由 tickPostDomainLocks 维持）。 */
+        tickDomainSureHitGarbledVisuals(player);
         /* 驱动蓄力倒计时 */
         tickCastingDelay(player);
+        /* 驱动开放式前摇倒计时 */
+        tickOpenDomainLeadIn(player);
         /* 正常的领域维持逻辑 */
         super.tickMaintain(player);
-        if (!instant)
+        if (!instant && !open)
         {
             tickLimitlessSkyboxTextureSwap(player);
         }
         clearOwnerMobLocksIfDomainClosed(player);
+    }
+
+    /** 当前活跃领域是否为开放式。 */
+    private boolean hasOpenDomainInstance(ServerPlayer player)
+    {
+        java.util.Deque<BarrierInstance> queue = ACTIVE_DOMAINS.get(player.getUUID());
+        if (queue == null || queue.isEmpty())
+        {
+            return false;
+        }
+        for (BarrierInstance instance : queue)
+        {
+            if (instance.isOpenDomain())
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** 当前活跃领域是否为瞬发（天空盒-only / 构建完即关）。 */
@@ -654,6 +1036,20 @@ public final class LimitlessDomainExpansion extends AbstractTechniqueDomain
      */
     private void spawnLimitlessLightLineEntity(ServerPlayer player, BarrierInstance instance)
     {
+        spawnLightLineAnchor(player, instance, LIGHT_LINE_SOUTH_DISTANCE, PHOTON_LIGHT_LINE_COMMAND);
+
+        playerLockMap.put(player.getUUID(), new PlayerLockState(new Vec3(player.getX(), player.getY(), player.getZ()), player.getXRot(), LOCK_PLAYER_DURATION_TICKS));
+        ModNetwork.sendPlayerInputLockSync(player, true);
+    }
+
+    /**
+     * 在球心 south 方向 {@code southDistance} 格放置 lightline 锚点实体并执行 Photon 命令。
+     * <p>
+     * 不含镜头 / 输入锁：常规无量空处由 {@link #spawnLimitlessLightLineEntity} 追加锁定；
+     * 开放式演出不锁施法者，直接调用本方法。
+     */
+    private static void spawnLightLineAnchor(ServerPlayer player, BarrierInstance instance, double southDistance, String photonCommand)
+    {
         ServerLevel level = player.serverLevel();
         SpecialEffectEntity entity = ModEntities.SPECIAL_EFFECT_ENTITY.get().create(level);
         if (entity == null)
@@ -664,7 +1060,7 @@ public final class LimitlessDomainExpansion extends AbstractTechniqueDomain
         BlockPos center = instance.getCenter();
         double spawnX = center.getX() + 0.5D;
         double spawnY = player.getY();
-        double spawnZ = center.getZ() + 0.5D + LIGHT_LINE_SOUTH_DISTANCE;
+        double spawnZ = center.getZ() + 0.5D + southDistance;
 
         entity.moveTo(spawnX, spawnY, spawnZ, NORTH_YAW, 0.0F);
         if (!level.addFreshEntity(entity))
@@ -675,10 +1071,7 @@ public final class LimitlessDomainExpansion extends AbstractTechniqueDomain
         CommandSourceStack commandSource = entity.createCommandSourceStack()
                 .withPermission(2)
                 .withSuppressedOutput();
-        level.getServer().getCommands().performPrefixedCommand(commandSource, "photon fx photon:limitless_light_line entity @s");
-
-        playerLockMap.put(player.getUUID(), new PlayerLockState(new Vec3(player.getX(), player.getY(), player.getZ()), player.getXRot(), LOCK_PLAYER_DURATION_TICKS));
-        ModNetwork.sendPlayerInputLockSync(player, true);
+        level.getServer().getCommands().performPrefixedCommand(commandSource, photonCommand);
     }
 
     /**
@@ -1161,7 +1554,7 @@ public final class LimitlessDomainExpansion extends AbstractTechniqueDomain
             return;
         }
         applyLimitlessSkyboxTextureToInstance(level, instance, LIMITLESS_DOMAIN_SKYBOX_TEXTURE_AFTER_280);
-        spawnLimitlessInkwashAnchorAtSphereCenter(level, instance);
+        spawnLimitlessInkwashAnchorAtSphereCenter(level, instance, PHOTON_INKWASH_COMMAND);
         sendPostDomainCompletionWhiteFlashNearSphereCenter(level, instance);
         broadcastLimitlessDomainAmbientSoundStart(level, instance, ownerUuid);
         limitlessSkyboxSwapAtServerTick.remove(ownerUuid);
@@ -1223,7 +1616,7 @@ public final class LimitlessDomainExpansion extends AbstractTechniqueDomain
     }
 
     /** 球心锚点 + Photon 水墨扩散（与 {@link #LOCK_PLAYER_DURATION_TICKS} 后天空盒切换同刻）。 */
-    private static void spawnLimitlessInkwashAnchorAtSphereCenter(ServerLevel level, BarrierInstance instance)
+    private static void spawnLimitlessInkwashAnchorAtSphereCenter(ServerLevel level, BarrierInstance instance, String photonCommand)
     {
         SpecialEffectEntity entity = ModEntities.SPECIAL_EFFECT_ENTITY.get().create(level);
         if (entity == null)
@@ -1245,7 +1638,7 @@ public final class LimitlessDomainExpansion extends AbstractTechniqueDomain
         MinecraftServer server = level.getServer();
         if (server != null)
         {
-            server.getCommands().performPrefixedCommand(commandSource, PHOTON_INKWASH_COMMAND);
+            server.getCommands().performPrefixedCommand(commandSource, photonCommand);
         }
     }
 
@@ -1291,6 +1684,7 @@ public final class LimitlessDomainExpansion extends AbstractTechniqueDomain
 
     /**
      * 每 tick 维持领域锁定目标：构建完成起 280 刻内强制南侧散布位与朝南姿态，之后不再传送与锁朝向，仍施加失明等直至领域关闭。
+     * 开放式从不做搬点/朝南锁位，只维持失明、乱码、AI/输入锁。
      */
     private void tickLockedMobs(ServerPlayer owner)
     {
@@ -1298,7 +1692,8 @@ public final class LimitlessDomainExpansion extends AbstractTechniqueDomain
         UUID ownerUuid = owner.getUUID();
         MinecraftServer server = level.getServer();
         int serverTick = server != null ? server.getTickCount() : 0;
-        boolean enforceAnchorPose = !isLimitlessDomainMobAnchorPoseExpired(ownerUuid, serverTick);
+        boolean openDomain = hasOpenDomainInstance(owner);
+        boolean enforceAnchorPose = !openDomain && !isLimitlessDomainMobAnchorPoseExpired(ownerUuid, serverTick);
         List<UUID> toRemove = new ArrayList<>();
         for (Map.Entry<UUID, MobLockState> entry : mobLockMap.entrySet())
         {
@@ -1327,10 +1722,6 @@ public final class LimitlessDomainExpansion extends AbstractTechniqueDomain
             if (target instanceof Mob mob && lockState.aiPausedByThisLock())
             {
                 mob.setNoAi(true);
-            }
-            if (target instanceof ServerPlayer targetPlayer)
-            {
-                sendGarbledDomainChat(targetPlayer);
             }
             mobLockMap.put(entry.getKey(), lockState.withIncrementedDomainTicks());
         }
@@ -1440,7 +1831,103 @@ public final class LimitlessDomainExpansion extends AbstractTechniqueDomain
                 default -> appendRandomChars(builder, GARBLED_CN_CHARS, 8, 18, random);
             }
         }
-        player.sendSystemMessage(Component.literal(builder.toString()).withStyle(ChatFormatting.DARK_PURPLE));
+        player.sendSystemMessage(Component.literal(builder.toString()).withStyle(ChatFormatting.WHITE));
+    }
+
+    /**
+     * 锁定目标的乱码表现：玩家额外灌聊天栏；全体在身周刷世界空间乱码碎片（附近玩家可见）。
+     */
+    private void applyDomainGarbledFx(LivingEntity target)
+    {
+        if (target instanceof ServerPlayer targetPlayer)
+        {
+            sendGarbledDomainChat(targetPlayer);
+        }
+        broadcastGarbledBurstAround(target);
+    }
+
+    private static final double GARBLED_BURST_SYNC_RADIUS = 48.0D;
+
+    /**
+     * 无量空处必中视觉：对当前活跃领域球内目标刷乱码（常规 / 瞬发 / 开放式）。
+     * 常规展开动画未完成前不刷；开放式已结算穿出后遗症的目标不再刷。
+     */
+    private void tickDomainSureHitGarbledVisuals(ServerPlayer owner)
+    {
+        java.util.Deque<BarrierInstance> queue = ACTIVE_DOMAINS.get(owner.getUUID());
+        if (queue == null || queue.isEmpty())
+        {
+            return;
+        }
+        BarrierInstance instance = queue.peekLast();
+        if (instance == null)
+        {
+            return;
+        }
+        boolean instantOrOpen = instance.isOpenDomain()
+                || instance.isAutoCloseOnComplete()
+                || instance.isSkyboxOnlyExpand();
+        if (instance.isExpanding() && !instantOrOpen)
+        {
+            return;
+        }
+        ServerLevel level = owner.serverLevel();
+        if (!instance.getDimension().equals(level.dimension()))
+        {
+            return;
+        }
+        BlockPos center = instance.getCenter();
+        int radius = instance.getRadius();
+        double radiusSqr = (double) radius * (double) radius;
+        UUID ownerUuid = owner.getUUID();
+        Set<UUID> openSettled = instance.isOpenDomain()
+                ? openDomainSettledByCaster.get(ownerUuid)
+                : null;
+
+        AABB queryBox = new AABB(
+                center.getX() - radius, center.getY() - radius, center.getZ() - radius,
+                center.getX() + radius + 1.0D, center.getY() + radius + 1.0D, center.getZ() + radius + 1.0D
+        );
+        for (LivingEntity target : level.getEntitiesOfClass(LivingEntity.class, queryBox, LivingEntity::isAlive))
+        {
+            if (target.getUUID().equals(ownerUuid) || target instanceof SpecialEffectEntity)
+            {
+                continue;
+            }
+            if (isExcludedFromBeingLimitlessDomainMobTarget(owner, ownerUuid, target))
+            {
+                continue;
+            }
+            if (!isInsideDomainSphere(target.position(), center, radiusSqr))
+            {
+                continue;
+            }
+            if (openSettled != null && openSettled.contains(target.getUUID()))
+            {
+                continue;
+            }
+            applyDomainGarbledFx(target);
+        }
+    }
+
+    private void broadcastGarbledBurstAround(LivingEntity target)
+    {
+        if (!(target.level() instanceof ServerLevel level))
+        {
+            return;
+        }
+        double x = target.getX();
+        double y = target.getY() + target.getBbHeight() * 0.65D;
+        double z = target.getZ();
+        double radiusSqr = GARBLED_BURST_SYNC_RADIUS * GARBLED_BURST_SYNC_RADIUS;
+        for (ServerPlayer nearby : level.players())
+        {
+            if (nearby.distanceToSqr(x, y, z) > radiusSqr)
+            {
+                continue;
+            }
+            ModNetwork.sendLimitlessDomainGarbledBurst(nearby, x, y, z);
+        }
     }
 
     /**
@@ -1503,10 +1990,7 @@ public final class LimitlessDomainExpansion extends AbstractTechniqueDomain
             {
                 mob.setNoAi(true);
             }
-            if (target instanceof ServerPlayer targetPlayer)
-            {
-                sendGarbledDomainChat(targetPlayer);
-            }
+            applyDomainGarbledFx(target);
             if (remainingAfter <= 0)
             {
                 releasePostDomainMobLock(uuid, state, server);
@@ -1640,6 +2124,277 @@ public final class LimitlessDomainExpansion extends AbstractTechniqueDomain
             {
                 ModNetwork.sendPlayerInputLockSync(onlinePlayer, false);
             }
+        }
+    }
+
+    @Override
+    protected void tickOpenDomainMaintenance(ServerPlayer player, BarrierInstance instance)
+    {
+        tickOpenDomainPresence(player, instance);
+        spawnOpenDomainFloorParticles(player, instance);
+        // 持续同步球心/半径，使走进可视范围的玩家也能收到边界 spaceWarp
+        broadcastOpenDomainCubemap(player, instance, true);
+    }
+
+    /**
+     * 开放式：在半径内实际地表刷白色尘屑，强化无量空处地板氛围。
+     */
+    private void spawnOpenDomainFloorParticles(ServerPlayer caster, BarrierInstance instance)
+    {
+        ServerLevel level = caster.serverLevel();
+        if (!level.dimension().equals(instance.getDimension()))
+        {
+            return;
+        }
+        BlockPos center = instance.getCenter();
+        double radius = instance.getRadius();
+        double radiusSqr = radius * radius;
+        double cx = center.getX() + 0.5D;
+        double cy = center.getY() + 0.5D;
+        double cz = center.getZ() + 0.5D;
+        ThreadLocalRandom random = ThreadLocalRandom.current();
+        for (int i = 0; i < OPEN_DOMAIN_FLOOR_PARTICLES_PER_TICK; i++)
+        {
+            double angle = random.nextDouble() * Math.PI * 2.0D;
+            double dist = Math.sqrt(random.nextDouble()) * radius;
+            double x = cx + Math.cos(angle) * dist;
+            double z = cz + Math.sin(angle) * dist;
+            int blockX = (int) Math.floor(x);
+            int blockZ = (int) Math.floor(z);
+            int surfaceY = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, blockX, blockZ);
+            double y = surfaceY + 0.08D;
+            double dx = x - cx;
+            double dy = y - cy;
+            double dz = z - cz;
+            if (dx * dx + dy * dy + dz * dz >= radiusSqr)
+            {
+                continue;
+            }
+            level.sendParticles(OPEN_DOMAIN_FLOOR_DUST, x, y, z, 1, 0.18D, 0.02D, 0.18D, 0.0D);
+        }
+    }
+
+    private void beginOpenDomainSession(ServerPlayer caster, BarrierInstance instance)
+    {
+        UUID casterUuid = caster.getUUID();
+        openDomainDwellByCaster.put(casterUuid, new ConcurrentHashMap<>());
+        openDomainSettledByCaster.put(casterUuid, ConcurrentHashMap.newKeySet());
+        broadcastOpenDomainCubemap(caster, instance, true);
+        tickOpenDomainPresence(caster, instance);
+    }
+
+    private void endOpenDomainSession(ServerPlayer caster, BarrierInstance instance, boolean settleRemaining)
+    {
+        UUID casterUuid = caster.getUUID();
+        if (settleRemaining)
+        {
+            ConcurrentMap<UUID, Integer> dwellMap = openDomainDwellByCaster.get(casterUuid);
+            if (dwellMap != null)
+            {
+                for (Map.Entry<UUID, Integer> entry : Set.copyOf(dwellMap.entrySet()))
+                {
+                    settleOpenDomainAftermathOnce(caster, entry.getKey(), entry.getValue());
+                }
+            }
+        }
+        openDomainDwellByCaster.remove(casterUuid);
+        openDomainSettledByCaster.remove(casterUuid);
+        broadcastOpenDomainCubemap(caster, instance, false);
+    }
+
+    private void tickOpenDomainPresence(ServerPlayer caster, BarrierInstance instance)
+    {
+        ServerLevel level = caster.serverLevel();
+        if (!level.dimension().equals(instance.getDimension()))
+        {
+            return;
+        }
+        UUID casterUuid = caster.getUUID();
+        ConcurrentMap<UUID, Integer> dwellMap =
+                openDomainDwellByCaster.computeIfAbsent(casterUuid, key -> new ConcurrentHashMap<>());
+        Set<UUID> settled = openDomainSettledByCaster.computeIfAbsent(casterUuid, key -> ConcurrentHashMap.newKeySet());
+
+        BlockPos center = instance.getCenter();
+        double radius = instance.getRadius();
+        double radiusSqr = radius * radius;
+        Vec3 centerVec = Vec3.atCenterOf(center);
+        AABB box = new AABB(centerVec, centerVec).inflate(radius);
+        Set<UUID> inside = ConcurrentHashMap.newKeySet();
+
+        for (LivingEntity living : level.getEntitiesOfClass(LivingEntity.class, box, LivingEntity::isAlive))
+        {
+            if (living.getUUID().equals(casterUuid))
+            {
+                continue;
+            }
+            if (living instanceof SpecialEffectEntity)
+            {
+                continue;
+            }
+            if (isExcludedFromBeingLimitlessDomainMobTarget(caster, casterUuid, living))
+            {
+                continue;
+            }
+            if (!isInsideDomainSphere(living.position(), center, radiusSqr))
+            {
+                continue;
+            }
+            UUID id = living.getUUID();
+            inside.add(id);
+            if (settled.contains(id))
+            {
+                continue;
+            }
+            dwellMap.merge(id, 1, Integer::sum);
+            registerOpenDomainEffectLock(caster, living, level);
+        }
+
+        for (UUID id : Set.copyOf(dwellMap.keySet()))
+        {
+            if (inside.contains(id))
+            {
+                continue;
+            }
+            Integer dwell = dwellMap.remove(id);
+            if (dwell != null)
+            {
+                settleOpenDomainAftermathOnce(caster, id, dwell);
+            }
+        }
+    }
+
+    /**
+     * 开放式：在当前位置施加无量空处必中效果（失明 / 乱码 / AI·输入锁），不搬点、不朝南锁位。
+     */
+    private void registerOpenDomainEffectLock(ServerPlayer caster, LivingEntity target, ServerLevel level)
+    {
+        if (mobLockMap.containsKey(target.getUUID()))
+        {
+            return;
+        }
+        if (isExcludedFromBeingLimitlessDomainMobTarget(caster, caster.getUUID(), target))
+        {
+            return;
+        }
+        MinecraftServer server = level.getServer();
+        PostDomainMobLockState lingeringPost = postDomainMobLockMap.remove(target.getUUID());
+        if (lingeringPost != null && server != null)
+        {
+            releasePostDomainMobLock(target.getUUID(), lingeringPost, server);
+        }
+        NearCasterMobLockState lingeringNear = nearCasterMobLockMap.remove(target.getUUID());
+        if (lingeringNear != null && server != null)
+        {
+            releaseNearCasterMobLock(target.getUUID(), lingeringNear, server);
+        }
+        boolean aiPausedByThisLock = false;
+        boolean originNoAi = false;
+        if (target instanceof Mob mob)
+        {
+            originNoAi = mob.isNoAi();
+            if (!originNoAi)
+            {
+                mob.setNoAi(true);
+                aiPausedByThisLock = true;
+            }
+        }
+        if (target instanceof ServerPlayer targetPlayer)
+        {
+            ModNetwork.sendPlayerInputLockSync(targetPlayer, true);
+        }
+        applyLockBlindness(target);
+        mobLockMap.put(target.getUUID(), new MobLockState(
+                caster.getUUID(),
+                target.position(),
+                aiPausedByThisLock,
+                originNoAi,
+                0));
+    }
+
+    private void settleOpenDomainAftermathOnce(ServerPlayer caster, UUID targetId, int dwellTicks)
+    {
+        UUID casterUuid = caster.getUUID();
+        Set<UUID> settled = openDomainSettledByCaster.computeIfAbsent(casterUuid, key -> ConcurrentHashMap.newKeySet());
+        if (!settled.add(targetId))
+        {
+            return;
+        }
+        ConcurrentMap<UUID, Integer> dwellMap = openDomainDwellByCaster.get(casterUuid);
+        if (dwellMap != null)
+        {
+            dwellMap.remove(targetId);
+        }
+
+        MobLockState priorLock = mobLockMap.remove(targetId);
+        MinecraftServer server = caster.getServer();
+        LivingEntity living = findLivingEntity(server, targetId);
+        if (living instanceof ServerPlayer victim)
+        {
+            PlayerBrainDamageData.addFromLimitlessDomainDwell(victim, dwellTicks, false);
+        }
+
+        int postTicks = Math.min(dwellTicks * 3, POST_DOMAIN_LOCK_MAX_TICKS);
+        if (postTicks <= 0 || living == null || !living.isAlive())
+        {
+            if (priorLock != null)
+            {
+                releaseMobLock(targetId, priorLock, caster.serverLevel());
+            }
+            return;
+        }
+
+        boolean aiPausedByUs = priorLock != null && priorLock.aiPausedByThisLock();
+        boolean originNoAi = priorLock != null && priorLock.originNoAi();
+        if (priorLock == null)
+        {
+            if (living instanceof Mob mob)
+            {
+                originNoAi = mob.isNoAi();
+                if (!originNoAi)
+                {
+                    mob.setNoAi(true);
+                    aiPausedByUs = true;
+                }
+            }
+            if (living instanceof ServerPlayer targetPlayer)
+            {
+                ModNetwork.sendPlayerInputLockSync(targetPlayer, true);
+            }
+        }
+
+        Vec3 lockPos = priorLock != null ? priorLock.lockPos() : living.position();
+        postDomainMobLockMap.put(targetId, new PostDomainMobLockState(
+                lockPos,
+                postTicks,
+                aiPausedByUs,
+                originNoAi,
+                false
+        ));
+    }
+
+    private void broadcastOpenDomainCubemap(ServerPlayer caster, BarrierInstance instance, boolean active)
+    {
+        ServerLevel level = caster.serverLevel();
+        BlockPos center = instance.getCenter();
+        double cx = center.getX() + 0.5D;
+        double cy = center.getY() + 0.5D;
+        double cz = center.getZ() + 0.5D;
+        int radius = instance.getRadius();
+        ResourceLocation texture = instance.getCustomSkyboxTexture() != null
+                ? instance.getCustomSkyboxTexture()
+                : LIMITLESS_DOMAIN_SKYBOX_TEXTURE_AFTER_280;
+        double syncRadius = Math.max(radius + 32.0D, 96.0D);
+        double syncRadiusSqr = syncRadius * syncRadius;
+        for (ServerPlayer nearby : level.players())
+        {
+            double dx = nearby.getX() - cx;
+            double dy = nearby.getY() - cy;
+            double dz = nearby.getZ() - cz;
+            if (dx * dx + dy * dy + dz * dz > syncRadiusSqr)
+            {
+                continue;
+            }
+            ModNetwork.sendOpenDomainCubemapSync(nearby, active, cx, cy, cz, radius, texture);
         }
     }
 

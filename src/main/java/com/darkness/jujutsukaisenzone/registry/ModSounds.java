@@ -22,6 +22,10 @@ public final class ModSounds
     public static final RegistryObject<SoundEvent> LIMITLESS_REMOTE_MURASAKI = register("jutsushiki.limitless.remote_murasaki");
     /** 无下限术式领域展开「无量空处」蓄力时在施法者处播放。 */
     public static final RegistryObject<SoundEvent> LIMITLESS_DOMAIN_EXPANSION = register("domain.limitless_domain_expantion");
+    /** 无量空处瞬时领域展开时在施法者处播放。 */
+    public static final RegistryObject<SoundEvent> LIMITLESS_INSTANT_DOMAIN = register("domain.limitless_instant_domain");
+    /** 无量空处开放式领域前摇开始时在施法者处播放。 */
+    public static final RegistryObject<SoundEvent> LIMITLESS_OPEN_DOMAIN = register("domain.limitless_open_domain");
     /** 无量空处结界完成 280 刻后于球心循环播放直至领域关闭（客户端环境音效通道，非音乐）。 */
     public static final RegistryObject<SoundEvent> LIMITLESS_DOMAIN_CENTER_AMBIENT = register("domain.limitless_domain_sound");
     /** 无量空处「完美控制」反馈（{@code assets/.../sounds/sound_effects/iron_sound}）。 */

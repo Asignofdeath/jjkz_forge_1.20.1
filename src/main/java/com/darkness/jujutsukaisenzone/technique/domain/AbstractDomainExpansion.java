@@ -1,14 +1,17 @@
 package com.darkness.jujutsukaisenzone.technique.domain;
 
 import com.darkness.jujutsukaisenzone.JuJutsuKaisenZone;
+import com.darkness.jujutsukaisenzone.api.screen.ScreenShakeKind;
 import com.darkness.jujutsukaisenzone.effect.ConfiscationEffect;
 import com.darkness.jujutsukaisenzone.effect.TechniqueMeltdownEffect;
 import com.darkness.jujutsukaisenzone.compat.ShaderedCompat;
+import com.darkness.jujutsukaisenzone.network.ModNetwork;
 import com.darkness.jujutsukaisenzone.player.BarrierRulesData;
 import com.darkness.jujutsukaisenzone.player.PlayerDomainExpansionData;
 import com.darkness.jujutsukaisenzone.player.PlayerBarrierTechniqueData;
 import com.darkness.jujutsukaisenzone.player.PlayerBrainDamageData;
 import com.darkness.jujutsukaisenzone.player.PlayerDomainGaugeData;
+import com.darkness.jujutsukaisenzone.player.PlayerDomainModeData;
 import com.darkness.jujutsukaisenzone.player.PlayerCursedEnergyData;
 import com.darkness.jujutsukaisenzone.player.PlayerReverseTechniqueData;
 import com.darkness.jujutsukaisenzone.registry.ModBlocks;
@@ -73,14 +76,37 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
     private static final ResourceLocation DEFAULT_SKYBOX_TEXTURE =
             ResourceLocation.fromNamespaceAndPath(JuJutsuKaisenZone.MODID, "textures/environment/black");
 
-    /** 领域展开的固定半径 */
+    /** 领域展开球体半径（常规）。 */
     protected static final int DOMAIN_RADIUS = 24;
+    /** 瞬发领域球体半径。 */
+    protected static final int INSTANT_DOMAIN_RADIUS = 32;
+    /** 开放式领域球体半径（开放式最小标准）。 */
+    protected static final int OPEN_DOMAIN_RADIUS = 64;
 
     /** 领域同时存在数量上限 */
     private static final int MAX_ACTIVE_BARRIER_COUNT = 1;
 
     /** 瞬发领域构建完成后的完成态保持时长（2 秒 = 40 tick）。 */
     private static final int INSTANT_AUTO_CLOSE_HOLD_TICKS = 40;
+    /** 瞬发关域后十字残留时长（约 3.5 秒）。 */
+    private static final int INSTANT_CROSS_RESIDUAL_DURATION_TICKS = 70;
+    /** 十字平面内自转：约 3 秒一圈。 */
+    private static final float INSTANT_CROSS_RESIDUAL_SECONDS_PER_REV = 3.0F;
+    /** 由时长与转速推出的总圈数。 */
+    private static final float INSTANT_CROSS_RESIDUAL_REVOLUTIONS =
+            (INSTANT_CROSS_RESIDUAL_DURATION_TICKS * 0.05F) / INSTANT_CROSS_RESIDUAL_SECONDS_PER_REV;
+    /** 十字残留同步半径（格）。 */
+    private static final double INSTANT_CROSS_RESIDUAL_SYNC_RADIUS = 64.0D;
+    /** 十字锚点相对头顶再上抬（格）。 */
+    private static final double INSTANT_CROSS_RESIDUAL_HEAD_LIFT = 0.35D;
+    /** 十字锚点沿水平朝向后方的偏移（格）。 */
+    private static final double INSTANT_CROSS_RESIDUAL_BACK_OFFSET = 0.65D;
+    /** 瞬发关域瞬间屏幕强晃同步半径（格）。 */
+    private static final double INSTANT_CLOSE_SCREEN_SHAKE_RADIUS = 32.0D;
+    /** 瞬发关域瞬间屏幕单次冲击时长。 */
+    private static final int INSTANT_CLOSE_SCREEN_SHAKE_TICKS = 10;
+    /** 瞬发关域瞬间屏幕单次冲击最大角度。 */
+    private static final float INSTANT_CLOSE_SCREEN_SHAKE_MAX_DEG = 10.0F;
 
     /** 维持领域每秒消耗的咒力基数 */
     private static final double MAINTAIN_COST_BASE_PER_SECOND = 2.0;
@@ -284,6 +310,17 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
     {
     }
 
+    /**
+     * 瞬发领域（天空盒-only / 构建完即关）展开进度<strong>首次过半</strong>时的钩子：
+     * 子类可在此挂演出（如球心 Photon）。比等到 100% 构建完成更早，给短命瞬发领域留出展示时间。
+     * <p>
+     * 瞬发路径不经过 {@link #applyDomainSpecificEffect(ServerPlayer, BarrierInstance)}，故演出需挂此处。
+     * 同一次展开只触发一次。
+     */
+    protected void onInstantDomainHalfProgress(ServerPlayer player, ServerLevel level, BarrierInstance instance)
+    {
+    }
+
     // ==================== 领域方块 ====================
 
     /**
@@ -351,8 +388,20 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
             return;
         }
 
-        // 领域展开固定半径
-        int radius = DOMAIN_RADIUS;
+        // 领域展开半径：开放式 64 / 瞬发 32 / 常规 DOMAIN_RADIUS
+        int radius;
+        if (PlayerDomainModeData.isOpen(player))
+        {
+            radius = OPEN_DOMAIN_RADIUS;
+        }
+        else if (PlayerDomainModeData.isInstant(player))
+        {
+            radius = INSTANT_DOMAIN_RADIUS;
+        }
+        else
+        {
+            radius = DOMAIN_RADIUS;
+        }
 
         // 脑损满则禁止展开（强开受伤）
         if (!PlayerBrainDamageData.tryAllowDomainExpansion(player))
@@ -381,18 +430,23 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
         int playerFootY = player.getBlockY() - 1;
         Map<BlockPos, BlockState> removedBlocks = new HashMap<>();
 
-        // 计算球壳所有位置
-        List<BlockPos> shellBlocks = buildHollowSpherePositions(center, radius);
-        if (shellBlocks.isEmpty())
+        boolean openDomain = PlayerDomainModeData.isOpen(player);
+        List<BlockPos> shellBlocks = openDomain
+                ? List.of()
+                : buildHollowSpherePositions(center, radius);
+        if (!openDomain && shellBlocks.isEmpty())
         {
             return;
         }
 
-        // 领域展开始终使用延迟展开动画（从背后向前方包围）
-        boolean animatedExpand = radius > ANIMATED_EXPAND_THRESHOLD;
+        // 领域展开始终使用延迟展开动画（从背后向前方包围）；开放式无壳，直接完成。
+        boolean animatedExpand = !openDomain && radius > ANIMATED_EXPAND_THRESHOLD;
 
         // 排序（从背后向前方包围）
-        shellBlocks = sortShellBlocksForExpansion(shellBlocks, center, player);
+        if (!openDomain)
+        {
+            shellBlocks = sortShellBlocksForExpansion(shellBlocks, center, player);
+        }
 
         // 读取玩家的规则设置
         boolean blockMobSpawn = BarrierRulesData.isBlockMobSpawn(player.getUUID());
@@ -407,7 +461,7 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
                 radius,
                 blockMobSpawn,
                 10,
-                animatedExpand ? 0 : shellBlocks.size(),
+                animatedExpand ? 0 : Math.max(shellBlocks.size(), openDomain ? 1 : 0),
                 animatedExpand,
                 0,
                 expansionCost,
@@ -421,7 +475,16 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
         PlayerDomainGaugeData.consumeOnExpand(player);
 
         configureDomainInstance(player, instance);
-        if (instance.isAutoCloseOnComplete())
+        if (instance.isOpenDomain())
+        {
+            instance.setExpanding(false);
+            applyDomainSpecificEffect(player, instance);
+            String nameDisplay = domainName.isEmpty() ? "" : "「" + domainName + "」";
+            player.displayClientMessage(
+                    Component.literal(nameDisplay + "开放式领域展开（半径 " + radius + "）")
+                            .withStyle(ChatFormatting.GOLD), true);
+        }
+        else if (instance.isAutoCloseOnComplete())
         {
             InstantDomainSlowMo.refresh(level, instance.getCenter(), instance.getInstantSlowMoTargets());
         }
@@ -439,6 +502,11 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
         if (queue.isEmpty())
         {
             ACTIVE_DOMAINS.remove(player.getUUID());
+        }
+
+        if (instance.isOpenDomain())
+        {
+            return;
         }
 
         // 领域展开固定清除内部方块
@@ -640,23 +708,30 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
                 }
             }
 
-            // 领域生命值追踪
-            double remainingPercent = calculateRemainingPercent(level, instance);
-            if (remainingPercent < MIN_MAINTAIN_PERCENT)
+            // 领域生命值追踪（开放式无壳，跳过）
+            if (!instance.isOpenDomain())
             {
-                if (!collapsedNotified && isPlayerInsideBarrier(player, instance))
+                double remainingPercent = calculateRemainingPercent(level, instance);
+                if (remainingPercent < MIN_MAINTAIN_PERCENT)
                 {
-                    String nameDisplay = domainName.isEmpty() ? "" : "「" + domainName + "」";
-                    player.displayClientMessage(
-                            Component.literal(nameDisplay + "已崩解")
-                                    .withStyle(ChatFormatting.RED), true);
-                    collapsedNotified = true;
+                    if (!collapsedNotified && isPlayerInsideBarrier(player, instance))
+                    {
+                        String nameDisplay = domainName.isEmpty() ? "" : "「" + domainName + "」";
+                        player.displayClientMessage(
+                                Component.literal(nameDisplay + "已崩解")
+                                        .withStyle(ChatFormatting.RED), true);
+                        collapsedNotified = true;
+                    }
+                    clearBarrierInstance(player, instance);
+                    continue;
                 }
-                clearBarrierInstance(player, instance);
-                continue;
-            }
 
-            notifyDomainHealthIfNeeded(player, instance, remainingPercent);
+                notifyDomainHealthIfNeeded(player, instance, remainingPercent);
+            }
+            else
+            {
+                tickOpenDomainMaintenance(player, instance);
+            }
             kept.addLast(instance);
         }
 
@@ -666,6 +741,13 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
             return;
         }
         ACTIVE_DOMAINS.put(player.getUUID(), kept);
+    }
+
+    /**
+     * 开放式领域每 tick 钩子（穿出结算等）；默认空。
+     */
+    protected void tickOpenDomainMaintenance(ServerPlayer player, BarrierInstance instance)
+    {
     }
 
     /**
@@ -1306,6 +1388,7 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
         instance.setExpansionProgress(newProgress);
 
         int totalBlocks = allBlocks.size();
+        maybeNotifyInstantHalfProgress(player, level, instance, newProgress, totalBlocks);
         int percent = (int) Math.round(100.0 * newProgress / totalBlocks);
         String nameDisplay = domainName.isEmpty() ? "" : "「" + domainName + "」";
         player.displayClientMessage(
@@ -1325,6 +1408,20 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
                     playerFootY,
                     instance.getRemovedBlocks());
         }
+    }
+
+    /**
+     * 瞬发展开进度首次过半时触发一次 {@link #onInstantDomainHalfProgress}。
+     */
+    private void maybeNotifyInstantHalfProgress(ServerPlayer player, ServerLevel level, BarrierInstance instance,
+                                                int progress, int totalBlocks)
+    {
+        if (instance.isInstantHalfProgressNotified() || totalBlocks <= 0 || progress * 2 < totalBlocks)
+        {
+            return;
+        }
+        instance.setInstantHalfProgressNotified(true);
+        onInstantDomainHalfProgress(player, level, instance);
     }
 
     /**
@@ -1392,11 +1489,82 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
     private void finishInstantAutoClose(ServerPlayer player, BarrierInstance instance)
     {
         String nameDisplay = domainName.isEmpty() ? "" : "「" + domainName + "」";
+        ResourceLocation residualTexture = instance.getCustomSkyboxTexture() != null
+                ? instance.getCustomSkyboxTexture()
+                : DEFAULT_SKYBOX_TEXTURE;
         clearBarrierInstance(player, instance);
         instance.setDiscardAfterTick(true);
+        broadcastInstantCloseScreenShake(player);
+        broadcastInstantDomainCrossResidual(player, residualTexture);
         player.displayClientMessage(
                 Component.literal(nameDisplay + "瞬发领域已关闭")
                         .withStyle(ChatFormatting.AQUA), true);
+    }
+
+    /**
+     * 瞬发关域瞬间：向半径 32 内玩家发送单次冲击晃动（非连震）。
+     */
+    private void broadcastInstantCloseScreenShake(ServerPlayer caster)
+    {
+        ServerLevel level = caster.serverLevel();
+        double cx = caster.getX();
+        double cy = caster.getY();
+        double cz = caster.getZ();
+        double radiusSqr = INSTANT_CLOSE_SCREEN_SHAKE_RADIUS * INSTANT_CLOSE_SCREEN_SHAKE_RADIUS;
+        for (ServerPlayer nearby : level.players())
+        {
+            double dx = nearby.getX() - cx;
+            double dy = nearby.getY() - cy;
+            double dz = nearby.getZ() - cz;
+            if (dx * dx + dy * dy + dz * dz > radiusSqr)
+            {
+                continue;
+            }
+            ModNetwork.sendScreenShake(
+                    nearby,
+                    ScreenShakeKind.SINGLE,
+                    INSTANT_CLOSE_SCREEN_SHAKE_TICKS,
+                    INSTANT_CLOSE_SCREEN_SHAKE_MAX_DEG
+            );
+        }
+    }
+
+    /**
+     * 瞬发关域后：向附近玩家同步十字窗口残留（窗内为领域立方体贴图）。
+     * 残留锚点为施术者头顶略后方；熔断等关域代价已由 {@link #clearBarrierInstance} 处理。
+     */
+    private void broadcastInstantDomainCrossResidual(
+            ServerPlayer caster,
+            ResourceLocation textureFolder)
+    {
+        ServerLevel level = caster.serverLevel();
+        /* 水平朝向的后方单位向量（忽略俯仰，避免低头时锚点扎进身体）。 */
+        float yawRad = caster.getYRot() * ((float) Math.PI / 180.0F);
+        double backX = Math.sin(yawRad);
+        double backZ = -Math.cos(yawRad);
+        double cx = caster.getX() + backX * INSTANT_CROSS_RESIDUAL_BACK_OFFSET;
+        double cy = caster.getY() + caster.getBbHeight() + INSTANT_CROSS_RESIDUAL_HEAD_LIFT;
+        double cz = caster.getZ() + backZ * INSTANT_CROSS_RESIDUAL_BACK_OFFSET;
+        double radiusSqr = INSTANT_CROSS_RESIDUAL_SYNC_RADIUS * INSTANT_CROSS_RESIDUAL_SYNC_RADIUS;
+        for (ServerPlayer nearby : level.players())
+        {
+            double dx = nearby.getX() - cx;
+            double dy = nearby.getY() - cy;
+            double dz = nearby.getZ() - cz;
+            if (dx * dx + dy * dy + dz * dz > radiusSqr)
+            {
+                continue;
+            }
+            ModNetwork.sendInstantDomainCrossResidualSync(
+                    nearby,
+                    cx,
+                    cy,
+                    cz,
+                    INSTANT_CROSS_RESIDUAL_DURATION_TICKS,
+                    INSTANT_CROSS_RESIDUAL_REVOLUTIONS,
+                    textureFolder
+            );
+        }
     }
 
     private void removeDomainInstanceFromActive(UUID ownerUuid, BarrierInstance instance)

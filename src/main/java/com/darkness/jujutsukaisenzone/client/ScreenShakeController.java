@@ -36,6 +36,14 @@ public final class ScreenShakeController
     private static float wobbleMaxAmplitude;
     private static final float WOBBLE_OSCILLATIONS = 3.0F;
 
+    /** 单次冲击：固定方向，sin 包络甩出再收回。 */
+    private static long singleShakeEndMillis;
+    private static long singleShakeDurationMillis;
+    private static float singleShakeMaxDegrees;
+    private static float singleShakeYawSign;
+    private static float singleShakePitchSign;
+    private static float singleShakeRollSign;
+
     private ScreenShakeController()
     {
     }
@@ -48,6 +56,7 @@ public final class ScreenShakeController
             case CONSTANT -> beginConstant(durationTicks, amplitude);
             case SUSTAINED -> setSustained(sustainedActiveFlag, amplitude);
             case SMOOTH_WOBBLE -> beginSmoothWobble(durationTicks, amplitude);
+            case SINGLE -> beginSingle(durationTicks, amplitude);
         }
     }
 
@@ -122,6 +131,22 @@ public final class ScreenShakeController
         wobbleMaxAmplitude = maxAmplitude;
     }
 
+    public static void beginSingle(int durationTicks, float maxDegrees)
+    {
+        if (durationTicks <= 0 || maxDegrees <= 0.0F)
+        {
+            return;
+        }
+        long durationMillis = (long) durationTicks * 50L;
+        singleShakeEndMillis = System.currentTimeMillis() + durationMillis;
+        singleShakeDurationMillis = durationMillis;
+        singleShakeMaxDegrees = maxDegrees;
+        ThreadLocalRandom random = ThreadLocalRandom.current();
+        singleShakeYawSign = random.nextBoolean() ? 1.0F : -1.0F;
+        singleShakePitchSign = random.nextBoolean() ? 1.0F : -1.0F;
+        singleShakeRollSign = random.nextBoolean() ? 1.0F : -1.0F;
+    }
+
     public static void stopWobble()
     {
         wobbleEndMillis = 0L;
@@ -129,9 +154,21 @@ public final class ScreenShakeController
         wobbleMaxAmplitude = 0.0F;
     }
 
+    public static void stopSingle()
+    {
+        singleShakeEndMillis = 0L;
+        singleShakeDurationMillis = 0L;
+        singleShakeMaxDegrees = 0.0F;
+    }
+
     private static boolean isWobbleActive()
     {
         return wobbleEndMillis > System.currentTimeMillis();
+    }
+
+    private static boolean isSingleShakeActive()
+    {
+        return singleShakeEndMillis > System.currentTimeMillis();
     }
 
     public static void resetAll()
@@ -139,6 +176,7 @@ public final class ScreenShakeController
         stopDecay();
         stopConstant();
         stopWobble();
+        stopSingle();
         sustainedActive = false;
         sustainedMaxDegrees = 0.0F;
     }
@@ -195,6 +233,22 @@ public final class ScreenShakeController
         {
             stopWobble();
         }
+
+        if (isSingleShakeActive())
+        {
+            long remainingMillis = singleShakeEndMillis - System.currentTimeMillis();
+            float progress = singleShakeDurationMillis > 0L
+                    ? 1.0F - (float) remainingMillis / (float) singleShakeDurationMillis
+                    : 1.0F;
+            progress = Mth.clamp(progress, 0.0F, 1.0F);
+            /* sin(πt)：0→峰值→0，整段只甩一次 */
+            float envelope = (float) Math.sin(progress * Math.PI);
+            applySingleOffset(event, singleShakeMaxDegrees * envelope);
+        }
+        else if (singleShakeEndMillis != 0L)
+        {
+            stopSingle();
+        }
     }
 
     private static void applyShakeOffset(ViewportEvent.ComputeCameraAngles event, float amp)
@@ -224,6 +278,18 @@ public final class ScreenShakeController
         event.setYaw(event.getYaw() + (float) Math.sin(phase) * amp);
         event.setPitch(Mth.clamp(event.getPitch() + (float) Math.cos(phase * 1.3) * amp * 0.5F, -89.9F, 89.9F));
         event.setRoll(event.getRoll() + (float) Math.sin(phase + Math.PI * 0.5) * amp * 0.3F);
+    }
+
+    private static void applySingleOffset(ViewportEvent.ComputeCameraAngles event, float amp)
+    {
+        if (amp <= 0.0F)
+        {
+            return;
+        }
+
+        event.setYaw(event.getYaw() + singleShakeYawSign * amp);
+        event.setPitch(Mth.clamp(event.getPitch() + singleShakePitchSign * amp * 0.55F, -89.9F, 89.9F));
+        event.setRoll(event.getRoll() + singleShakeRollSign * amp * 0.35F);
     }
 
     @Mod.EventBusSubscriber(modid = JuJutsuKaisenZone.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE, value = Dist.CLIENT)

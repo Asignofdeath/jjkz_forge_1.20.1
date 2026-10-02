@@ -7,9 +7,11 @@ import com.darkness.jujutsukaisenzone.client.renderer.entity.CourtSeatRenderer;
 import com.darkness.jujutsukaisenzone.client.renderer.entity.DemonSubduingShrineRenderer;
 import com.darkness.jujutsukaisenzone.client.renderer.entity.JadeDogRenderer;
 import com.darkness.jujutsukaisenzone.client.renderer.entity.JudgeRenderer;
+import com.darkness.jujutsukaisenzone.client.renderer.entity.JujutsuCouncilStaffRenderer;
 import com.darkness.jujutsukaisenzone.client.renderer.entity.MahoragaRenderer;
 import com.darkness.jujutsukaisenzone.client.renderer.entity.WedgeRenderer;
 import com.darkness.jujutsukaisenzone.entity.JadeDogEntity;
+import com.darkness.jujutsukaisenzone.entity.JujutsuCouncilStaffEntity;
 import com.darkness.jujutsukaisenzone.entity.MahoragaEntity;
 import com.darkness.jujutsukaisenzone.entity.SpecialEffectEntity;
 import com.darkness.jujutsukaisenzone.entity.WedgeEntity;
@@ -34,6 +36,7 @@ public final class ModEntityEvents
         event.put(ModEntities.WEDGE.get(), WedgeEntity.createAttributes().build());
         event.put(ModEntities.JADE_DOG.get(), JadeDogEntity.createAttributes().build());
         event.put(ModEntities.MAHORAGA.get(), MahoragaEntity.createAttributes().build());
+        event.put(ModEntities.JUJUTSU_COUNCIL_STAFF.get(), JujutsuCouncilStaffEntity.createAttributes().build());
     }
 
     @Mod.EventBusSubscriber(modid = JuJutsuKaisenZone.MODID, bus = Mod.EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
@@ -55,6 +58,7 @@ public final class ModEntityEvents
             event.registerEntityRenderer(ModEntities.WEDGE.get(), WedgeRenderer::new);
             event.registerEntityRenderer(ModEntities.JADE_DOG.get(), JadeDogRenderer::new);
             event.registerEntityRenderer(ModEntities.MAHORAGA.get(), MahoragaRenderer::new);
+            event.registerEntityRenderer(ModEntities.JUJUTSU_COUNCIL_STAFF.get(), JujutsuCouncilStaffRenderer::new);
         }
     }
 }

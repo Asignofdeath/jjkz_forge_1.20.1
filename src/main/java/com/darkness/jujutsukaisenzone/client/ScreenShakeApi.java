@@ -41,6 +41,11 @@ public final class ScreenShakeApi
         ScreenShakeController.beginSmoothWobble(durationTicks, maxAmplitude);
     }
 
+    public static void beginSingle(int durationTicks, float maxDegrees)
+    {
+        ScreenShakeController.beginSingle(durationTicks, maxDegrees);
+    }
+
     public static void resetAll()
     {
         ScreenShakeController.resetAll();

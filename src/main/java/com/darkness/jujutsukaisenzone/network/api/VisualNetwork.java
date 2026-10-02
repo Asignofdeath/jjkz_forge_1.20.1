@@ -4,9 +4,15 @@ import com.darkness.jujutsukaisenzone.network.NetworkSenders;
 import com.darkness.jujutsukaisenzone.network.packet.OwnerOnlyPhotonMountS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.OwnerOnlyPhotonRemoveS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncBlackFlashScreenShakeS2CPacket;
+import com.darkness.jujutsukaisenzone.network.packet.SyncCinematicLetterboxS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncColoredWorldOverlayAnimationS2CPacket;
+import com.darkness.jujutsukaisenzone.network.packet.SyncDomainScanWaveS2CPacket;
+import com.darkness.jujutsukaisenzone.network.packet.SyncSpaceWarpS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncDomainWhiteCurtainElevateS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncDomainWhiteCurtainS2CPacket;
+import com.darkness.jujutsukaisenzone.network.packet.SyncInstantDomainCrossResidualS2CPacket;
+import com.darkness.jujutsukaisenzone.network.packet.SyncOpenDomainCubemapS2CPacket;
+import com.darkness.jujutsukaisenzone.network.packet.SyncLimitlessDomainGarbledBurstS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncFugaBoomFlashSequenceS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncFugaBoomScreenShakeS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncFullScreenWorldFlashS2CPacket;
@@ -22,6 +28,7 @@ import com.darkness.jujutsukaisenzone.network.packet.SyncShrineCastFilterS2CPack
 import com.darkness.jujutsukaisenzone.network.packet.SyncShrineDomainScreenShakeS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncShrineSlashLoopSoundStartS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncShrineSlashLoopSoundStopS2CPacket;
+import com.darkness.jujutsukaisenzone.network.packet.SyncSingleScreenShakeS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncStylizedDamageStylesRuleS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncWhiteOverlayAnimationS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncWhiteOverlayS2CPacket;
@@ -82,6 +89,9 @@ public final class VisualNetwork
             );
             case SMOOTH_WOBBLE -> NetworkSenders.toPlayer(player,
                     new SyncGhostFaceWobbleS2CPacket(durationTicks, amplitude)
+            );
+            case SINGLE -> NetworkSenders.toPlayer(player,
+                    new SyncSingleScreenShakeS2CPacket(durationTicks, amplitude)
             );
         }
     }
@@ -157,6 +167,58 @@ public final class VisualNetwork
         NetworkSenders.toPlayer(player,
                 new SyncDomainWhiteCurtainElevateS2CPacket()
         );
+    }
+
+    public static void sendCinematicLetterboxSync(ServerPlayer player, int totalTicks, int fadeInTicks, int fadeOutTicks, float barFraction)
+    {
+        NetworkSenders.toPlayer(player,
+                new SyncCinematicLetterboxS2CPacket(totalTicks, fadeInTicks, fadeOutTicks, barFraction)
+        );
+    }
+
+    public static void sendDomainScanWaveSync(ServerPlayer player, double centerX, double centerY, double centerZ, int totalTicks, float peakRadius)
+    {
+        NetworkSenders.toPlayer(player,
+                new SyncDomainScanWaveS2CPacket(centerX, centerY, centerZ, totalTicks, peakRadius)
+        );
+    }
+
+    public static void sendSpaceWarpSync(ServerPlayer player, boolean enabled, float intensity)
+    {
+        NetworkSenders.toPlayer(player, new SyncSpaceWarpS2CPacket(enabled, intensity));
+    }
+
+    public static void sendInstantDomainCrossResidualSync(
+            ServerPlayer player,
+            double x,
+            double y,
+            double z,
+            int durationTicks,
+            float revolutions,
+            ResourceLocation textureFolder)
+    {
+        NetworkSenders.toPlayer(player,
+                new SyncInstantDomainCrossResidualS2CPacket(x, y, z, durationTicks, revolutions, textureFolder)
+        );
+    }
+
+    public static void sendOpenDomainCubemapSync(
+            ServerPlayer player,
+            boolean active,
+            double x,
+            double y,
+            double z,
+            int radius,
+            ResourceLocation textureFolder)
+    {
+        NetworkSenders.toPlayer(player,
+                new SyncOpenDomainCubemapS2CPacket(active, x, y, z, radius, textureFolder)
+        );
+    }
+
+    public static void sendLimitlessDomainGarbledBurst(ServerPlayer player, double x, double y, double z)
+    {
+        NetworkSenders.toPlayer(player, new SyncLimitlessDomainGarbledBurstS2CPacket(x, y, z));
     }
 
     public static void sendFugaBoomFlashSequenceSync(ServerPlayer player)

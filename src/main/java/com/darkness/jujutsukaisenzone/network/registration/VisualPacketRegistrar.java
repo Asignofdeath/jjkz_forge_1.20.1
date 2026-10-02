@@ -22,8 +22,15 @@ import com.darkness.jujutsukaisenzone.network.packet.SyncFugaBoomScreenShakeS2CP
 import com.darkness.jujutsukaisenzone.network.packet.SyncStylizedDamageStylesRuleS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncShrineBlackFlashMilestoneS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncJudgmentDomainColorCycleOverlayS2CPacket;
+import com.darkness.jujutsukaisenzone.network.packet.SyncDomainScanWaveS2CPacket;
+import com.darkness.jujutsukaisenzone.network.packet.SyncSpaceWarpS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncDomainWhiteCurtainS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncDomainWhiteCurtainElevateS2CPacket;
+import com.darkness.jujutsukaisenzone.network.packet.SyncInstantDomainCrossResidualS2CPacket;
+import com.darkness.jujutsukaisenzone.network.packet.SyncOpenDomainCubemapS2CPacket;
+import com.darkness.jujutsukaisenzone.network.packet.SyncLimitlessDomainGarbledBurstS2CPacket;
+import com.darkness.jujutsukaisenzone.network.packet.SyncSingleScreenShakeS2CPacket;
+import com.darkness.jujutsukaisenzone.network.packet.SyncCinematicLetterboxS2CPacket;
 import net.minecraftforge.network.NetworkDirection;
 import net.minecraftforge.network.simple.SimpleChannel;
 
@@ -154,6 +161,41 @@ public final class VisualPacketRegistrar
                 .encoder(SyncDomainWhiteCurtainElevateS2CPacket::encode)
                 .decoder(SyncDomainWhiteCurtainElevateS2CPacket::decode)
                 .consumerMainThread(SyncDomainWhiteCurtainElevateS2CPacket::handle)
+                .add();
+        channel.messageBuilder(SyncInstantDomainCrossResidualS2CPacket.class, 97, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(SyncInstantDomainCrossResidualS2CPacket::encode)
+                .decoder(SyncInstantDomainCrossResidualS2CPacket::decode)
+                .consumerMainThread(SyncInstantDomainCrossResidualS2CPacket::handle)
+                .add();
+        channel.messageBuilder(SyncSingleScreenShakeS2CPacket.class, 98, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(SyncSingleScreenShakeS2CPacket::encode)
+                .decoder(SyncSingleScreenShakeS2CPacket::decode)
+                .consumerMainThread(SyncSingleScreenShakeS2CPacket::handle)
+                .add();
+        channel.messageBuilder(SyncOpenDomainCubemapS2CPacket.class, 99, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(SyncOpenDomainCubemapS2CPacket::encode)
+                .decoder(SyncOpenDomainCubemapS2CPacket::decode)
+                .consumerMainThread(SyncOpenDomainCubemapS2CPacket::handle)
+                .add();
+        channel.messageBuilder(SyncLimitlessDomainGarbledBurstS2CPacket.class, 100, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(SyncLimitlessDomainGarbledBurstS2CPacket::encode)
+                .decoder(SyncLimitlessDomainGarbledBurstS2CPacket::decode)
+                .consumerMainThread(SyncLimitlessDomainGarbledBurstS2CPacket::handle)
+                .add();
+        channel.messageBuilder(SyncCinematicLetterboxS2CPacket.class, 101, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(SyncCinematicLetterboxS2CPacket::encode)
+                .decoder(SyncCinematicLetterboxS2CPacket::decode)
+                .consumerMainThread(SyncCinematicLetterboxS2CPacket::handle)
+                .add();
+        channel.messageBuilder(SyncDomainScanWaveS2CPacket.class, 102, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(SyncDomainScanWaveS2CPacket::encode)
+                .decoder(SyncDomainScanWaveS2CPacket::decode)
+                .consumerMainThread(SyncDomainScanWaveS2CPacket::handle)
+                .add();
+        channel.messageBuilder(SyncSpaceWarpS2CPacket.class, 103, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(SyncSpaceWarpS2CPacket::encode)
+                .decoder(SyncSpaceWarpS2CPacket::decode)
+                .consumerMainThread(SyncSpaceWarpS2CPacket::handle)
                 .add();
     }
 }

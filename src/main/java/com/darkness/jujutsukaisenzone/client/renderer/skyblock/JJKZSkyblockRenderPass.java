@@ -1,5 +1,7 @@
 package com.darkness.jujutsukaisenzone.client.renderer.skyblock;
 
+import com.darkness.jujutsukaisenzone.client.renderer.InstantDomainCrossResidualRenderer;
+import com.darkness.jujutsukaisenzone.client.renderer.OpenDomainCubemapRenderer;
 import com.mojang.blaze3d.pipeline.TextureTarget;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
@@ -21,6 +23,7 @@ import java.util.Map;
  * <p>
  * 遍历所有已注册的纹理类型，分别渲染天空盒几何和方块。
  * 每帧渲染完成后清空所有 BatchData。
+ * 若存在瞬发十字残留，在同通道内以相同立方体贴图 FBO 绘制十字窗口。
  */
 public class JJKZSkyblockRenderPass implements RenderableComplexPass
 {
@@ -76,6 +79,11 @@ public class JJKZSkyblockRenderPass implements RenderableComplexPass
                 );
             }
         }
+
+        /* 开放式领域范围立方体贴图球体 */
+        OpenDomainCubemapRenderer.renderInSkyblockPass(poseStack, renderer);
+        /* 瞬发关域十字残留：与方块天空盒同一套立方体贴图行为 */
+        InstantDomainCrossResidualRenderer.renderInSkyblockPass(poseStack, renderer);
 
         /* 本帧渲染完成，清空所有 BatchData 以准备下一帧 */
         batchManager.clearAll();

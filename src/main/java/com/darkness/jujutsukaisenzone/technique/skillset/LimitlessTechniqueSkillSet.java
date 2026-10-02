@@ -87,17 +87,25 @@ public final class LimitlessTechniqueSkillSet extends AbstractInnateTechniqueSki
     public static final String SKILL_REMOTE_PURPLE = "limitless_remote_murasaki";
     /** 机制型：解锁「领域模式 · 瞬发」（0.2 秒领域展开，叙事名）。 */
     public static final String SKILL_INSTANT_DOMAIN = "limitless_instant_domain";
+    /** 机制型：解锁「领域模式 · 开放式」。 */
+    public static final String SKILL_OPEN_DOMAIN = "limitless_open_domain";
     public static final String REF_CURSED_GRADE_SPECIAL = "ref_cursed_grade_special";
     public static final String REF_BARRIER_MASTERED = "ref_barrier_mastered";
 
     private static final String TAG_INSTANT_DOMAIN_UNLOCK = "jujutsukaisenzone_limitless_instant_domain_unlock";
+    private static final String TAG_OPEN_DOMAIN_UNLOCK = "jujutsukaisenzone_limitless_open_domain_unlock";
     private static final String ICON_INSTANT_DOMAIN = "textures/item/innate_technique_limitless.png";
+    private static final String ICON_OPEN_DOMAIN = "textures/item/innate_technique_limitless.png";
 
     private static final TechniqueSkill MECHANIC_INSTANT_DOMAIN = new TechniqueSkill(
             SKILL_INSTANT_DOMAIN, 0, Component.literal("0.2秒的领域展开"), ICON_INSTANT_DOMAIN,
             0, 0, 0, "", TAG_INSTANT_DOMAIN_UNLOCK, "");
 
-    private static final List<TechniqueSkill> MECHANICS = List.of(MECHANIC_INSTANT_DOMAIN);
+    private static final TechniqueSkill MECHANIC_OPEN_DOMAIN = new TechniqueSkill(
+            SKILL_OPEN_DOMAIN, 0, Component.literal("开放式无量空处"), ICON_OPEN_DOMAIN,
+            0, 0, 0, "", TAG_OPEN_DOMAIN_UNLOCK, "");
+
+    private static final List<TechniqueSkill> MECHANICS = List.of(MECHANIC_INSTANT_DOMAIN, MECHANIC_OPEN_DOMAIN);
 
     private static final List<TechniqueSkill> SKILLS = Arrays.asList(
             new TechniqueSkill(SKILL_BLUE, 1, net.minecraft.network.chat.Component.literal("苍"),
@@ -160,6 +168,17 @@ public final class LimitlessTechniqueSkillSet extends AbstractInnateTechniqueSki
              * 条件：已习得领域展开 + 结界术达到掌握（熟练）；前置节点用引用节点展示结界等级。
              */
             .node(SkillTreeNodeDef.skill("limitless_instant_domain", SKILL_INSTANT_DOMAIN)
+                    .requires("limitless_purple", REF_BARRIER_MASTERED)
+                    .conditions(
+                            UnlockCondition.hasDomainExpansion(),
+                            UnlockCondition.minBarrierTechniqueLevel(BarrierTechniqueLevel.MASTERED))
+                    .intelCost(300)
+                    .build())
+            /*
+             * 机制型：「开放式无量空处」——解锁通用圆盘「领域模式」的开放式档。
+             * 条件：已习得领域展开 + 结界术完全掌握；无壳、范围立方体贴图。
+             */
+            .node(SkillTreeNodeDef.skill("limitless_open_domain", SKILL_OPEN_DOMAIN)
                     .requires("limitless_purple", REF_BARRIER_MASTERED)
                     .conditions(
                             UnlockCondition.hasDomainExpansion(),

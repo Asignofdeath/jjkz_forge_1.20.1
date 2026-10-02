@@ -237,6 +237,16 @@ public class Config
             .comment("If false, penetration floors positive mitigation at 0 (no overpen into vulnerability).")
             .define("combatDefense.penetrationCanOverpen", false);
 
+    // ======== 伤害浮动 ========
+
+    private static final ForgeConfigSpec.BooleanValue DAMAGE_VARIANCE_ENABLED = BUILDER
+            .comment("是否启用伤害浮动乘区（每次命中在 ±spread 内均匀随机，破除固定出伤）")
+            .define("damageVariance.enabled", true);
+
+    private static final ForgeConfigSpec.DoubleValue DAMAGE_VARIANCE_SPREAD = BUILDER
+            .comment("伤害浮动幅度：0.10 = 每次命中在 90%~110% 之间随机")
+            .defineInRange("damageVariance.spread", 0.10D, 0.0D, 1.0D);
+
     // ======== 领域脑损（第1期） ========
     private static final ForgeConfigSpec.BooleanValue DOMAIN_BRAIN_ENABLED = BUILDER
             .comment("Enable domain brain-damage soft limit (free daily expansions, then escalating damage).")
@@ -542,6 +552,13 @@ public class Config
     public static boolean combatDefensePenetrationEnabled;
     public static boolean combatDefensePenetrationCanOverpen;
 
+    // ======== 伤害浮动 ========
+
+    /** 是否启用伤害浮动乘区。 */
+    public static boolean damageVarianceEnabled;
+    /** 伤害浮动幅度（0.10 = ±10%，每次命中在 [1-spread, 1+spread] 内均匀随机）。 */
+    public static double damageVarianceSpread;
+
     // domain brain
     public static boolean domainBrainEnabled;
     public static int domainBrainMax;
@@ -674,6 +691,11 @@ public class Config
         combatDefenseDefenseReductionCap = COMBAT_DEFENSE_TOTAL_CAP.get();
         combatDefensePenetrationEnabled = COMBAT_DEFENSE_PENETRATION_ENABLED.get();
         combatDefensePenetrationCanOverpen = COMBAT_DEFENSE_PENETRATION_CAN_OVERPEN.get();
+
+        // 伤害浮动配置加载
+        damageVarianceEnabled = DAMAGE_VARIANCE_ENABLED.get();
+        damageVarianceSpread = DAMAGE_VARIANCE_SPREAD.get();
+
         domainBrainEnabled = DOMAIN_BRAIN_ENABLED.get();
         domainBrainMax = DOMAIN_BRAIN_MAX.get();
         domainBrainFreeDailyExpansions = DOMAIN_BRAIN_FREE_DAILY.get();

@@ -4,8 +4,12 @@ import com.darkness.jujutsukaisenzone.effect.RushIntoTheZoneClimaxEffect;
 import com.darkness.jujutsukaisenzone.JuJutsuKaisenZone;
 import com.darkness.jujutsukaisenzone.advancement.HeavenlyRestrictionAdvancements;
 import com.darkness.jujutsukaisenzone.entity.DemonSubduingShrineEntity;
+import com.darkness.jujutsukaisenzone.entity.JujutsuCouncilStaffEntity;
 import com.darkness.jujutsukaisenzone.entity.SpecialEffectEntity;
+import com.darkness.jujutsukaisenzone.entity.StaffRole;
 import com.darkness.jujutsukaisenzone.entity.WedgeEntity;
+import com.darkness.jujutsukaisenzone.locate.PlayerLocateGuidance;
+import com.darkness.jujutsukaisenzone.locate.StructureLocateTarget;
 import com.darkness.jujutsukaisenzone.gameplay.ModRules;
 import com.darkness.jujutsukaisenzone.gameplay.CurseSpiritSpawnGrade;
 import com.darkness.jujutsukaisenzone.gameplay.TengenWedgeBarrierLogic;
@@ -39,24 +43,34 @@ import com.darkness.jujutsukaisenzone.player.PlayerSeanceTechniqueData;
 import com.darkness.jujutsukaisenzone.player.PlayerStrengthenTechniqueData;
 import com.darkness.jujutsukaisenzone.player.SeanceTechniqueLevel;
 import com.darkness.jujutsukaisenzone.player.StrengthenTechniqueLevel;
+import com.darkness.jujutsukaisenzone.technique.crit.CritRules;
 import com.darkness.jujutsukaisenzone.technique.DomainExpansionServerLogic;
 import com.darkness.jujutsukaisenzone.technique.domain.JudgmentDomainTrialLogic;
 import com.darkness.jujutsukaisenzone.network.ModNetwork;
 import com.darkness.jujutsukaisenzone.compat.StylizedDamageIntegrationRegistrar;
+import com.darkness.jujutsukaisenzone.registry.ModAttributes;
 import com.darkness.jujutsukaisenzone.registry.ModEntities;
 import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.UUID;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.ai.attributes.AttributeInstance;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
+import net.minecraft.world.entity.projectile.ProjectileUtil;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -67,6 +81,14 @@ public final class JjkzCommands
 {
     /** 教程分类 →（主题 → 说明文字） */
     private static final Map<String, Map<String, String>> ASK_CATEGORIES = new LinkedHashMap<>();
+
+    /**
+     * 调试暴击加成的固定 modifier UUID。
+     * <p>
+     * 重复执行指令只会覆盖同一个 modifier（不叠加），{@code /jjkz critChance 0} 即移除。
+     * 用 transient modifier：不进存档 NBT，重登 / 重启即自动失效，不会污染长期数据。
+     */
+    private static final UUID CRIT_DEBUG_CHANCE_UUID = UUID.fromString("7f3a9c21-5d64-4b8e-9a10-2c6e5b4d8f03");
 
     static
     {
@@ -156,6 +178,7 @@ public final class JjkzCommands
                         .then(buildCursedEnergyCheatBranch())
                         .then(buildTechniqueIntelCheatBranch())
                         .then(buildCombatPowerBranch())
+                        .then(buildCritChanceCheatBranch())
                         .then(buildSpCheatBranch())
                         .then(buildSpNodeCheatBranch())
                         .then(buildSeCheatBranch())
@@ -170,8 +193,11 @@ public final class JjkzCommands
                         .then(buildTengenWedgeBranch())
                         .then(buildWedgeSpawnBranch())
                         .then(buildCurseSpiritSpawnBranch())
+                        .then(buildCouncilStaffBranch())
+                        .then(buildLocateBranch())
                         .then(buildWhiteOverlayBranch())
                         .then(buildWhiteCurtainBranch())
+                        .then(buildSpaceWarpBranch())
                         .then(buildRushIntoTheZoneClimaxBranch())
                         .then(buildModRulesBranch())
                         .then(buildDomainSphereDebugBranch())
@@ -330,6 +356,48 @@ public final class JjkzCommands
                             }
                             PlayerMeltdownRepairData.setLearned(player, false);
                             player.sendSystemMessage(Component.literal("已撤销修复术式熔断。"));
+                            return 1;
+                        }));
+    }
+
+    /**
+     * 调试暴击几率：{@code /jjkz critChance <点数>}（0 = 移除）。
+     * <p>
+     * 暴击几率是点数制属性（{@code ModAttributes.CRIT_CHANCE}，5 点 = 5%）。本指令以
+     * {@code ADDITION} modifier 叠一个调试加成，重复执行<b>覆盖</b>同一个 UUID（不叠加）。
+     * 实际生效值仍受 {@link CritRules} 的硬顶（{@code CHANCE_HARD_CAP_POINTS} = 60 点）封顶，
+     * 所以反馈里给的是夹取后的<b>真实</b>暴击率，不是填入的原始点数。
+     * <p>
+     * 用 transient modifier ⇒ 不进存档 NBT，重登 / 重启自动失效，不会污染长期数据。
+     */
+    private static LiteralArgumentBuilder<CommandSourceStack> buildCritChanceCheatBranch()
+    {
+        return Commands.literal("critChance")
+                .requires(source -> source.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                .then(Commands.argument("points", DoubleArgumentType.doubleArg(0.0D, 1000.0D))
+                        .executes(ctx ->
+                        {
+                            ServerPlayer player = ctx.getSource().getPlayerOrException();
+                            double points = DoubleArgumentType.getDouble(ctx, "points");
+                            AttributeInstance instance = player.getAttribute(ModAttributes.CRIT_CHANCE.get());
+                            if (instance == null)
+                            {
+                                player.sendSystemMessage(Component.literal("无法读取暴击几率属性。"));
+                                return 0;
+                            }
+                            instance.removeModifier(CRIT_DEBUG_CHANCE_UUID);
+                            if (points > 0.0D)
+                            {
+                                instance.addTransientModifier(new AttributeModifier(
+                                        CRIT_DEBUG_CHANCE_UUID, "jjkz_debug_crit_chance",
+                                        points, AttributeModifier.Operation.ADDITION));
+                            }
+                            float chance = CritRules.critChance(player) * 100.0F;
+                            String text = points > 0.0D
+                                    ? String.format("调试暴击加成已设为 +%.1f 点，当前暴击率 %.1f%%（硬顶 %.0f%%，重登后失效）。",
+                                            points, chance, CritRules.CHANCE_HARD_CAP_POINTS)
+                                    : String.format("已移除调试暴击加成，当前暴击率 %.1f%%。", chance);
+                            player.sendSystemMessage(Component.literal(text));
                             return 1;
                         }));
     }
@@ -1001,6 +1069,47 @@ public final class JjkzCommands
         return 1;
     }
 
+    /**
+     * 调试屏幕空间径向扭曲：{@code /jjkz spaceWarp on|off|intensity}。
+     */
+    private static LiteralArgumentBuilder<CommandSourceStack> buildSpaceWarpBranch()
+    {
+        return Commands.literal("spaceWarp")
+                .requires(source -> source.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                .then(Commands.literal("on")
+                        .executes(ctx -> executeSpaceWarpSet(
+                                ctx.getSource().getPlayerOrException(), true, 55))
+                        .then(Commands.argument("percent", IntegerArgumentType.integer(0, 100))
+                                .executes(ctx -> executeSpaceWarpSet(
+                                        ctx.getSource().getPlayerOrException(),
+                                        true,
+                                        IntegerArgumentType.getInteger(ctx, "percent")))))
+                .then(Commands.literal("off")
+                        .executes(ctx -> executeSpaceWarpSet(
+                                ctx.getSource().getPlayerOrException(), false, 0)))
+                .then(Commands.literal("intensity")
+                        .then(Commands.argument("percent", IntegerArgumentType.integer(0, 100))
+                                .executes(ctx ->
+                                {
+                                    ServerPlayer player = ctx.getSource().getPlayerOrException();
+                                    int percent = IntegerArgumentType.getInteger(ctx, "percent");
+                                    return executeSpaceWarpSet(player, true, percent);
+                                })));
+    }
+
+    private static int executeSpaceWarpSet(ServerPlayer player, boolean enabled, int percent)
+    {
+        float intensity = Math.max(0, Math.min(100, percent)) / 100.0F;
+        ModNetwork.sendSpaceWarpSync(player, enabled, intensity);
+        if (!enabled)
+        {
+            player.sendSystemMessage(Component.literal("空间扭曲已关闭。"));
+            return 1;
+        }
+        player.sendSystemMessage(Component.literal("空间扭曲已开启，强度：" + percent + "%。"));
+        return 1;
+    }
+
     /** 作弊设置降灵术等级：{@code /jjkz seanceTechnique set <等级>} */
     private static LiteralArgumentBuilder<CommandSourceStack> buildSeanceTechniqueCheatBranch()
     {
@@ -1562,5 +1671,135 @@ public final class JjkzCommands
                             "已获得 Rush Into The ZONE 最高潮：ZONE III + 下一次体术攻击必定黑闪。"));
                     return 1;
                 });
+    }
+
+    /**
+     * 咒术议会工作人员岗位：
+     * {@code /jjkz councilStaff role <reception|contract|dispatch|generic>}
+     * {@code /jjkz councilStaff get}
+     * 对准或靠近工作人员使用。
+     */
+    private static LiteralArgumentBuilder<CommandSourceStack> buildCouncilStaffBranch()
+    {
+        LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal("councilStaff")
+                .requires(source -> source.hasPermission(Commands.LEVEL_GAMEMASTERS));
+
+        LiteralArgumentBuilder<CommandSourceStack> role = Commands.literal("role");
+        role.then(councilStaffRoleLiteral("reception", StaffRole.RECEPTION));
+        role.then(councilStaffRoleLiteral("接待", StaffRole.RECEPTION));
+        role.then(councilStaffRoleLiteral("contract", StaffRole.CONTRACT));
+        role.then(councilStaffRoleLiteral("委托", StaffRole.CONTRACT));
+        role.then(councilStaffRoleLiteral("dispatch", StaffRole.DISPATCH));
+        role.then(councilStaffRoleLiteral("出击", StaffRole.DISPATCH));
+        role.then(councilStaffRoleLiteral("generic", StaffRole.GENERIC));
+        role.then(councilStaffRoleLiteral("其他事务", StaffRole.GENERIC));
+        root.then(role);
+
+        root.then(Commands.literal("get")
+                .executes(ctx -> executeCouncilStaffGet(ctx.getSource().getPlayerOrException())));
+        return root;
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> councilStaffRoleLiteral(String literal, StaffRole role)
+    {
+        return Commands.literal(literal)
+                .executes(ctx -> executeCouncilStaffSetRole(ctx.getSource().getPlayerOrException(), role));
+    }
+
+    private static int executeCouncilStaffSetRole(ServerPlayer player, StaffRole role)
+    {
+        JujutsuCouncilStaffEntity staff = findLookedCouncilStaff(player);
+        if (staff == null)
+        {
+            player.sendSystemMessage(Component.literal("未找到工作人员：请看向或靠近一名咒术议会工作人员。"));
+            return 0;
+        }
+        staff.setStaffRole(role);
+        player.sendSystemMessage(Component.literal("已将该工作人员岗位设为：")
+                .append(Component.translatable(role.translationKey()))
+                .append(Component.literal("（" + role.getId() + "）")));
+        return 1;
+    }
+
+    private static int executeCouncilStaffGet(ServerPlayer player)
+    {
+        JujutsuCouncilStaffEntity staff = findLookedCouncilStaff(player);
+        if (staff == null)
+        {
+            player.sendSystemMessage(Component.literal("未找到工作人员：请看向或靠近一名咒术议会工作人员。"));
+            return 0;
+        }
+        StaffRole role = staff.getStaffRole();
+        player.sendSystemMessage(Component.literal("当前岗位：")
+                .append(Component.translatable(role.translationKey()))
+                .append(Component.literal("（" + role.getId() + "）")));
+        return 1;
+    }
+
+    @javax.annotation.Nullable
+    private static JujutsuCouncilStaffEntity findLookedCouncilStaff(ServerPlayer player)
+    {
+        double reach = 8.0D;
+        Vec3 eye = player.getEyePosition();
+        Vec3 look = player.getViewVector(1.0F);
+        Vec3 end = eye.add(look.scale(reach));
+        AABB sweep = player.getBoundingBox().expandTowards(look.scale(reach)).inflate(1.0D);
+        EntityHitResult hit = ProjectileUtil.getEntityHitResult(
+                player,
+                eye,
+                end,
+                sweep,
+                entity -> entity instanceof JujutsuCouncilStaffEntity && entity.isAlive(),
+                reach * reach);
+        if (hit != null && hit.getEntity() instanceof JujutsuCouncilStaffEntity staff)
+        {
+            return staff;
+        }
+
+        AABB near = player.getBoundingBox().inflate(reach);
+        JujutsuCouncilStaffEntity nearest = null;
+        double nearestDist = Double.MAX_VALUE;
+        for (JujutsuCouncilStaffEntity staff : player.level().getEntitiesOfClass(
+                JujutsuCouncilStaffEntity.class, near, Entity::isAlive))
+        {
+            double dist = staff.distanceToSqr(player);
+            if (dist < nearestDist)
+            {
+                nearestDist = dist;
+                nearest = staff;
+            }
+        }
+        return nearest;
+    }
+
+    /**
+     * 结构引导：{@code /jjkz locate liaison|连络所} 开始追踪；
+     * {@code /jjkz locate clear|清除} 结束。
+     */
+    private static LiteralArgumentBuilder<CommandSourceStack> buildLocateBranch()
+    {
+        LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal("locate");
+        root.then(Commands.literal("liaison")
+                .executes(ctx -> executeLocateLiaison(ctx.getSource().getPlayerOrException())));
+        root.then(Commands.literal("连络所")
+                .executes(ctx -> executeLocateLiaison(ctx.getSource().getPlayerOrException())));
+        root.then(Commands.literal("clear")
+                .executes(ctx ->
+                {
+                    PlayerLocateGuidance.clear(ctx.getSource().getPlayerOrException());
+                    return 1;
+                }));
+        root.then(Commands.literal("清除")
+                .executes(ctx ->
+                {
+                    PlayerLocateGuidance.clear(ctx.getSource().getPlayerOrException());
+                    return 1;
+                }));
+        return root;
+    }
+
+    private static int executeLocateLiaison(ServerPlayer player)
+    {
+        return PlayerLocateGuidance.start(player, StructureLocateTarget.PLAINS_LIAISON_OFFICE) ? 1 : 0;
     }
 }

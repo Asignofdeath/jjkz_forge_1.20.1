@@ -13,6 +13,7 @@ import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.event.entity.living.LivingEvent;
@@ -32,12 +33,13 @@ import java.util.concurrent.ConcurrentMap;
  * （上限 90 秒；倍率高于常规 ×3，补偿瞬发领域偏短）。
  * <p>
  * 不使用会刷图标的缓慢/挖掘疲劳；不改朝向、不搬散布点。
+ * 不对玩家施加移速归零（避免原版按移速缩 FOV 造成镜头放大）；玩家定格靠输入锁与锁位。
  */
 @Mod.EventBusSubscriber(modid = JuJutsuKaisenZone.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 final class InstantDomainSlowMo
 {
-    /** 作用半径（格）。 */
-    static final double RADIUS = 32.0D;
+    /** 作用半径（格），与瞬发领域球体 {@link AbstractDomainExpansion#INSTANT_DOMAIN_RADIUS} 一致。 */
+    static final double RADIUS = AbstractDomainExpansion.INSTANT_DOMAIN_RADIUS;
     /** 与 {@code LimitlessDomainExpansion#POST_DOMAIN_LOCK_MAX_TICKS} 一致。 */
     private static final int POST_DOMAIN_LOCK_MAX_TICKS = 90 * 20;
     /**
@@ -273,7 +275,12 @@ final class InstantDomainSlowMo
 
     private static void applyActive(LivingEntity living)
     {
-        putMultiplyToZero(living, Attributes.MOVEMENT_SPEED, SPEED_MODIFIER_UUID, SPEED_MODIFIER_NAME);
+        /* 玩家不定格移速：原版会按移速改 FOV，乘到 0 会像镜头突然放大。
+         * 玩家定格靠输入锁 + 每 tick 清速度/传送锁位即可。 */
+        if (!(living instanceof Player))
+        {
+            putMultiplyToZero(living, Attributes.MOVEMENT_SPEED, SPEED_MODIFIER_UUID, SPEED_MODIFIER_NAME);
+        }
         putMultiplyToZero(living, Attributes.ATTACK_SPEED, ATTACK_SPEED_MODIFIER_UUID, ATTACK_SPEED_MODIFIER_NAME);
 
         FreezeState prev = ACTIVE.get(living.getUUID());
@@ -445,7 +452,10 @@ final class InstantDomainSlowMo
         {
             int remaining = aftermath.remainingTicks() - 1;
             maintainFreezePose(living, aftermath.aiPausedByUs());
-            putMultiplyToZero(living, Attributes.MOVEMENT_SPEED, SPEED_MODIFIER_UUID, SPEED_MODIFIER_NAME);
+            if (!(living instanceof Player))
+            {
+                putMultiplyToZero(living, Attributes.MOVEMENT_SPEED, SPEED_MODIFIER_UUID, SPEED_MODIFIER_NAME);
+            }
             putMultiplyToZero(living, Attributes.ATTACK_SPEED, ATTACK_SPEED_MODIFIER_UUID, ATTACK_SPEED_MODIFIER_NAME);
             if (remaining <= 0)
             {

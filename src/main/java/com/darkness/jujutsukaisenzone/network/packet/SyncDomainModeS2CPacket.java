@@ -8,24 +8,24 @@ import net.minecraftforge.network.NetworkEvent;
 
 import java.util.function.Supplier;
 
-/** 领域模式同步：true = 瞬发。 */
+/** 领域模式同步（常规 / 瞬发 / 开放式）。 */
 public class SyncDomainModeS2CPacket
 {
-    private final boolean instant;
+    private final PlayerDomainModeData.Mode mode;
 
-    public SyncDomainModeS2CPacket(boolean instant)
+    public SyncDomainModeS2CPacket(PlayerDomainModeData.Mode mode)
     {
-        this.instant = instant;
+        this.mode = mode == null ? PlayerDomainModeData.Mode.NORMAL : mode;
     }
 
     public static void encode(SyncDomainModeS2CPacket packet, FriendlyByteBuf buffer)
     {
-        buffer.writeBoolean(packet.instant);
+        buffer.writeEnum(packet.mode);
     }
 
     public static SyncDomainModeS2CPacket decode(FriendlyByteBuf buffer)
     {
-        return new SyncDomainModeS2CPacket(buffer.readBoolean());
+        return new SyncDomainModeS2CPacket(buffer.readEnum(PlayerDomainModeData.Mode.class));
     }
 
     public static void handle(SyncDomainModeS2CPacket packet, Supplier<NetworkEvent.Context> contextSupplier)
@@ -38,7 +38,7 @@ public class SyncDomainModeS2CPacket
             {
                 return;
             }
-            PlayerDomainModeData.applyClientSnapshot(player, packet.instant);
+            PlayerDomainModeData.applyClientSnapshot(player, packet.mode);
         });
         context.setPacketHandled(true);
     }

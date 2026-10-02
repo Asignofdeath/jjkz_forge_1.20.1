@@ -309,6 +309,10 @@ public abstract class AbstractBarrierTechnique implements IBarrierTechnique
         /** 结界构建完成后立刻关闭（瞬发领域模式）。 */
         private boolean autoCloseOnComplete;
         /**
+         * 开放式：无领域壳 / 无天空盒方块，仅半径逻辑 + 客户端范围立方体贴图。
+         */
+        private boolean openDomain;
+        /**
          * 瞬发：构建完成后的「完成态」剩余 tick；&gt;0 时保持实例、刷新慢镜头，倒计时结束再关。
          * 0 表示未进入完成态保持。
          */
@@ -317,6 +321,8 @@ public abstract class AbstractBarrierTechnique implements IBarrierTechnique
         private final Set<UUID> instantSlowMoTargets = new HashSet<>();
         /** 本 tick 内已执行 auto-close 清理，维持循环应丢弃该实例。 */
         private boolean discardAfterTick;
+        /** 瞬发展开过程中「进度过半」钩子是否已触发过（同一次展开只触发一次）。 */
+        private boolean instantHalfProgressNotified;
 
         public BarrierInstance(
                 ResourceKey<Level> dimension,
@@ -394,9 +400,12 @@ public abstract class AbstractBarrierTechnique implements IBarrierTechnique
         public net.minecraft.resources.ResourceLocation getCustomSkyboxTexture() { return customSkyboxTexture; }
         public boolean isSkyboxOnlyExpand() { return skyboxOnlyExpand; }
         public boolean isAutoCloseOnComplete() { return autoCloseOnComplete; }
+        public boolean isOpenDomain() { return openDomain; }
         public boolean isDiscardAfterTick() { return discardAfterTick; }
         public int getAutoCloseHoldTicksRemaining() { return autoCloseHoldTicksRemaining; }
         public Set<UUID> getInstantSlowMoTargets() { return instantSlowMoTargets; }
+        public boolean isInstantHalfProgressNotified() { return instantHalfProgressNotified; }
+        public void setInstantHalfProgressNotified(boolean instantHalfProgressNotified) { this.instantHalfProgressNotified = instantHalfProgressNotified; }
 
         // Setters
         public void setBlockMobSpawn(boolean blockMobSpawn) { this.blockMobSpawn = blockMobSpawn; }
@@ -413,6 +422,7 @@ public abstract class AbstractBarrierTechnique implements IBarrierTechnique
         public void setCustomSkyboxTexture(@Nullable net.minecraft.resources.ResourceLocation texture) { this.customSkyboxTexture = texture; }
         public void setSkyboxOnlyExpand(boolean skyboxOnlyExpand) { this.skyboxOnlyExpand = skyboxOnlyExpand; }
         public void setAutoCloseOnComplete(boolean autoCloseOnComplete) { this.autoCloseOnComplete = autoCloseOnComplete; }
+        public void setOpenDomain(boolean openDomain) { this.openDomain = openDomain; }
         public void setDiscardAfterTick(boolean discardAfterTick) { this.discardAfterTick = discardAfterTick; }
         public void setAutoCloseHoldTicksRemaining(int ticks) { this.autoCloseHoldTicksRemaining = Math.max(0, ticks); }
 
