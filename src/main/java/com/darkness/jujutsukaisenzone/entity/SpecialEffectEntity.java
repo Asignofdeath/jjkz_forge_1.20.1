@@ -127,98 +127,20 @@ public class SpecialEffectEntity extends Chicken
         return data;
     }
 
-    // ==== Configure methods (each creates its behavior) ====
+    // ==== 行为装载 ====
 
-    public void configureLimitlessBlueNormal(@Nullable LivingEntity owner, boolean allowOwnerPull)
-    {
-        LimitlessBlueBehavior b = new LimitlessBlueBehavior();
-        b.configure(owner, allowOwnerPull);
-        this.behavior = b;
-    }
-
-    public void configureLimitlessRedNormal(@Nullable LivingEntity owner, boolean allowOwnerKnockback)
-    {
-        LimitlessRedBehavior b = new LimitlessRedBehavior();
-        b.configure(owner, allowOwnerKnockback);
-        this.behavior = b;
-    }
-
-    public void configureLimitlessPurpleMiniNormal(@Nullable LivingEntity owner)
-    {
-        LimitlessPurpleBehavior b = new LimitlessPurpleBehavior();
-        b.configure(owner);
-        this.behavior = b;
-    }
-
-    public void configureLimitlessRemoteMurasaki(@Nullable LivingEntity owner)
-    {
-        LimitlessRemoteMurasakiBehavior b = new LimitlessRemoteMurasakiBehavior();
-        b.configure(owner);
-        this.behavior = b;
-    }
-
-    public void configureLimitlessRemoteMurasakiStartOrb(
-            @Nullable LivingEntity owner,
-            LimitlessRemoteMurasakiStartOrbBehavior.Side side)
-    {
-        LimitlessRemoteMurasakiStartOrbBehavior b = new LimitlessRemoteMurasakiStartOrbBehavior();
-        b.configure(owner, side);
-        this.behavior = b;
-    }
-
-    public void configureShrineKaiDelay(@Nullable LivingEntity owner, double maxRange, boolean horizontal)
-    {
-        ShrineKaiDelayBehavior b = new ShrineKaiDelayBehavior();
-        b.configure(owner, maxRange, horizontal);
-        this.behavior = b;
-    }
-
-    public void configureBlackFlash(@Nullable LivingEntity owner)
-    {
-        BlackFlashFxBehavior b = new BlackFlashFxBehavior();
-        b.configure(owner);
-        this.behavior = b;
-    }
-
-    public void configureShrineKaiArrival(@Nullable LivingEntity owner, int slashType)
-    {
-        ShrineKaiArrivalBehavior b = new ShrineKaiArrivalBehavior();
-        b.configure(owner, slashType);
-        this.behavior = b;
-    }
-
-    public void configureShrineKaiFlyobjProjectile(@Nullable LivingEntity owner, double maxRange, Vec3 flightDir)
-    {
-        ShrineKaiArrowBehavior b = new ShrineKaiArrowBehavior();
-        b.configure(owner, maxRange, flightDir, true, true);
-        this.behavior = b;
-    }
-
-    public void configureShrineHachi(@Nullable LivingEntity owner, LivingEntity target)
-    {
-        ShrineHachiBehavior b = new ShrineHachiBehavior();
-        b.configure(owner, target);
-        this.behavior = b;
-    }
-
-    public void configureShrineFugaCharge(@Nullable LivingEntity owner)
-    {
-        ShrineFugaBehavior b = new ShrineFugaBehavior();
-        b.configure(owner);
-        this.behavior = b;
-    }
-
-    public void configureBlackFlashShockwaveDelay(@Nullable LivingEntity owner)
-    {
-        BlackFlashShockwaveBehavior b = new BlackFlashShockwaveBehavior();
-        b.configure(owner);
-        this.behavior = b;
-    }
-
-    // ==== Internal accessor for behaviors in entity.behavior package ====
-
-    /** 供 {@code entity.behavior} 包内 Behavior 创建飞行实体时设置行为。 */
-    public void setBehaviorForInternal(EffectBehavior behavior)
+    /**
+     * 装载行为 —— 宿主唯一的配置入口。
+     * <p>
+     * ⛔ 宿主不再为每个技能提供 {@code configureXxx}：那会让本类随技能数量线性膨胀。请在技能侧
+     * 构造并配置好，再整体挂上来：
+     * <pre>{@code
+     * ShrineHachiBehavior b = new ShrineHachiBehavior();
+     * b.configure(owner, target);
+     * fx.attach(b);
+     * }</pre>
+     */
+    public void attach(EffectBehavior behavior)
     {
         this.behavior = behavior;
     }

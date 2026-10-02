@@ -7,7 +7,7 @@ import com.darkness.jujutsukaisenzone.technique.TechniqueDamageSources;
 import com.darkness.jujutsukaisenzone.technique.scaling.LimitlessRedSkillGrowth;
 import com.darkness.jujutsukaisenzone.technique.skillset.LimitlessTechniqueSkillSet;
 import com.darkness.jujutsukaisenzone.technique.skillset.SkillDamageType;
-import net.minecraft.commands.CommandSourceStack;
+import com.darkness.jujutsukaisenzone.photon.PhotonFxCommands;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
@@ -125,11 +125,7 @@ public class LimitlessRedArrowBehavior extends EffectBehavior
         applyKnockback(entity);
         spawnExtraTntExplosionParticles(entity);
 
-        CommandSourceStack source = entity.createCommandSourceStack().withPermission(2).withSuppressedOutput();
-        if (entity.getServer() != null)
-        {
-            entity.getServer().getCommands().performPrefixedCommand(source, LimitlessRedConfig.PHOTON_EXPLOSION_COMMAND);
-        }
+        PhotonFxCommands.perform(entity, LimitlessRedConfig.PHOTON_EXPLOSION_COMMAND);
     }
 
     /** 在原版爆炸粒子之外，再叠一层 TNT 同款 EXPLOSION / EXPLOSION_EMITTER。 */

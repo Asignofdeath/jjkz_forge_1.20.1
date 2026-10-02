@@ -2,10 +2,10 @@ package com.darkness.jujutsukaisenzone.entity.behavior;
 
 import com.darkness.jujutsukaisenzone.entity.SpecialEffectEntity;
 import com.darkness.jujutsukaisenzone.entity.data.LimitlessPurpleConfig;
+import com.darkness.jujutsukaisenzone.entity.util.AreaShape;
+import com.darkness.jujutsukaisenzone.entity.util.BlockErase;
 import com.darkness.jujutsukaisenzone.entity.util.GeometryUtils;
-import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.util.Mth;
 import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
 import com.darkness.jujutsukaisenzone.technique.SkillDamageResolver;
 import com.darkness.jujutsukaisenzone.technique.TechniqueDamageSources;
@@ -67,31 +67,15 @@ public class LimitlessPurpleArrowBehavior extends EffectBehavior
         Level level = entity.level();
         if (level.isClientSide()) return;
 
-        double cx = entity.getX();
-        double cy = entity.getY();
-        double cz = entity.getZ();
-        double r = LimitlessPurpleConfig.ARROW_BLOCK_ERASE_RADIUS;
-        double rSqr = r * r;
-        int ri = Mth.ceil(r);
-        int ox = Mth.floor(cx);
-        int oy = Mth.floor(cy);
-        int oz = Mth.floor(cz);
-        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
-
-        for (int dx = -ri; dx <= ri; dx++)
+        AreaShape shape = AreaShape.sphere(entity.getX(), entity.getY(), entity.getZ(),
+                LimitlessPurpleConfig.ARROW_BLOCK_ERASE_RADIUS);
+        BlockErase.forEach(level, shape, (lv, pos) ->
         {
-            for (int dy = -ri; dy <= ri; dy++)
-            {
-                for (int dz = -ri; dz <= ri; dz++)
-                {
-                    pos.set(ox + dx, oy + dy, oz + dz);
-                    if (level.isOutsideBuildHeight(pos) || !level.getWorldBorder().isWithinBounds(pos)) continue;
-                    if (!GeometryUtils.blockCubeIntersectsSphere(cx, cy, cz, rSqr, pos.getX(), pos.getY(), pos.getZ())) continue;
-                    if (level.getBlockState(pos).isAir()) continue;
-                    level.setBlock(pos, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL | Block.UPDATE_SUPPRESS_DROPS);
-                }
-            }
-        }
+            if (lv.isOutsideBuildHeight(pos) || !lv.getWorldBorder().isWithinBounds(pos)) return false;
+            if (lv.getBlockState(pos).isAir()) return false;
+            lv.setBlock(pos, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL | Block.UPDATE_SUPPRESS_DROPS);
+            return false;
+        });
     }
 
     private void damageLivingInSphere(SpecialEffectEntity entity)

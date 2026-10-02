@@ -2,8 +2,9 @@ package com.darkness.jujutsukaisenzone.entity.behavior;
 
 import com.darkness.jujutsukaisenzone.entity.SpecialEffectEntity;
 import com.darkness.jujutsukaisenzone.entity.data.BlackFlashConfig;
+import com.darkness.jujutsukaisenzone.entity.util.AreaShape;
+import com.darkness.jujutsukaisenzone.entity.util.BlockErase;
 import com.darkness.jujutsukaisenzone.technique.TechniqueDamageSources;
-import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
@@ -45,30 +46,22 @@ public class BlackFlashShockwaveBehavior extends EffectBehavior
             return;
         }
 
-        int cx = Mth.floor(entity.getX());
-        int cy = Mth.floor(entity.getY());
-        int cz = Mth.floor(entity.getZ());
+        double cx = Mth.floor(entity.getX());
+        double cy = Mth.floor(entity.getY());
+        double cz = Mth.floor(entity.getZ());
         int radius = BlackFlashConfig.SHOCKWAVE_RADIUS;
-        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
-
-        for (int dx = -radius; dx <= radius; dx++)
+        AreaShape shape = AreaShape.sphere(cx, cy, cz, radius);
+        BlockErase.forEach(level, shape, (lv, pos) ->
         {
-            for (int dy = -radius; dy <= radius; dy++)
+            if (lv.isOutsideBuildHeight(pos)) return false;
+            var state = lv.getBlockState(pos);
+            if (state.isAir() || state.getDestroySpeed(lv, pos) < 0.0F) return false;
+            if (lv.random.nextDouble() < BlackFlashConfig.SHOCKWAVE_DESTROY_CHANCE)
             {
-                for (int dz = -radius; dz <= radius; dz++)
-                {
-                    if (dx * dx + dy * dy + dz * dz > radius * radius) continue;
-                    pos.set(cx + dx, cy + dy, cz + dz);
-                    if (level.isOutsideBuildHeight(pos)) continue;
-                    var state = level.getBlockState(pos);
-                    if (state.isAir() || state.getDestroySpeed(level, pos) < 0.0F) continue;
-                    if (entity.level().random.nextDouble() < BlackFlashConfig.SHOCKWAVE_DESTROY_CHANCE)
-                    {
-                        level.destroyBlock(pos, true);
-                    }
-                }
+                lv.destroyBlock(pos, true);
             }
-        }
+            return false;
+        });
 
         AABB area = entity.getBoundingBox().inflate(radius);
         LivingEntity owner = resolveOwner(entity, this.ownerUuid);

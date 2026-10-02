@@ -3,7 +3,7 @@ package com.darkness.jujutsukaisenzone.entity.behavior;
 import com.darkness.jujutsukaisenzone.compat.EpicFightBoneUtil;
 import com.darkness.jujutsukaisenzone.entity.SpecialEffectEntity;
 import com.darkness.jujutsukaisenzone.entity.data.LimitlessRedConfig;
-import net.minecraft.commands.CommandSourceStack;
+import com.darkness.jujutsukaisenzone.photon.PhotonFxCommands;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.Vec3;
@@ -55,8 +55,7 @@ public final class LimitlessRedChargeBehavior extends EffectBehavior
 
         if (!this.photonMounted && entity.getServer() != null)
         {
-            CommandSourceStack source = entity.createCommandSourceStack().withPermission(2).withSuppressedOutput();
-            entity.getServer().getCommands().performPrefixedCommand(source, LimitlessRedConfig.PHOTON_FLYOBJ_COMMAND);
+            PhotonFxCommands.perform(entity, LimitlessRedConfig.PHOTON_FLYOBJ_COMMAND);
             this.photonMounted = true;
         }
     }

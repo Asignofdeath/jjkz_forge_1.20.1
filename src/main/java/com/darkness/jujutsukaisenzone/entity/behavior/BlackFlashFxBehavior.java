@@ -2,7 +2,7 @@ package com.darkness.jujutsukaisenzone.entity.behavior;
 
 import com.darkness.jujutsukaisenzone.entity.SpecialEffectEntity;
 import com.darkness.jujutsukaisenzone.entity.data.BlackFlashConfig;
-import net.minecraft.commands.CommandSourceStack;
+import com.darkness.jujutsukaisenzone.photon.PhotonFxCommands;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.entity.LivingEntity;
 import org.jetbrains.annotations.Nullable;
@@ -36,10 +36,7 @@ public class BlackFlashFxBehavior extends EffectBehavior
         {
             if (entity.getServer() != null)
             {
-                CommandSourceStack source = entity.createCommandSourceStack()
-                        .withPermission(2)
-                        .withSuppressedOutput();
-                entity.getServer().getCommands().performPrefixedCommand(source, BlackFlashConfig.PHOTON_COMMAND);
+                PhotonFxCommands.perform(entity, BlackFlashConfig.PHOTON_COMMAND);
             }
         }
         this.remainingLifeTicks--;

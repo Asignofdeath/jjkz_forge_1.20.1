@@ -12,6 +12,9 @@ import java.util.UUID;
 
 /**
  * 御厨子斩击 Photon：仅向施法者客户端同步，其他玩家不可见。
+ * <p>
+ * 这是全项目「Photon 挂载」的第二条也是最后一条通道（owner-only）。世界可见的通道走
+ * {@code PhotonFxCommands#perform}；两条通道各只有一个入口，调用点别再手搓命令栈 / 数据包。
  */
 public final class OwnerOnlyShrineSlashFx
 {

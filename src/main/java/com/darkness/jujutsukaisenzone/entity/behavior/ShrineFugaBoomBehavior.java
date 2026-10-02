@@ -4,13 +4,13 @@ import com.darkness.jujutsukaisenzone.api.mimicry.MimicryVoiceLineEvents;
 import com.darkness.jujutsukaisenzone.api.mimicry.MimicryVoiceLines;
 import com.darkness.jujutsukaisenzone.entity.SpecialEffectEntity;
 import com.darkness.jujutsukaisenzone.entity.data.ShrineFugaConfig;
+import com.darkness.jujutsukaisenzone.entity.util.AreaShape;
+import com.darkness.jujutsukaisenzone.entity.util.BlockErase;
 import com.darkness.jujutsukaisenzone.entity.util.GeometryUtils;
-import net.minecraft.commands.CommandSourceStack;
-import net.minecraft.core.BlockPos;
+import com.darkness.jujutsukaisenzone.photon.PhotonFxCommands;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.util.Mth;
 import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
 import com.darkness.jujutsukaisenzone.technique.SkillDamageResolver;
 import com.darkness.jujutsukaisenzone.technique.TechniqueDamageSources;
@@ -130,48 +130,22 @@ public class ShrineFugaBoomBehavior extends EffectBehavior
             double outerRadiusSqr,
             int maxBlocks)
     {
-        int cleared = 0;
-        int ri = Mth.ceil(Math.sqrt(outerRadiusSqr));
-        int ox = Mth.floor(cx);
-        int oy = Mth.floor(cy);
-        int oz = Mth.floor(cz);
-        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
-
-        outer:
-        for (int dx = -ri; dx <= ri; dx++)
+        int[] cleared = {0};
+        AreaShape shell = AreaShape.sphere(cx, cy, cz, Math.sqrt(outerRadiusSqr));
+        BlockErase.forEach(level, shell, (lv, pos) ->
         {
-            for (int dy = -ri; dy <= ri; dy++)
+            if (lv.isOutsideBuildHeight(pos) || !lv.getWorldBorder().isWithinBounds(pos)) return false;
+            if (innerRadiusSqr > 0.0D
+                    && GeometryUtils.blockCubeIntersectsSphere(cx, cy, cz, innerRadiusSqr, pos.getX(), pos.getY(), pos.getZ()))
             {
-                for (int dz = -ri; dz <= ri; dz++)
-                {
-                    pos.set(ox + dx, oy + dy, oz + dz);
-                    if (level.isOutsideBuildHeight(pos) || !level.getWorldBorder().isWithinBounds(pos))
-                    {
-                        continue;
-                    }
-                    if (!GeometryUtils.blockCubeIntersectsSphere(cx, cy, cz, outerRadiusSqr, pos.getX(), pos.getY(), pos.getZ()))
-                    {
-                        continue;
-                    }
-                    if (innerRadiusSqr > 0.0D
-                            && GeometryUtils.blockCubeIntersectsSphere(cx, cy, cz, innerRadiusSqr, pos.getX(), pos.getY(), pos.getZ()))
-                    {
-                        continue;
-                    }
-                    var state = level.getBlockState(pos);
-                    if (state.isAir() || state.getDestroySpeed(level, pos) < 0.0F)
-                    {
-                        continue;
-                    }
-                    level.setBlock(pos, Blocks.AIR.defaultBlockState(), Block.UPDATE_CLIENTS);
-                    if (++cleared >= maxBlocks)
-                    {
-                        break outer;
-                    }
-                }
+                return false;
             }
-        }
-        return cleared;
+            var state = lv.getBlockState(pos);
+            if (state.isAir() || state.getDestroySpeed(lv, pos) < 0.0F) return false;
+            lv.setBlock(pos, Blocks.AIR.defaultBlockState(), Block.UPDATE_CLIENTS);
+            return ++cleared[0] >= maxBlocks;
+        });
+        return cleared[0];
     }
 
     private void damageLivingInSphere(SpecialEffectEntity entity, ServerLevel level)
@@ -231,8 +205,7 @@ public class ShrineFugaBoomBehavior extends EffectBehavior
         {
             return;
         }
-        CommandSourceStack source = entity.createCommandSourceStack().withPermission(2).withSuppressedOutput();
-        entity.getServer().getCommands().performPrefixedCommand(source, ShrineFugaConfig.PHOTON_BOOM_COMMAND);
+        PhotonFxCommands.perform(entity, ShrineFugaConfig.PHOTON_BOOM_COMMAND);
     }
 
     @Override
@@ -248,8 +221,7 @@ public class ShrineFugaBoomBehavior extends EffectBehavior
         {
             return;
         }
-        CommandSourceStack source = entity.createCommandSourceStack().withPermission(2).withSuppressedOutput();
-        entity.getServer().getCommands().performPrefixedCommand(source, ShrineFugaConfig.PHOTON_BOOM_REMOVE_COMMAND);
+        PhotonFxCommands.perform(entity, ShrineFugaConfig.PHOTON_BOOM_REMOVE_COMMAND);
         this.photonMounted = false;
     }
 

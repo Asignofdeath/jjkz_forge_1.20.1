@@ -2,7 +2,10 @@ package com.darkness.jujutsukaisenzone.entity.behavior;
 
 import com.darkness.jujutsukaisenzone.entity.SpecialEffectEntity;
 import com.darkness.jujutsukaisenzone.entity.data.ShrineKaiConfig;
+import com.darkness.jujutsukaisenzone.entity.util.AreaShape;
+import com.darkness.jujutsukaisenzone.entity.util.BlockErase;
 import com.darkness.jujutsukaisenzone.entity.util.GeometryUtils;
+import com.darkness.jujutsukaisenzone.entity.util.SpecialEffectFlight;
 import com.darkness.jujutsukaisenzone.photon.OwnerOnlyShrineSlashFx;
 import com.darkness.jujutsukaisenzone.registry.ModEntities;
 import com.darkness.jujutsukaisenzone.registry.ModSounds;
@@ -10,7 +13,6 @@ import com.darkness.jujutsukaisenzone.technique.TechniqueDamageSources;
 import com.darkness.jujutsukaisenzone.technique.scaling.ShrineSkillGrowth;
 import com.darkness.jujutsukaisenzone.technique.skillset.ShrineTechniqueSkillSet;
 import com.darkness.jujutsukaisenzone.technique.se.ShrineFinishCutMarks;
-import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -44,11 +46,9 @@ public class ShrineKaiArrowBehavior extends EffectBehavior
     private boolean flyobjMode;
     private boolean photonMounted;
     private int slashType = 1; // 1=竖斩 2=横斩
-    private Vec3 flightDir = Vec3.ZERO;
-    private double maxRange;
-    private double traveled;
-    /** 破方块遍历复用的坐标对象（避免每采样点 new 一个）。 */
-    private final BlockPos.MutableBlockPos scratchPos = new BlockPos.MutableBlockPos();
+    /** 匀速直线飞行状态（方向 / 已飞距离 / 射程）；速度每 tick 从配置重取。 */
+    private SpecialEffectFlight.LinearMotion motion =
+            new SpecialEffectFlight.LinearMotion(new Vec3(0.0D, 0.0D, 1.0D), 0.0D, 1.0D);
 
     @Override
     public String id() { return ID; }
@@ -58,9 +58,7 @@ public class ShrineKaiArrowBehavior extends EffectBehavior
         this.ownerUuid = owner == null ? null : owner.getUUID();
         this.flyobjMode = flyobjMode;
         this.slashType = horizontal ? 2 : 1;
-        this.flightDir = flightDir.lengthSqr() < 1.0E-8D ? new Vec3(0.0D, 0.0D, 1.0D) : flightDir.normalize();
-        this.maxRange = maxRange;
-        this.traveled = 0.0D;
+        this.motion = new SpecialEffectFlight.LinearMotion(flightDir, ShrineKaiConfig.ARROW_SPEED, maxRange);
     }
 
     @Override
@@ -86,35 +84,27 @@ public class ShrineKaiArrowBehavior extends EffectBehavior
         List<Vec3> columnBases = new ArrayList<>(16);
         try
         {
-            double remainingDist = ShrineKaiConfig.ARROW_SPEED;
-            while (remainingDist > 0.0D)
+            // 逐格匀速直线推进（每步 ≤ 1 格、射程封顶）与每步后的旋转、柱清场都交给
+            // SpecialEffectFlight；速度每 tick 从配置重取，改 TOML 立即生效。
+            this.motion.setSpeedPerTick(ShrineKaiConfig.ARROW_SPEED);
+            SpecialEffectFlight.Result result = SpecialEffectFlight.tickLinear(entity, this.motion, (e, from, to) ->
             {
-                double step = Math.min(remainingDist, 1.0D);
-                double nextTraveled = this.traveled + step;
-                if (nextTraveled >= this.maxRange)
-                {
-                    double finalDist = this.maxRange - this.traveled;
-                    if (finalDist > 0.0D)
-                    {
-                        entity.setPos(entity.position().add(this.flightDir.scale(finalDist)));
-                        this.traveled = this.maxRange;
-                        if (!this.flyobjMode)
-                        {
-                            applyRotation(entity);
-                        }
-                        tickColumn(entity, columnBases);
-                    }
-                    arrive(entity);
-                    return;
-                }
-                entity.setPos(entity.position().add(this.flightDir.scale(step)));
-                this.traveled = nextTraveled;
                 if (!this.flyobjMode)
                 {
-                    applyRotation(entity);
+                    applyRotation(e);
                 }
-                tickColumn(entity, columnBases);
-                remainingDist -= step;
+                tickColumn(e, columnBases);
+                return false;
+            });
+
+            if (result == SpecialEffectFlight.Result.ABORT_CHUNK_UNLOADED)
+            {
+                entity.discard();
+                return;
+            }
+            if (result == SpecialEffectFlight.Result.ARRIVED)
+            {
+                arrive(entity);
             }
         }
         finally
@@ -153,7 +143,9 @@ public class ShrineKaiArrowBehavior extends EffectBehavior
             {
                 fx.moveTo(pos.x, pos.y, pos.z, entity.getYRot(), entity.getXRot());
             }
-            fx.configureShrineKaiArrival(owner, this.slashType);
+            ShrineKaiArrivalBehavior arrivalBehavior = new ShrineKaiArrivalBehavior();
+            arrivalBehavior.configure(owner, this.slashType);
+            fx.attach(arrivalBehavior);
             entity.level().addFreshEntity(fx);
         }
 
@@ -180,28 +172,23 @@ public class ShrineKaiArrowBehavior extends EffectBehavior
 
     private Vec3 getHorizontalColumnDir()
     {
-        Vec3 cross = new Vec3(-this.flightDir.z, 0.0D, this.flightDir.x);
+        Vec3 dir = this.motion.direction();
+        Vec3 cross = new Vec3(-dir.z, 0.0D, dir.x);
         double len = cross.length();
         if (len < 1.0E-8D) return new Vec3(1.0D, 0.0D, 0.0D);
         return cross.scale(1.0D / len);
     }
 
     /**
-     * 破方块（档 B）：整条柱的包围盒<b>只遍历一次</b>，逐方块判定「到柱轴线段的最短距离 ≤ 柱半径」，
-     * 取代原先「每个采样点各遍历一遍 {@code (2r+1)³ = 125} 个立方体」。
+     * 破方块：整条柱的包围盒只遍历一次，逐方块判定「到柱轴线段的最短距离 ≤ 柱半径」。
      * <p>
-     * 迭代量：竖斩约 1000 → 约 160；横斩约 1125 → 约 180~360（取决于柱方向与坐标轴的对齐度）。
-     * <p>
-     * ⚠️ 这是本项目<b>唯一</b>会改变破坏形状的改动：原先的覆盖是「8~9 个离散球的并集」，
-     * 现在是「轴上连续扫过的胶囊」。因球心间距 1 格小于直径 3 格、重叠很深，两端点完全一致，
-     * 只在柱<i>腰部</i>有约 {@code r - sqrt(r² - 0.25) ≈ 0.086} 格的外扩
-     * ⇒ 侧面可能多破坏极少数方块（已知并接受）。
+     * 几何委托 {@link AreaShape#capsule}（球沿轴连续扫过的胶囊语义），遍历委托 {@link BlockErase}。
+     * 判据与旧实现一致——这是本项目唯一会改变破坏形状的改动：两端点完全一致，
+     * 只在柱腰部有约 {@code r - sqrt(r² - 0.25) ≈ 0.086} 格的外扩，侧面可能多破坏极少数方块（已知并接受）。
      */
     private void breakBlocksInColumn(Level level, Vec3 base, Vec3 columnDir)
     {
-        double rSqr = ShrineKaiConfig.COLUMN_RADIUS * ShrineKaiConfig.COLUMN_RADIUS;
-
-        // 柱轴线段：竖斩 [base, base + up*(H-1)]（采样点 i∈[0, H-1]）；横斩 [base - dir*H/2, base + dir*H/2]
+        // 柱轴线段：竖斩 [base, base + up*(H-1)]；横斩 [base - dir*H/2, base + dir*H/2]
         Vec3 a;
         Vec3 b;
         if (this.slashType == 2)
@@ -215,52 +202,17 @@ public class ShrineKaiArrowBehavior extends EffectBehavior
             a = base;
             b = base.add(columnDir.scale(ShrineKaiConfig.COLUMN_HEIGHT - 1));
         }
-        Vec3 ab = b.subtract(a);
-        double abLenSqr = Math.max(ab.lengthSqr(), 1.0E-8D);
 
-        AABB box = new AABB(a, b).inflate(ShrineKaiConfig.COLUMN_RADIUS);
-        int minX = Mth.floor(box.minX), minY = Mth.floor(box.minY), minZ = Mth.floor(box.minZ);
-        int maxX = Mth.floor(box.maxX), maxY = Mth.floor(box.maxY), maxZ = Mth.floor(box.maxZ);
-
-        BlockPos.MutableBlockPos pos = this.scratchPos;
-        for (int x = minX; x <= maxX; x++)
-            for (int y = minY; y <= maxY; y++)
-                for (int z = minZ; z <= maxZ; z++)
-                {
-                    pos.set(x, y, z);
-                    if (level.isOutsideBuildHeight(pos) || !level.getWorldBorder().isWithinBounds(pos)) continue;
-                    if (!cubeIntersectsCapsule(x, y, z, a, ab, abLenSqr, rSqr)) continue;
-                    BlockState state = level.getBlockState(pos);
-                    if (state.isAir()) continue;
-                    if (state.getDestroySpeed(level, pos) < 0.0F) continue;
-                    level.destroyBlock(pos, false);
-                }
-    }
-
-    /**
-     * 方块是否与「轴 a → a+ab、半径平方 rSqr」的胶囊相交。
-     * <p>
-     * 取方块中心在轴上的投影点（夹到线段内）当球心，再做球-方块判定——即「球沿轴连续扫过」
-     * 的胶囊语义，与 {@code GeometryUtils.blockCubeIntersectsSphere} 同一套距离判据。
-     */
-    private static boolean cubeIntersectsCapsule(int bx, int by, int bz,
-                                                 Vec3 a, Vec3 ab, double abLenSqr, double rSqr)
-    {
-        double cx = bx + 0.5D;
-        double cy = by + 0.5D;
-        double cz = bz + 0.5D;
-        double t = ((cx - a.x) * ab.x + (cy - a.y) * ab.y + (cz - a.z) * ab.z) / abLenSqr;
-        t = Mth.clamp(t, 0.0D, 1.0D);
-        double px = a.x + ab.x * t;
-        double py = a.y + ab.y * t;
-        double pz = a.z + ab.z * t;
-        double qx = Mth.clamp(px, bx, bx + 1.0D);
-        double qy = Mth.clamp(py, by, by + 1.0D);
-        double qz = Mth.clamp(pz, bz, bz + 1.0D);
-        double dx = px - qx;
-        double dy = py - qy;
-        double dz = pz - qz;
-        return dx * dx + dy * dy + dz * dz <= rSqr;
+        AreaShape shape = AreaShape.capsule(a, b, ShrineKaiConfig.COLUMN_RADIUS);
+        BlockErase.forEach(level, shape, (lv, pos) ->
+        {
+            if (lv.isOutsideBuildHeight(pos) || !lv.getWorldBorder().isWithinBounds(pos)) return false;
+            BlockState state = lv.getBlockState(pos);
+            if (state.isAir()) return false;
+            if (state.getDestroySpeed(lv, pos) < 0.0F) return false;
+            lv.destroyBlock(pos, false);
+            return false;
+        });
     }
 
     /**
@@ -353,9 +305,10 @@ public class ShrineKaiArrowBehavior extends EffectBehavior
 
     private void applyRotation(SpecialEffectEntity entity)
     {
-        double h = Math.sqrt(this.flightDir.x * this.flightDir.x + this.flightDir.z * this.flightDir.z);
-        float yaw = (float) (Mth.atan2(this.flightDir.x, this.flightDir.z) * (180.0D / Math.PI));
-        float pitch = (float) (-Mth.atan2(this.flightDir.y, h) * (180.0D / Math.PI));
+        Vec3 dir = this.motion.direction();
+        double h = Math.sqrt(dir.x * dir.x + dir.z * dir.z);
+        float yaw = (float) (Mth.atan2(dir.x, dir.z) * (180.0D / Math.PI));
+        float pitch = (float) (-Mth.atan2(dir.y, h) * (180.0D / Math.PI));
         entity.setYRot(yaw);
         entity.setXRot(pitch);
         entity.setYBodyRot(yaw);
@@ -393,11 +346,7 @@ public class ShrineKaiArrowBehavior extends EffectBehavior
         tag.putBoolean("FlyobjMode", this.flyobjMode);
         tag.putBoolean("PhotonMounted", this.photonMounted);
         tag.putInt("SlashType", this.slashType);
-        tag.putDouble("FlightDirX", this.flightDir.x);
-        tag.putDouble("FlightDirY", this.flightDir.y);
-        tag.putDouble("FlightDirZ", this.flightDir.z);
-        tag.putDouble("MaxRange", this.maxRange);
-        tag.putDouble("Traveled", this.traveled);
+        this.motion.writeToNbt(tag);
         if (this.ownerUuid != null) tag.putUUID("Owner", this.ownerUuid);
     }
 
@@ -407,11 +356,7 @@ public class ShrineKaiArrowBehavior extends EffectBehavior
         this.flyobjMode = tag.getBoolean("FlyobjMode");
         this.photonMounted = tag.getBoolean("PhotonMounted");
         this.slashType = tag.contains("SlashType") ? tag.getInt("SlashType") : 1;
-        this.flightDir = new Vec3(tag.getDouble("FlightDirX"), tag.getDouble("FlightDirY"), tag.getDouble("FlightDirZ"));
-        if (this.flightDir.lengthSqr() < 1.0E-8D) this.flightDir = new Vec3(0.0D, 0.0D, 1.0D);
-        else this.flightDir = this.flightDir.normalize();
-        this.maxRange = tag.contains("MaxRange") ? tag.getDouble("MaxRange") : 0.0D;
-        this.traveled = tag.contains("Traveled") ? tag.getDouble("Traveled") : 0.0D;
+        this.motion = SpecialEffectFlight.LinearMotion.readFromNbt(tag);
         this.ownerUuid = tag.hasUUID("Owner") ? tag.getUUID("Owner") : null;
     }
 }

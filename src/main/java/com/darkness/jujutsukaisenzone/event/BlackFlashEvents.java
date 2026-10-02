@@ -16,6 +16,8 @@ import com.darkness.jujutsukaisenzone.technique.development.SkillUnlockLogic;
 import com.darkness.jujutsukaisenzone.technique.skillset.ShrineTechniqueSkillSet;
 import com.darkness.jujutsukaisenzone.technique.skillset.SkillDamageType;
 import com.darkness.jujutsukaisenzone.entity.SpecialEffectEntity;
+import com.darkness.jujutsukaisenzone.entity.behavior.BlackFlashFxBehavior;
+import com.darkness.jujutsukaisenzone.entity.behavior.BlackFlashShockwaveBehavior;
 import com.darkness.jujutsukaisenzone.entity.data.BlackFlashConfig;
 import com.darkness.jujutsukaisenzone.effect.RushIntoTheZoneClimaxEffect;
 import com.darkness.jujutsukaisenzone.registry.ModEffects;
@@ -372,7 +374,9 @@ public final class BlackFlashEvents
                 float pitchToAttacker = (float) -Math.toDegrees(Math.atan2(
                         attacker.getEyeY() - pos.y, horizontalDist));
                 fx.moveTo(pos.x, pos.y, pos.z, yawToAttacker, pitchToAttacker);
-                fx.configureBlackFlash(attacker);
+                BlackFlashFxBehavior blackFlashFx = new BlackFlashFxBehavior();
+                blackFlashFx.configure(attacker);
+                fx.attach(blackFlashFx);
                 serverLevel.addFreshEntity(fx);
             }
         }
@@ -382,7 +386,9 @@ public final class BlackFlashEvents
         if (shockwave != null)
         {
             shockwave.moveTo(attacker.getX(), attacker.getY(), attacker.getZ(), 0, 0);
-            shockwave.configureBlackFlashShockwaveDelay(attacker);
+            BlackFlashShockwaveBehavior shockwaveBehavior = new BlackFlashShockwaveBehavior();
+            shockwaveBehavior.configure(attacker);
+            shockwave.attach(shockwaveBehavior);
             attacker.serverLevel().addFreshEntity(shockwave);
         }
 

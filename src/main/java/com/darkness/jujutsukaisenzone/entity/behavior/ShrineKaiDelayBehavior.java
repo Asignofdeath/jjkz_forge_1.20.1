@@ -84,7 +84,7 @@ public class ShrineKaiDelayBehavior extends EffectBehavior
 
         ShrineKaiArrowBehavior b = new ShrineKaiArrowBehavior();
         b.configure(owner, this.maxRange, look, this.horizontal, false);
-        arrow.setBehaviorForInternal(b);
+        arrow.attach(b);
         if (!level.addFreshEntity(arrow)) return;
 
         level.playSound(null, spawn.x, spawn.y, spawn.z,

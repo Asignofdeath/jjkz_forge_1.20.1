@@ -4,11 +4,12 @@ import com.darkness.jujutsukaisenzone.api.screen.ScreenShakeKind;
 import com.darkness.jujutsukaisenzone.compat.EpicFightCompat;
 import com.darkness.jujutsukaisenzone.entity.SpecialEffectEntity;
 import com.darkness.jujutsukaisenzone.entity.data.ShrineFugaConfig;
+import com.darkness.jujutsukaisenzone.entity.util.SpecialEffectFlight;
 import com.darkness.jujutsukaisenzone.network.ModNetwork;
 import com.darkness.jujutsukaisenzone.player.PlayerHoldReleaseChargeData;
 import com.darkness.jujutsukaisenzone.registry.ModEntities;
 import com.darkness.jujutsukaisenzone.registry.ModSounds;
-import net.minecraft.commands.CommandSourceStack;
+import com.darkness.jujutsukaisenzone.photon.PhotonFxCommands;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -34,8 +35,9 @@ public final class ShrineFugaBehavior extends EffectBehavior
     @Nullable
     private UUID ownerUuid;
     private boolean flying;
-    private Vec3 flightDir = Vec3.ZERO;
-    private double traveled;
+    /** 匀速直线飞行状态（方向 / 已飞距离 / 射程）；速度与射程每 tick 从配置重取。 */
+    private SpecialEffectFlight.LinearMotion motion =
+            new SpecialEffectFlight.LinearMotion(new Vec3(0.0D, 0.0D, 1.0D), 0.0D, 1.0D);
 
     @Override
     public String id()
@@ -47,8 +49,7 @@ public final class ShrineFugaBehavior extends EffectBehavior
     {
         this.ownerUuid = owner == null ? null : owner.getUUID();
         this.flying = false;
-        this.flightDir = Vec3.ZERO;
-        this.traveled = 0.0D;
+        this.motion = new SpecialEffectFlight.LinearMotion(new Vec3(0.0D, 0.0D, 1.0D), 0.0D, 1.0D);
     }
 
     /** 玩家长按满蓄力后松手时由服务端调用，锁定当前朝向并开始飞行。 */
@@ -95,16 +96,8 @@ public final class ShrineFugaBehavior extends EffectBehavior
     /** 锁定蓄力结束瞬间的朝向与飞行方向，发射后不再改旋转。 */
     private void beginFlight(SpecialEffectEntity entity)
     {
-        this.flightDir = entity.getLookAngle();
-        if (this.flightDir.lengthSqr() < 1.0E-8D)
-        {
-            this.flightDir = new Vec3(0.0D, 0.0D, 1.0D);
-        }
-        else
-        {
-            this.flightDir = this.flightDir.normalize();
-        }
-        this.traveled = 0.0D;
+        this.motion.setDirection(entity.getLookAngle());
+        this.motion.setTraveled(0.0D);
         this.flying = true;
         if (entity.level() instanceof ServerLevel level)
         {
@@ -123,52 +116,50 @@ public final class ShrineFugaBehavior extends EffectBehavior
 
     private void tickFlight(SpecialEffectEntity entity, ServerLevel level)
     {
-        if (!level.hasChunkAt(entity.blockPosition()))
+        // 逐格匀速直线推进（每步 ≤ 1 格、射程封顶）交给 SpecialEffectFlight；
+        // 速度与射程每 tick 从配置重取，改 TOML 立即生效。
+        this.motion.setSpeedPerTick(ShrineFugaConfig.PROJECTILE_SPEED);
+        this.motion.setMaxRange(ShrineFugaConfig.MAX_RANGE);
+
+        SpecialEffectFlight.Result result = SpecialEffectFlight.tickLinear(entity, this.motion,
+                (e, from, to) -> onFlightStep(level, e, from, to));
+
+        if (result == SpecialEffectFlight.Result.ABORT_CHUNK_UNLOADED)
         {
             entity.discard();
             return;
         }
-
-        double remainingDist = ShrineFugaConfig.PROJECTILE_SPEED;
-        while (remainingDist > 0.0D)
+        if (result == SpecialEffectFlight.Result.ARRIVED)
         {
-            double step = Math.min(remainingDist, 1.0D);
-            Vec3 from = entity.position();
-            double nextTraveled = this.traveled + step;
-
-            if (nextTraveled >= ShrineFugaConfig.MAX_RANGE)
-            {
-                double finalDist = ShrineFugaConfig.MAX_RANGE - this.traveled;
-                Vec3 impact = finalDist > 0.0D ? from.add(this.flightDir.scale(finalDist)) : from;
-                explode(entity, impact);
-                return;
-            }
-
-            Vec3 to = from.add(this.flightDir.scale(step));
-
-            entity.setPos(to.x, to.y, to.z);
-            this.traveled = nextTraveled;
-            remainingDist -= step;
-
-            if (this.traveled < ShrineFugaConfig.COLLISION_MIN_TRAVEL)
-            {
-                continue;
-            }
-
-            LivingEntity hitEntity = findHitLivingEntity(entity, level, from, to, this.ownerUuid);
-            if (hitEntity != null)
-            {
-                explode(entity, to);
-                return;
-            }
-
-            BlockHitResult blockHit = clipBlocks(entity, level, from, to);
-            if (blockHit.getType() != HitResult.Type.MISS)
-            {
-                explode(entity, blockHit.getLocation());
-                return;
-            }
+            // 抵达射程终点：按原实现直接在该点引爆。
+            explode(entity, entity.position());
         }
+    }
+
+    /**
+     * 单步碰撞检测（由 {@link SpecialEffectFlight#tickLinear} 每步回调）。
+     * <p>
+     * 与原实现逐条对应：起步 {@code COLLISION_MIN_TRAVEL} 格内不判碰撞；抵达射程终点的那一步
+     * 也不判碰撞（终点一律按射程引爆）。命中实体或方块就地引爆，返回 {@code true} 终止本 tick 剩余步进。
+     */
+    private boolean onFlightStep(ServerLevel level, SpecialEffectEntity entity, Vec3 from, Vec3 to)
+    {
+        if (this.motion.traveled() < ShrineFugaConfig.COLLISION_MIN_TRAVEL) return false;
+        if (this.motion.traveled() >= this.motion.maxRange()) return false;
+
+        if (findHitLivingEntity(entity, level, from, to, this.ownerUuid) != null)
+        {
+            explode(entity, to);
+            return true;
+        }
+
+        BlockHitResult blockHit = clipBlocks(entity, level, from, to);
+        if (blockHit.getType() != HitResult.Type.MISS)
+        {
+            explode(entity, blockHit.getLocation());
+            return true;
+        }
+        return false;
     }
 
     private void explode(SpecialEffectEntity entity, Vec3 impact)
@@ -197,7 +188,7 @@ public final class ShrineFugaBehavior extends EffectBehavior
             boom.moveTo(impact.x, impact.y, impact.z, entity.getYRot(), entity.getXRot());
             ShrineFugaBoomBehavior behavior = new ShrineFugaBoomBehavior();
             behavior.configure(owner);
-            boom.setBehaviorForInternal(behavior);
+            boom.attach(behavior);
             level.addFreshEntity(boom);
         }
 
@@ -323,18 +314,14 @@ public final class ShrineFugaBehavior extends EffectBehavior
         {
             return;
         }
-        CommandSourceStack source = entity.createCommandSourceStack().withPermission(2).withSuppressedOutput();
-        entity.getServer().getCommands().performPrefixedCommand(source, ShrineFugaConfig.PHOTON_FUGA_REMOVE_COMMAND);
+        PhotonFxCommands.perform(entity, ShrineFugaConfig.PHOTON_FUGA_REMOVE_COMMAND);
     }
 
     @Override
     public void writeToNbt(CompoundTag tag)
     {
         tag.putBoolean("Flying", this.flying);
-        tag.putDouble("FlightDirX", this.flightDir.x);
-        tag.putDouble("FlightDirY", this.flightDir.y);
-        tag.putDouble("FlightDirZ", this.flightDir.z);
-        tag.putDouble("Traveled", this.traveled);
+        this.motion.writeToNbt(tag);
         if (this.ownerUuid != null)
         {
             tag.putUUID("Owner", this.ownerUuid);
@@ -345,16 +332,7 @@ public final class ShrineFugaBehavior extends EffectBehavior
     public void readFromNbt(CompoundTag tag)
     {
         this.flying = tag.getBoolean("Flying");
-        this.flightDir = new Vec3(tag.getDouble("FlightDirX"), tag.getDouble("FlightDirY"), tag.getDouble("FlightDirZ"));
-        if (this.flightDir.lengthSqr() < 1.0E-8D)
-        {
-            this.flightDir = new Vec3(0.0D, 0.0D, 1.0D);
-        }
-        else
-        {
-            this.flightDir = this.flightDir.normalize();
-        }
-        this.traveled = tag.contains("Traveled") ? tag.getDouble("Traveled") : 0.0D;
+        this.motion = SpecialEffectFlight.LinearMotion.readFromNbt(tag);
         this.ownerUuid = tag.hasUUID("Owner") ? tag.getUUID("Owner") : null;
     }
 }

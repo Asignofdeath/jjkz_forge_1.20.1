@@ -9,7 +9,8 @@ import org.jetbrains.annotations.Nullable;
  * {@link SpecialEffectEntity} 通用飞行推进工具。
  * <p>
  * 特效实体 {@code noPhysics=true}，不会靠原版物理自动位移；飞行需在 Behavior 每 tick 主动调用本类。
- * 现有术式 Behavior 保持各自实现不变，新技能优先使用此处 API。
+ * 现有飞行 Behavior（「解」{@code ShrineKaiArrowBehavior}、「灶」开 {@code ShrineFugaBehavior}）已迁移至本类；
+ * 新技能一律走此处 API，别再各自手写飞行循环。
  */
 public final class SpecialEffectFlight
 {

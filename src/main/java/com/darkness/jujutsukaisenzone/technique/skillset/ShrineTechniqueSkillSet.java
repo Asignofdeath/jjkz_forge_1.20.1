@@ -5,6 +5,9 @@ import com.darkness.jujutsukaisenzone.api.mimicry.MimicryVoiceLines;
 import com.darkness.jujutsukaisenzone.compat.EpicFightCompat;
 import com.darkness.jujutsukaisenzone.entity.SpecialEffectEntity;
 import com.darkness.jujutsukaisenzone.entity.behavior.ShrineFugaBehavior;
+import com.darkness.jujutsukaisenzone.entity.behavior.ShrineHachiBehavior;
+import com.darkness.jujutsukaisenzone.entity.behavior.ShrineKaiArrowBehavior;
+import com.darkness.jujutsukaisenzone.entity.behavior.ShrineKaiDelayBehavior;
 import com.darkness.jujutsukaisenzone.entity.data.ShrineFugaConfig;
 import com.darkness.jujutsukaisenzone.player.PlayerCursedEnergyData;
 import com.darkness.jujutsukaisenzone.player.PlayerHoldReleaseChargeData;
@@ -543,7 +546,9 @@ public final class ShrineTechniqueSkillSet extends AbstractInnateTechniqueSkillS
         }
 
         entity.moveTo(player.getX(), player.getY(), player.getZ(), player.getYRot(), player.getXRot());
-        entity.configureShrineKaiDelay(player, maxRange, horizontal);
+        ShrineKaiDelayBehavior kaiDelay = new ShrineKaiDelayBehavior();
+        kaiDelay.configure(player, maxRange, horizontal);
+        entity.attach(kaiDelay);
         level.addFreshEntity(entity);
     }
 
@@ -571,7 +576,9 @@ public final class ShrineTechniqueSkillSet extends AbstractInnateTechniqueSkillS
         fx.setYBodyRot(player.getYRot());
         fx.setYHeadRot(player.getYRot());
         flightDir = fx.getLookAngle().normalize();
-        fx.configureShrineKaiFlyobjProjectile(player, KAI_FLYOBJ_RANGE, flightDir);
+        ShrineKaiArrowBehavior kaiFlyobj = new ShrineKaiArrowBehavior();
+        kaiFlyobj.configure(player, KAI_FLYOBJ_RANGE, flightDir, true, true);
+        fx.attach(kaiFlyobj);
         if (!level.addFreshEntity(fx))
         {
             return;
@@ -601,7 +608,9 @@ public final class ShrineTechniqueSkillSet extends AbstractInnateTechniqueSkillS
         }
 
         ShrineFugaBehavior.syncTransformWithOwner(entity, player);
-        entity.configureShrineFugaCharge(player);
+        ShrineFugaBehavior fugaCharge = new ShrineFugaBehavior();
+        fugaCharge.configure(player);
+        entity.attach(fugaCharge);
         if (!level.addFreshEntity(entity))
         {
             return;
@@ -734,7 +743,9 @@ public final class ShrineTechniqueSkillSet extends AbstractInnateTechniqueSkillS
         }
 
         fx.moveTo(target.getX(), target.getY(), target.getZ(), 0.0F, 0.0F);
-        fx.configureShrineHachi(player, target);
+        ShrineHachiBehavior hachi = new ShrineHachiBehavior();
+        hachi.configure(player, target);
+        fx.attach(hachi);
         level.addFreshEntity(fx);
         ShrineFinishCutMarks.consume(player, target);
     }

@@ -2,7 +2,7 @@ package com.darkness.jujutsukaisenzone.entity.behavior;
 
 import com.darkness.jujutsukaisenzone.entity.SpecialEffectEntity;
 import com.darkness.jujutsukaisenzone.entity.data.LimitlessRedConfig;
-import net.minecraft.commands.CommandSourceStack;
+import com.darkness.jujutsukaisenzone.photon.PhotonFxCommands;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.LivingEntity;
@@ -65,8 +65,7 @@ public class LimitlessRedBehavior extends EffectBehavior
 
         if (!this.photonMounted && entity.getServer() != null)
         {
-            CommandSourceStack source = entity.createCommandSourceStack().withPermission(2).withSuppressedOutput();
-            entity.getServer().getCommands().performPrefixedCommand(source, LimitlessRedConfig.PHOTON_FLYOBJ_COMMAND);
+            PhotonFxCommands.perform(entity, LimitlessRedConfig.PHOTON_FLYOBJ_COMMAND);
             this.photonMounted = true;
         }
 
@@ -90,7 +89,7 @@ public class LimitlessRedBehavior extends EffectBehavior
 
         LimitlessRedArrowBehavior arrowBehavior = new LimitlessRedArrowBehavior();
         arrowBehavior.configure(owner, this.allowOwnerKnockback, look.scale(LimitlessRedConfig.ARROW_SPEED));
-        entity.setBehaviorForInternal(arrowBehavior);
+        entity.attach(arrowBehavior);
     }
 
     @Override

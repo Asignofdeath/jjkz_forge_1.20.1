@@ -4,7 +4,7 @@ import com.darkness.jujutsukaisenzone.entity.SpecialEffectEntity;
 import com.darkness.jujutsukaisenzone.entity.data.LimitlessPurpleConfig;
 import com.darkness.jujutsukaisenzone.registry.ModEntities;
 import com.darkness.jujutsukaisenzone.registry.ModSounds;
-import net.minecraft.commands.CommandSourceStack;
+import com.darkness.jujutsukaisenzone.photon.PhotonFxCommands;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundSource;
@@ -87,7 +87,7 @@ public class LimitlessPurpleBehavior extends EffectBehavior
 
         LimitlessPurpleArrowBehavior b = new LimitlessPurpleArrowBehavior();
         b.configure(purpleOwner, velocity);
-        arrow.setBehaviorForInternal(b);
+        arrow.attach(b);
         if (!level.addFreshEntity(arrow)) return;
 
         if (purpleOwner != null)
@@ -96,8 +96,7 @@ public class LimitlessPurpleBehavior extends EffectBehavior
                     ModSounds.LIMITLESS_MURASAKI_MINI.get(), SoundSource.PLAYERS, 1.0F, 1.0F);
         }
 
-        CommandSourceStack commandSource = arrow.createCommandSourceStack().withPermission(2).withSuppressedOutput();
-        level.getServer().getCommands().performPrefixedCommand(commandSource, LimitlessPurpleConfig.PHOTON_ARROW_COMMAND);
+        PhotonFxCommands.perform(arrow, LimitlessPurpleConfig.PHOTON_ARROW_COMMAND);
     }
 
     @Override

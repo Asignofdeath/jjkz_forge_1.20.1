@@ -358,5 +358,94 @@ counterMultiplier, beats, breakQualityFactor}`、`PoiseStats` 的第 6 个分量
   破韧不专属体术也不专属术式）、`JjkzPlayerDataDisplay`（命令里连咒力特质一起打，用 `trait.id()` 而不是
   `displayName()`：服务端 `Component#getString()` 解析不了客户端的语言键）。
 
+## 进程级静态会话状态（2026-09-30 起）
+
+- ⛔ **领域 / 结界的活跃实例由进程级静态单例持有**：`AbstractDomainExpansion.ACTIVE_DOMAINS`、
+  `deferredSkyboxPlacementDelayByCaster`（实例字段，但承载者是不变的静态单例）、
+  `BarrierTechniqueServerLogic.ACTIVE_BARRIERS` / `BARRIER_RADIUS_TIER`（static）。
+  Forge **退出世界 / 切换存档不重载模组类** ⇒ 静态容器跨会话残留、永不淘汰。
+- **正确形态**：`BarrierInstance` 只存 `ResourceKey<Level>` + 坐标 + 半径，**不持有 ServerLevel**
+  （所以不会有 NPE / 悬挂 level 引用）。残留条目会在新会话以「幽灵领域 / 幽灵结界」匹配
+  **同维度同坐标**继续生效（该处静默禁刷怪、触发领域门控）；`BARRIER_RADIUS_TIER` 按 UUID 永久保留
+  ⇒ 档位串存档；`removedBlocks` 数万条目永久驻留内存。
+- **统一兜底** = `event/SessionStateCleanupEvents`（FORGE 总线）：
+  - `ServerStoppingEvent` → 先对在线玩家完整关闭，再 `restoreAllWorldAll` / `restoreAllWorld` 兜底还原
+    离线者的残留方块，最后 `DomainExpansionRouter.resetAllSessionState()` +
+    `BarrierTechniqueServerLogic.resetSessionState()`。
+  - `PlayerLoggedOut` → `DomainExpansionRouter.closeAllForPlayer` + `BarrierTechniqueServerLogic.closeAllForPlayer`
+    （都走 `clearBarrierInstance`：触发 `onBarrierClosed` 回调 + 方块还原）。
+  - ⚠️ 登出**不**重置结界半径档位（属玩家偏好），档位仅在停机时清。
+- ⚠️ `ACTIVE_DOMAINS` 是**每个领域单例各自一份**；`DomainExpansionRouter.ALL_DOMAINS` 是唯一遍历入口
+  —— 新增领域实现必须登记进去，否则重置 / 查询 / 维持全漏。
+- `AbstractBarrierTechnique` 抽出 `restoreBarrierWorld(level, instance)`（纯世界侧还原，不触发回调，可空 level）。
+- ⛔ **以后新增任何「进程级静态会话容器」都要挂进 `SessionStateCleanupEvents`**，别在别处零散 `.clear()`。
+- 同类隐患（**本轮未处理**）：`RatioIchimonjiLogic.SESSIONS`、`StarFlightSkillLogic.FLIGHTS`、
+  `TenShadowsRitualLogic.BY_CASTER`、`JudgmentTrialSkillLogic.sessionByCaster`、
+  `InnateDomainExperienceManager.SESSIONS`、`StarMarkRules.RENDEZVOUS_DOMAINS`、`TengenWedge*`
+  等 ~15 处静态 UUID 容器同样不随停机清理。
+
+## SE 术式侵入 / 咒力特质 / 统一质量池（2026-09-27 落地）
+
+- **质量 = Σ(已点亮 SP 节点的 spCost) + Σ(已装载 SE 的 quality)**，不是节点个数。上限 = 玩家数据
+  `spNodeQuality`（默认 6）；宽限 `Config.seQualityAllowance`（默认 2）。**超过上限才吃超载罚**
+  （每点扣体术 / 术式强度各 `seOverloadPowerPenaltyPerPoint`）；越过「上限 + 宽限」**直接拒装**。
+  SP 点数（购买力）与质量（占位）是两套账。统一入口 `PlayerQualityPoolData`。
+- **SE 装载五道闸**（`PlayerSeLoadoutData.tryEquip`，顺序即错误优先级）：已知 SE → 未重复 → **特质** →
+  **专用术式**（`SeScope.matches`）→ 互斥组 → 背包有咒物 → 质量硬顶。
+  ⚠️ UI 置灰判据必须同序，否则出现「能点但装不上」。
+- ⛔ **SE 惩罚只能削数值、不能碰身份**：`PanelStat` 里**不许**出现特质等身份项。体术 / 术式强度走
+  **面板负贡献行**，其余 7 条（抗性 / 穿透 / 反转效率 / 领域充能 / 暴击）走 **Attribute 层**
+  （`PlayerSePenaltyApplier`，UUID 由 seId 派生、`recompute` 先全清再加；AttributeMap 不落盘 ⇒
+  登录 / 重生靠 `CursedEnergyEvents.syncPlayerState` 重算）。
+- ⛔ **面板强度行的惩罚必须加在 `PlayerCombatPowerData.resolveServer` 最后**：早了会被「十影·大蛇」
+  倍率放大，或被天与咒缚分支 `technique.clear()` 抹掉。
+- ⚠️ 面板贡献行 label 是**硬编码中文**，不是 lang 键。`Component.translatable(key, args)` 的 args 传
+  **String 会被当字面量**，要传 `Component`。
+- **`CursedEnergyTrait`（精 / 粗 / 属 / 常，玩家侧只存一个）现在只剩一处用途**：SE 装载门卡
+  （`SeEffectDef#requiredTraits`）。⛔ **特质的产生规则 / 被动效果仍未实现**，用户说过那是后续铺垫，
+  **别顺手扩**。
+- 存档迁移：用户明确不要。旧 `seSlots` 丢弃，新 tag 是 `seEquipped`（集合）。
+
+## 特效 Behavior 层重构（2026-10-03 起）
+
+- 目标不是「一技能一类」而是「机制级复制」：线性飞行 / 柱球清场 / Photon 挂载 / 定时 被逐字抄进多个
+  Behavior。已抽 `entity/util/{AreaShape, BlockErase, SpecialEffectFlight, SpecialEffectChunkForce}`。
+- **P0（已落地）**：删死代码 `ShrineKaiFlyobjBehavior`（330 行，全项目从未实例化；「解·切割 flyobj」
+  实际走 `ShrineKaiArrowBehavior` 的 `flyobjMode`，入口 `SpecialEffectEntity#configureShrineKaiFlyobjProjectile`）。
+  ⚠️ 连带遗留（当前无调用点，待拍板）：`ShrineSkillGrowth.kaiFlyobjColumnDamage`、
+  `Config.SHRINE_KAI_FLYOBJ_DAMAGE_*`、`ShrineKaiConfig.FLYOBJ_SPEED` / `PHOTON_FLYOBJ_MOUNT` / `PHOTON_FLYOBJ_REMOVE`。
+- **P1（已落地）**：`AreaShape`（球 / 胶囊几何，方块相交委托 `GeometryUtils`）+ `BlockErase.forEach`
+  替换 `LimitlessPurpleArrowBehavior` / `ShrineFugaBoomBehavior` / `BlackFlashShockwaveBehavior` /
+  `ShrineKaiArrowBehavior` 里各自手写的三重循环；黑闪的 `random.nextDouble()` 抽取顺序保持 x→y→z 不变。
+- **P2（已落地）**：`SpecialEffectFlight.tickLinear(LinearMotion, StepCallback)` 接管
+  `ShrineKaiArrowBehavior.tick` 与 `ShrineFugaBehavior.tickFlight` 的逐格循环；
+  NBT 改由 `LinearMotion.writeToNbt` / `readFromNbt` 读写（**旧键 `FlightDirX/Y/Z` 已弃**，不做存档兼容）。
+  两个 Behavior 的 `flightDir` / `maxRange` / `traveled` 三字段合并为单个 `LinearMotion motion`。
+  速度 / 射程每 tick 从配置重取，保留「改 TOML 立即生效」。
+  - ⚠️ `tickLinear` 的 **ARRIVED 分支也会回调一次** `StepCallback`（解箭靠这次跑终点格清场）；
+    灶的 `onFlightStep` 因此显式用 `traveled() >= maxRange()` 跳过终点步的碰撞判定，与原实现逐条对齐。
+- **P3（已落地）**：`entity/behavior/*` 里 8 个文件、10 处手搓的
+  `createCommandSourceStack().withPermission(2).withSuppressedOutput()` + `performPrefixedCommand`
+  全部改走 `photon/PhotonFxCommands#perform(entity, command)`；`CommandSourceStack` import 全部移除
+  （`ServerLevel` import 逐个复核仍在用）。
+  两条通道已在类注释里写死口径：**世界可见 = `PhotonFxCommands`**、**仅施术者可见 = `OwnerOnlyShrineSlashFx`**，
+  调用点不许再手搓命令栈。原有 `entity.getServer() != null` 守卫保留（不改「失败就不置 `photonMounted`」的重试语义）。
+  ⚠️ **本轮只覆盖 `entity/behavior/*`**；`technique/domain/*`（`ShrineDomainExpansion` 3 处、
+  `LimitlessDomainExpansion` 2 处）、`technique/skillset/*`（2 处）、`technique/EmotionalReleaseServerLogic`（1 处）
+  仍是手搓写法，**未动**（在本次重构范围外，待拍板）。
+- **P4（已落地 · 注册表部分）**：`EffectBehavior#createFromId` 的 16 分支 `switch` 换成
+  `REGISTRY = Map<String, Supplier<EffectBehavior>>`；新增 Behavior 只需在 `buildRegistry()` 加一行。
+  id 重复在 `register()` 里直接抛 `IllegalStateException`（类加载期 —— 复制粘贴忘改 `ID` 是静默失败，必须炸）。
+  ⚠️ **`CompositeBehavior` 模块框架刻意没做**：当前机制层只有「4 个工具类 + 各自 tick」这一个复用点，
+  找不出「两个技能只差参数」或「同一技能多段流程」的实例 ⇒ 先造框架就是零消费者的空壳。
+  要上必须先指名具体案例。
+- **P5（已落地）**：宿主 12 个 `configureXxx` 全删，只留 `public void attach(EffectBehavior)`；
+  `setBehaviorForInternal` 并入 `attach`（4 处包内调用改名）。12 个外部调用点改为
+  「就地 new → configure → attach」三行（与 `entity.behavior` 包内既有写法一致）。
+  涉及 `ShrineTechniqueSkillSet`(4)、`LimitlessTechniqueSkillSet`(4)、`BlackFlashEvents`(2)、
+  `ShrineKaiArrowBehavior`(1)、`LimitlessRemoteMurasakiBehavior`(1)。
+  ⛔ **宿主从此不随技能数量增长**。未把 `configure` 改成链式返回（避免 16 个类的无谓 churn）。
+- ⚠️ `SpecialEffectFlight.tickLinear` 每 tick 会 `setDeltaMovement(Vec3.ZERO)`（原手写循环不设）。
+
 
 

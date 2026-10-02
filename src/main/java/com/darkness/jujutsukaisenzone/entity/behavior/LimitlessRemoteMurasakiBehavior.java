@@ -13,7 +13,7 @@ import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
 import com.darkness.jujutsukaisenzone.technique.config.SkillCombatConfigRegistry;
 import com.darkness.jujutsukaisenzone.technique.development.SkillUpgradeLogic;
 import com.darkness.jujutsukaisenzone.technique.skillset.LimitlessTechniqueSkillSet;
-import net.minecraft.commands.CommandSourceStack;
+import com.darkness.jujutsukaisenzone.photon.PhotonFxCommands;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
@@ -417,16 +417,15 @@ public class LimitlessRemoteMurasakiBehavior extends EffectBehavior
         }
         Vec3 spawn = center.add(lateral);
         orb.moveTo(spawn.x, spawn.y, spawn.z, owner.getYRot(), owner.getXRot());
-        orb.configureLimitlessRemoteMurasakiStartOrb(owner, side);
+        LimitlessRemoteMurasakiStartOrbBehavior orbBehavior = new LimitlessRemoteMurasakiStartOrbBehavior();
+        orbBehavior.configure(owner, side);
+        orb.attach(orbBehavior);
         if (!level.addFreshEntity(orb))
         {
             return null;
         }
 
-        CommandSourceStack commandSource = orb.createCommandSourceStack()
-                .withPermission(2)
-                .withSuppressedOutput();
-        level.getServer().getCommands().performPrefixedCommand(commandSource, photonCommand);
+        PhotonFxCommands.perform(orb, photonCommand);
         return orb.getUUID();
     }
 
@@ -483,15 +482,12 @@ public class LimitlessRemoteMurasakiBehavior extends EffectBehavior
 
     private void mountPhotonIfNeeded(SpecialEffectEntity entity)
     {
-        if (this.photonMounted || !(entity.level() instanceof ServerLevel level))
+        if (this.photonMounted || !(entity.level() instanceof ServerLevel))
         {
             return;
         }
 
-        CommandSourceStack commandSource = entity.createCommandSourceStack()
-                .withPermission(2)
-                .withSuppressedOutput();
-        level.getServer().getCommands().performPrefixedCommand(commandSource, LimitlessRemoteMurasakiConfig.PHOTON_COMMAND);
+        PhotonFxCommands.perform(entity, LimitlessRemoteMurasakiConfig.PHOTON_COMMAND);
         this.photonMounted = true;
     }
 

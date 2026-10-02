@@ -3,6 +3,9 @@ package com.darkness.jujutsukaisenzone.technique.skillset;
 import com.darkness.jujutsukaisenzone.compat.EpicFightCompat;
 import com.darkness.jujutsukaisenzone.event.LimitlessPurpleShiftSpecialEvents;
 import com.darkness.jujutsukaisenzone.entity.SpecialEffectEntity;
+import com.darkness.jujutsukaisenzone.entity.behavior.LimitlessBlueBehavior;
+import com.darkness.jujutsukaisenzone.entity.behavior.LimitlessPurpleBehavior;
+import com.darkness.jujutsukaisenzone.entity.behavior.LimitlessRedBehavior;
 import com.darkness.jujutsukaisenzone.entity.behavior.LimitlessRemoteMurasakiBehavior;
 import com.darkness.jujutsukaisenzone.entity.data.LimitlessRemoteMurasakiConfig;
 import com.darkness.jujutsukaisenzone.player.BarrierTechniqueLevel;
@@ -676,7 +679,9 @@ public final class LimitlessTechniqueSkillSet extends AbstractInnateTechniqueSki
         }
 
         entity.moveTo(targetPos.x, targetPos.y, targetPos.z, player.getYRot(), 0.0F);
-        entity.configureLimitlessBlueNormal(player, allowOwnerPull);
+        LimitlessBlueBehavior blue = new LimitlessBlueBehavior();
+        blue.configure(player, allowOwnerPull);
+        entity.attach(blue);
         if (!level.addFreshEntity(entity))
         {
             return;
@@ -724,7 +729,9 @@ public final class LimitlessTechniqueSkillSet extends AbstractInnateTechniqueSki
         }
 
         entity.moveTo(spawn.x, spawn.y, spawn.z, player.getYRot(), player.getXRot());
-        entity.configureLimitlessRedNormal(player, allowOwnerKnockback);
+        LimitlessRedBehavior red = new LimitlessRedBehavior();
+        red.configure(player, allowOwnerKnockback);
+        entity.attach(red);
         if (!level.addFreshEntity(entity))
         {
             return;
@@ -752,7 +759,9 @@ public final class LimitlessTechniqueSkillSet extends AbstractInnateTechniqueSki
         }
 
         entity.moveTo(player.getX(), player.getY(), player.getZ(), player.getYRot(), player.getXRot());
-        entity.configureLimitlessRemoteMurasaki(player);
+        LimitlessRemoteMurasakiBehavior murasaki = new LimitlessRemoteMurasakiBehavior();
+        murasaki.configure(player);
+        entity.attach(murasaki);
         if (!level.addFreshEntity(entity))
         {
             return;
@@ -858,7 +867,9 @@ public final class LimitlessTechniqueSkillSet extends AbstractInnateTechniqueSki
         }
 
         entity.moveTo(chest.x, chest.y, chest.z, player.getYRot(), player.getXRot());
-        entity.configureLimitlessPurpleMiniNormal(player);
+        LimitlessPurpleBehavior purpleMini = new LimitlessPurpleBehavior();
+        purpleMini.configure(player);
+        entity.attach(purpleMini);
         if (!level.addFreshEntity(entity))
         {
             return;
