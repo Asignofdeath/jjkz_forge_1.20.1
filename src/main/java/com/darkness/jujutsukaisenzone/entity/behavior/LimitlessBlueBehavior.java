@@ -73,7 +73,10 @@ public class LimitlessBlueBehavior extends EffectBehavior
                     && entity.distanceToSqr(target) <= LimitlessBlueConfig.DAMAGE_RADIUS * LimitlessBlueConfig.DAMAGE_RADIUS
                     && canDamageByBlue(target))
             {
-                TechniqueDamageSources.deal(target, owner, damage, LimitlessTechniqueSkillSet.SKILL_BLUE);
+                // 放行暴击：调用虽是每 DAMAGE_INTERVAL(=4) tick 一次，但原版无敌帧把同一目标的
+                // 真实结算压到最快每 10 tick 一次（LivingHurtEvent 只在 actuallyHurt 内派发），
+                // 掷骰频率与单发招式同一量级。
+                TechniqueDamageSources.dealCrit(target, owner, damage, LimitlessTechniqueSkillSet.SKILL_BLUE);
             }
         }
     }

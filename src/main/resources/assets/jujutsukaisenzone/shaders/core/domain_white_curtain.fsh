@@ -41,8 +41,8 @@ void main() {
     float r = length(uv);
     float ang = atan(uv.y, uv.x);
 
-    float spreadEnd = 0.365;
-    float holdEnd = 0.852;
+    float spreadEnd = 0.400;
+    float holdEnd = 0.838;
     float u = clamp(Progress, 0.0, 1.0);
 
     float spreadT = clamp(u / spreadEnd, 0.0, 1.0);

@@ -169,17 +169,18 @@ public final class VisualNetwork
         );
     }
 
-    public static void sendCinematicLetterboxSync(ServerPlayer player, int totalTicks, int fadeInTicks, int fadeOutTicks, float barFraction)
+    public static void sendCinematicLetterboxSync(ServerPlayer player, int totalTicks, int fadeInTicks, int fadeOutTicks,
+                                                  float barFraction, boolean showGesture)
     {
         NetworkSenders.toPlayer(player,
-                new SyncCinematicLetterboxS2CPacket(totalTicks, fadeInTicks, fadeOutTicks, barFraction)
+                new SyncCinematicLetterboxS2CPacket(totalTicks, fadeInTicks, fadeOutTicks, barFraction, showGesture)
         );
     }
 
-    public static void sendDomainScanWaveSync(ServerPlayer player, double centerX, double centerY, double centerZ, int totalTicks, float peakRadius)
+    public static void sendDomainScanWaveSync(ServerPlayer player, UUID casterUuid, double centerX, double centerY, double centerZ, int totalTicks, float peakRadius)
     {
         NetworkSenders.toPlayer(player,
-                new SyncDomainScanWaveS2CPacket(centerX, centerY, centerZ, totalTicks, peakRadius)
+                new SyncDomainScanWaveS2CPacket(casterUuid, centerX, centerY, centerZ, totalTicks, peakRadius)
         );
     }
 

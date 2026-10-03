@@ -10,8 +10,8 @@ import org.jetbrains.annotations.Nullable;
 /**
  * 「苍」随咒术等级成长的数值表。
  * <p>
- * 真值来自 {@code config/jujutsukaisenzone-common.toml} 的 {@code [skillCombat.limitlessBlue]} 段，
- * 经 {@link SkillCombatConfigRegistry} 汇总；配置未加载时退回 {@code LimitlessBlueConfig} 上标注
+ * 真值来自 {@code Config} 中 {@code [skillCombat.limitlessBlue]} 各项的默认值（本模组无配置文件），
+ * 经 {@link SkillCombatConfigRegistry} 汇总；未汇总时退回 {@code LimitlessBlueConfig} 上标注
  * 【配置项·默认值】的常量。伤害再乘主动技能等级倍率（{@link SkillUpgradeLogic#scaleRatio}）。
  * <p>
  * ⛔ 本注释此前写的是 {@code data/jujutsukaisenzone/skill_combat/limitless_blue.json}——那个文件

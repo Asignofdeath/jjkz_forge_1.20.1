@@ -47,10 +47,6 @@ import net.minecraftforge.event.server.ServerStartingEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.client.ConfigScreenHandler;
-import net.minecraftforge.fml.DistExecutor;
-import net.minecraftforge.fml.config.ModConfig;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
@@ -120,13 +116,9 @@ public class JuJutsuKaisenZone
         // Register ourselves for server and other game events we are interested in
         MinecraftForge.EVENT_BUS.register(this);
 
-        // Register our mod's ForgeConfigSpec so that Forge can create and load the config file for us
-        context.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
-
-        DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> context.registerExtensionPoint(
-                ConfigScreenHandler.ConfigScreenFactory.class,
-                () -> new ConfigScreenHandler.ConfigScreenFactory(
-                        (mc, parent) -> com.darkness.jujutsukaisenzone.client.gui.JjkzModConfigScreen.create(parent))));
+        // ⛔ 刻意不注册 ForgeConfigSpec：本 mod 不再有配置文件（.toml），
+        //    数值只有 Config.java 里的代码默认值一份。
+        //    原因见 Config 类注释（Forge ConfigWatcher 截断/半写导致文件被重置）。
     }
 
     private void commonSetup(final FMLCommonSetupEvent event)

@@ -1,47 +1,89 @@
 package com.darkness.jujutsukaisenzone.client.renderer;
 
 import com.darkness.jujutsukaisenzone.JuJutsuKaisenZone;
-import com.mojang.blaze3d.shaders.AbstractUniform;
+import com.mojang.blaze3d.pipeline.RenderTarget;
+import com.mojang.blaze3d.platform.GlStateManager;
+import com.mojang.blaze3d.shaders.Uniform;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.BufferBuilder;
-import com.mojang.blaze3d.vertex.DefaultVertexFormat;
-import com.mojang.blaze3d.vertex.Tesselator;
-import com.mojang.blaze3d.vertex.VertexFormat;
-import com.mojang.blaze3d.vertex.VertexSorting;
-import net.minecraft.client.Camera;
+import com.mojang.logging.LogUtils;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.ShaderInstance;
+import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.client.player.AbstractClientPlayer;
+import net.minecraft.client.renderer.EffectInstance;
+import net.minecraft.client.renderer.PostChain;
+import net.minecraft.client.renderer.PostPass;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.RenderLevelStageEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import java.util.UUID;
 import org.joml.Matrix4f;
+import org.slf4j.Logger;
+
+import static com.mojang.blaze3d.platform.GlConst.GL_DRAW_FRAMEBUFFER;
 
 /**
- * 领域展开「扫描波」：从球心向外扩张再收回的双线白环。
+ * 领域展开「扫描波」：以球心为中心、在世界空间里扩张再收回的球壳波。
  * <p>
- * 与{@link DomainWhiteCurtainRenderer 白幕}不同，本效果<strong>不依赖后处理与深度缓冲</strong>：
- * 逐像素用 {@code InvViewProj} 反投影出视线，再解析地求环带位置。代价是环不被地形遮挡，
- * 也没有折射 / 补色（core shader 读不到主帧缓冲）—— 取舍细节见 {@code domain_scan_wave.fsh}。
+ * 走的是<strong>原版 PostChain 后处理 + 深度缓冲反投影</strong>（与{@link DomainWhiteCurtainRenderer 白幕}同一套设施）。
+ * 逐像素从深度反投影出真实的表面世界坐标，再算它到球心的距离，因此亮环是<strong>贴在地形上的等高线</strong>：
+ * 会顺着坡面起伏、会被山体挡住 —— 这是屏幕空间近似做不到的。
  * <p>
- * 绘制时点固定在 {@link RenderLevelStageEvent.Stage#AFTER_CUTOUT_BLOCKS}：实体叠在环之上。
+ * 执行时点固定在 {@link RenderLevelStageEvent.Stage#AFTER_LEVEL}：此刻世界已画完、深度完整，且 GUI 尚未绘制。
+ * <p>
+ * <strong>球心每帧跟踪施法者脚底</strong>：包里的坐标只是快照兜底，只要施法者还在客户端实体列表里，
+ * 就用它<em>当前</em>的脚底位置当球心（连带插值）。前摇期间不锁操作、玩家可自由移动 ——
+ * 固定球心会让人一走波心就留在原地，看起来「不是从脚下发出的」。
+ * <p>
+ * 与 JCraft 时停特效（{@code jcraft:za_warudo}）的差别：去掉色相反转 / 鱼眼折射，
+ * 只保留「球壳扫描」与「扫过即去饱和、收回即复原」。
  */
 @Mod.EventBusSubscriber(modid = JuJutsuKaisenZone.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE, value = Dist.CLIENT)
 public final class DomainScanWaveRenderer
 {
+    private static final Logger LOGGER = LogUtils.getLogger();
+
+    /**
+     * 后处理链定义：只声明 {@code swap} / {@code depthMain} 两个目标，pass 由 {@link PostChain#addPass} 挂。
+     * <p>
+     * 之所以不用 JSON 声明 pass：{@code PostChain.passes} 是 private，而 {@code addPass} 会返回
+     * {@link PostPass}，我们靠它拿 {@link EffectInstance} 设置每帧 uniform。
+     */
+    private static final ResourceLocation CHAIN_LOCATION =
+            ResourceLocation.fromNamespaceAndPath(JuJutsuKaisenZone.MODID, "shaders/post/domain_scan_wave.json");
+    /** 本效果的程序名（对应 shaders/program/domain_scan_wave.*）。 */
+    private static final String WAVE_PROGRAM = JuJutsuKaisenZone.MODID + ":domain_scan_wave";
+    /** 回拷程序：把 swap 的画面画回主帧缓冲。 */
+    private static final String BLIT_PROGRAM = "minecraft:blit";
+    private static final String DEPTH_SAMPLER = "DepthSampler";
+    private static final String SWAP_TARGET = "swap";
+    private static final String DEPTH_TARGET = "depthMain";
+
     /** 半径曲线中点：前半程 0 → 峰值，后半程峰值 → 0。 */
     private static final float MID_PROGRESS = 0.5F;
     /** 起始淡入结束的进度。 */
     private static final float FADE_IN_END_PROGRESS = 0.05F;
     /** 收尾淡出开始的进度。 */
     private static final float FADE_OUT_START_PROGRESS = 0.90F;
-    /** 低于此 alpha 不提交绘制。 */
-    private static final float MIN_ALPHA = 0.004F;
+    /** 低于此强度不提交绘制。 */
+    private static final float MIN_INTENSITY = 0.004F;
+
+    private static PostChain chain;
+    private static PostPass wavePass;
+    private static RenderTarget depthTarget;
+    private static int chainWidth = -1;
+    private static int chainHeight = -1;
+    /** 是否需要（重）建后处理链；尝试失败后置 false，等下一次资源重载再试，避免每帧刷日志。 */
+    private static boolean chainOutdated = true;
 
     private static boolean enabled;
     private static long startMillis;
     private static long totalMillis;
+    /** 施法者 UUID：每帧用它去客户端实体列表里找活人，找到就跟踪其脚底。 */
+    private static UUID casterUuid;
+    /** 快照球心 —— 仅在施法者不在客户端实体列表（走远 / 换维度）时兜底。 */
     private static double centerX;
     private static double centerY;
     private static double centerZ;
@@ -54,14 +96,16 @@ public final class DomainScanWaveRenderer
     /**
      * 播放一次扫描波（扩张 → 收回）。
      *
-     * @param x                球心世界 X
-     * @param y                球心世界 Y
-     * @param z                球心世界 Z
+     * @param casterUuid       施法者 UUID，用于每帧跟踪其脚底当球心；为 {@code null} 时只用快照坐标
+     * @param x                兜底球心世界 X
+     * @param y                兜底球心世界 Y
+     * @param z                兜底球心世界 Z
      * @param totalTicks       总时长（tick），至少 1
      * @param peakRadiusBlocks 峰值半径（世界格）
      */
-    public static void play(double x, double y, double z, int totalTicks, float peakRadiusBlocks)
+    public static void play(UUID casterUuid, double x, double y, double z, int totalTicks, float peakRadiusBlocks)
     {
+        DomainScanWaveRenderer.casterUuid = casterUuid;
         centerX = x;
         centerY = y;
         centerZ = z;
@@ -71,33 +115,28 @@ public final class DomainScanWaveRenderer
         totalMillis = Math.max(totalTicks, 1) * 50L;
     }
 
-    public static boolean isPlaying()
+    /**
+     * 资源重载时调用：{@code PostChain} 里编译好的 program 已随旧资源失效，必须整条重建。
+     * 由 {@link DomainScanWaveReloadListener} 在 {@code RegisterShadersEvent} 时触发。
+     */
+    public static void invalidate()
     {
-        return enabled && System.currentTimeMillis() - startMillis < totalMillis;
+        chainOutdated = true;
     }
 
     @SubscribeEvent
     public static void onRenderLevelStage(RenderLevelStageEvent event)
     {
+        if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_LEVEL)
+        {
+            return;
+        }
+
+        if (enabled && System.currentTimeMillis() - startMillis >= totalMillis)
+        {
+            enabled = false;
+        }
         if (!enabled)
-        {
-            return;
-        }
-
-        float progress = resolveProgress();
-        if (progress < 0.0F)
-        {
-            return;
-        }
-
-        float radius = resolveRadius(progress);
-        float intensity = resolveIntensity(progress);
-        if (radius <= 0.0F || intensity <= 0.0F)
-        {
-            return;
-        }
-
-        if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_CUTOUT_BLOCKS)
         {
             return;
         }
@@ -108,30 +147,59 @@ public final class DomainScanWaveRenderer
             return;
         }
 
-        ShaderInstance shader = DomainScanWaveShaders.get();
-        if (shader == null)
+        float progress = (float) (System.currentTimeMillis() - startMillis) / (float) totalMillis;
+        float radius = resolveRadius(progress);
+        float intensity = resolveIntensity(progress);
+        if (radius <= 0.0F || intensity <= MIN_INTENSITY)
         {
             return;
         }
 
-        /* 自本波开始以来的秒数：shader 用它做脉动与放射条纹的旋转。 */
-        float timeSeconds = (System.currentTimeMillis() - startMillis) / 1000.0F;
+        RenderTarget mainTarget = minecraft.getMainRenderTarget();
+        ensureChain(minecraft, mainTarget);
+        if (chain == null || wavePass == null)
+        {
+            return;
+        }
 
-        renderFullscreen(event.getCamera(), shader, radius, intensity, timeSeconds);
+        Vec3 center = resolveCenter(minecraft, event.getPartialTick());
+        applyUniforms(minecraft, center, radius, intensity);
+        render(mainTarget, event.getPartialTick());
     }
 
     /**
-     * @return 当前进度 0..1；动画已结束返回 -1（并复位状态）
+     * 取本帧的球心：施法者还在客户端实体列表里就用它<strong>当前</strong>的脚底位置（带插值），
+     * 否则退回服务端发来的快照坐标。
+     * <p>
+     * 用 {@link net.minecraft.world.entity.Entity#getPosition(float)} 而不是 {@code getX/Y/Z}：
+     * 前者按 {@code partialTick} 在上一 tick 与当前 tick 之间插值，人在走动时波心才不会一顿一顿。
      */
-    private static float resolveProgress()
+    private static Vec3 resolveCenter(Minecraft minecraft, float partialTick)
     {
-        long elapsed = System.currentTimeMillis() - startMillis;
-        if (elapsed >= totalMillis)
+        UUID uuid = casterUuid;
+        ClientLevel level = minecraft.level;
+        if (uuid != null && level != null)
         {
-            enabled = false;
-            return -1.0F;
+            Vec3 live = findCasterFoot(level, uuid, partialTick);
+            if (live != null)
+            {
+                return live;
+            }
         }
-        return (float) elapsed / (float) totalMillis;
+        return new Vec3(centerX, centerY, centerZ);
+    }
+
+    /** 在客户端已知的玩家列表里按 UUID 找施法者；找不到返回 {@code null}。 */
+    private static Vec3 findCasterFoot(ClientLevel level, UUID uuid, float partialTick)
+    {
+        for (AbstractClientPlayer player : level.players())
+        {
+            if (uuid.equals(player.getUUID()))
+            {
+                return player.getPosition(partialTick);
+            }
+        }
+        return null;
     }
 
     /** 半径走 0 → 峰值 → 0 的三角波。 */
@@ -150,81 +218,142 @@ public final class DomainScanWaveRenderer
                 * (1.0F - smoothStep(FADE_OUT_START_PROGRESS, 1.0F, progress));
     }
 
-    private static void renderFullscreen(Camera camera, ShaderInstance shader, float radius, float intensity, float timeSeconds)
+    private static void applyUniforms(Minecraft minecraft, Vec3 center, float radius, float intensity)
     {
         /*
-         * 必须在改写投影 / 模型视图之前抓取：本效果靠「世界 -> clip」的逆矩阵把像素还原成视线。
-         * 两个矩阵都走 RenderSystem（此刻仍是层级渲染的透视投影 + 相机模型视图），同源避免口径错位。
-         *
-         * shader 里只用 near/far 反投影结果之差求视线方向，故模型视图是否含相机平移不影响正确性；
-         * 相机世界坐标另行由 Camera#getPosition 传入。
+         * 必须在改写投影 / 模型视图之前抓取：本效果靠「clip -> 相机相对世界」的逆矩阵把像素还原成
+         * 世界坐标。两个矩阵都走 RenderSystem（此刻仍是世界渲染的透视投影 + 相机模型视图），
+         * 同源避免口径错位。世界渲染阶段的 ModelViewMat 只含相机朝向、不含平移，
+         * 故 shader 里还原出的坐标还要再加回相机世界坐标。
          */
-        Matrix4f view = new Matrix4f(RenderSystem.getModelViewMatrix());
-        Matrix4f invViewProj = new Matrix4f(RenderSystem.getProjectionMatrix()).mul(view).invert();
+        Matrix4f inverseTransform = new Matrix4f(RenderSystem.getProjectionMatrix())
+                .mul(RenderSystem.getModelViewMatrix())
+                .invert();
+        Vec3 cameraPos = minecraft.gameRenderer.getMainCamera().getPosition();
 
-        Vec3 cameraPos = camera.getPosition();
+        EffectInstance effect = wavePass.getEffect();
+        setUniformMatrix(effect, "InverseTransformMatrix", inverseTransform);
+        setUniformVec3(effect, "CameraPosition", cameraPos.x, cameraPos.y, cameraPos.z);
+        setUniformVec3(effect, "Center", center.x, center.y, center.z);
+        setUniformFloat(effect, "Radius", radius);
+        setUniformFloat(effect, "Intensity", intensity);
+    }
 
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
-        RenderSystem.disableCull();
-        RenderSystem.depthMask(false);
+    private static void render(RenderTarget mainTarget, float partialTick)
+    {
+        /*
+         * 主帧缓冲的深度确实是一张独立纹理（RenderTarget 用 glFramebufferTexture2D 挂的
+         * GL_DEPTH_ATTACHMENT），但要当 sampler 用就得先拷进临时目标 —— 原版自己也是这么做的
+         * （itemEntityTarget.copyDepthFrom / translucentTarget.copyDepthFrom），这样不必碰 Mixin。
+         */
+        if (depthTarget != null)
+        {
+            depthTarget.copyDepthFrom(mainTarget);
+            GlStateManager._glBindFramebuffer(GL_DRAW_FRAMEBUFFER, mainTarget.frameBufferId);
+        }
+
+        RenderSystem.disableBlend();
         RenderSystem.disableDepthTest();
+        RenderSystem.resetTextureMatrix();
 
-        RenderSystem.backupProjectionMatrix();
-        RenderSystem.setProjectionMatrix(new Matrix4f(), VertexSorting.ORTHOGRAPHIC_Z);
+        /* 全屏 quad 只用 ProjMat / OutSize（PostPass 自己下发），模型视图归零更保险。 */
         RenderSystem.getModelViewStack().pushPose();
         RenderSystem.getModelViewStack().setIdentity();
         RenderSystem.applyModelViewMatrix();
 
-        RenderSystem.setShader(() -> shader);
-        setUniformVec3(shader, "Center", centerX, centerY, centerZ);
-        setUniformVec3(shader, "CameraPos", cameraPos.x, cameraPos.y, cameraPos.z);
-        setUniformFloat(shader, "Radius", radius);
-        setUniformFloat(shader, "Intensity", intensity);
-        setUniformFloat(shader, "Time", timeSeconds);
-        setUniformMatrix(shader, "InvViewProj", invViewProj);
-
-        Tesselator tesselator = Tesselator.getInstance();
-        BufferBuilder buffer = tesselator.getBuilder();
-        Matrix4f matrix = new Matrix4f();
-        buffer.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX);
-        buffer.vertex(matrix, -1.0F, -1.0F, 0.0F).uv(0.0F, 0.0F).endVertex();
-        buffer.vertex(matrix, 1.0F, -1.0F, 0.0F).uv(1.0F, 0.0F).endVertex();
-        buffer.vertex(matrix, 1.0F, 1.0F, 0.0F).uv(1.0F, 1.0F).endVertex();
-        buffer.vertex(matrix, -1.0F, 1.0F, 0.0F).uv(0.0F, 1.0F).endVertex();
-        tesselator.end();
+        chain.process(partialTick);
 
         RenderSystem.getModelViewStack().popPose();
         RenderSystem.applyModelViewMatrix();
-        RenderSystem.restoreProjectionMatrix();
 
-        RenderSystem.depthMask(true);
-        RenderSystem.enableDepthTest();
-        RenderSystem.enableCull();
+        mainTarget.bindWrite(true);
         RenderSystem.disableBlend();
+        RenderSystem.defaultBlendFunc();
+        RenderSystem.enableDepthTest();
     }
 
-    private static void setUniformFloat(ShaderInstance shader, String name, float value)
+    private static void ensureChain(Minecraft minecraft, RenderTarget mainTarget)
     {
-        AbstractUniform uniform = shader.safeGetUniform(name);
+        int width = minecraft.getWindow().getWidth();
+        int height = minecraft.getWindow().getHeight();
+
+        if (chain != null && (chainOutdated || width != chainWidth || height != chainHeight))
+        {
+            closeChain();
+        }
+        if (chain != null || !chainOutdated)
+        {
+            return;
+        }
+
+        chainOutdated = false;
+        chainWidth = width;
+        chainHeight = height;
+        try
+        {
+            PostChain built = new PostChain(minecraft.getTextureManager(), minecraft.getResourceManager(),
+                    mainTarget, CHAIN_LOCATION);
+            RenderTarget swap = built.getTempTarget(SWAP_TARGET);
+            RenderTarget depth = built.getTempTarget(DEPTH_TARGET);
+            if (swap == null || depth == null)
+            {
+                built.close();
+                LOGGER.error("扫描波后处理链缺少 {} / {} 目标，本次不渲染", SWAP_TARGET, DEPTH_TARGET);
+                return;
+            }
+
+            PostPass pass = built.addPass(WAVE_PROGRAM, mainTarget, swap);
+            pass.addAuxAsset(DEPTH_SAMPLER, depth::getDepthTextureId, depth.width, depth.height);
+            built.addPass(BLIT_PROGRAM, swap, mainTarget);
+            /* 正交投影矩阵是在 resize() 里下发给各 pass 的，所以必须放在 addPass 之后调用，
+               否则新挂的 pass 拿不到 ProjMat。 */
+            built.resize(width, height);
+
+            chain = built;
+            wavePass = pass;
+            depthTarget = depth;
+        }
+        catch (Exception exception)
+        {
+            LOGGER.error("扫描波后处理链加载失败，本次不渲染", exception);
+            closeChain();
+            chainOutdated = false;
+        }
+    }
+
+    private static void closeChain()
+    {
+        if (chain != null)
+        {
+            chain.close();
+        }
+        chain = null;
+        wavePass = null;
+        depthTarget = null;
+        chainOutdated = true;
+    }
+
+    private static void setUniformFloat(EffectInstance effect, String name, float value)
+    {
+        Uniform uniform = effect.getUniform(name);
         if (uniform != null)
         {
             uniform.set(value);
         }
     }
 
-    private static void setUniformVec3(ShaderInstance shader, String name, double x, double y, double z)
+    private static void setUniformVec3(EffectInstance effect, String name, double x, double y, double z)
     {
-        AbstractUniform uniform = shader.safeGetUniform(name);
+        Uniform uniform = effect.getUniform(name);
         if (uniform != null)
         {
             uniform.set((float) x, (float) y, (float) z);
         }
     }
 
-    private static void setUniformMatrix(ShaderInstance shader, String name, Matrix4f value)
+    private static void setUniformMatrix(EffectInstance effect, String name, Matrix4f value)
     {
-        AbstractUniform uniform = shader.safeGetUniform(name);
+        Uniform uniform = effect.getUniform(name);
         if (uniform != null)
         {
             uniform.set(value);

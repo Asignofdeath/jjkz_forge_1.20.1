@@ -236,6 +236,12 @@ public class ShrineKaiArrowBehavior extends EffectBehavior
      * <p>
      * 顺带：{@code ShrineSkillGrowth.kaiColumnDamage} 与 {@code resolveOwner} 从「每采样点一次」
      * 降为「每 tick 一次」。
+     * <p>
+     * <b>暴击放行（走 {@code dealCrit}）</b>：本方法虽每 tick 都会对柱内目标调一次 {@code deal}，
+     * 但原版无敌帧（{@code invulnerableTime > 10}）在 {@code hurt} 里、{@code actuallyHurt} 之前
+     * 就把重复命中吞掉了，而 {@code LivingHurtEvent}（暴击乘区所在）只在 {@code actuallyHurt}
+     * 内派发 ⇒ 同一目标真实结算被压到最快每 10 tick 一次，掷骰频率与单发招式同一量级。
+     * 去重集合 {@code hit} 保证同一 tick 内一个目标最多 {@code deal} 一次（见上）。
      */
     private void resolveAndSettleHits(SpecialEffectEntity entity, List<Vec3> columnBases)
     {
@@ -274,7 +280,7 @@ public class ShrineKaiArrowBehavior extends EffectBehavior
         for (LivingEntity target : hit)
         {
             if (!target.isAlive()) continue;
-            if (TechniqueDamageSources.deal(target, owner, damage, ShrineTechniqueSkillSet.SKILL_KAI))
+            if (TechniqueDamageSources.dealCrit(target, owner, damage, ShrineTechniqueSkillSet.SKILL_KAI))
             {
                 ShrineFinishCutMarks.tryMarkFromKaiHit(owner, target);
                 level.playSound(null, entity.getX(), entity.getY(), entity.getZ(),

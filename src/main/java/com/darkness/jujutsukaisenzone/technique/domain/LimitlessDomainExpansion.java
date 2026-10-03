@@ -81,10 +81,10 @@ public final class LimitlessDomainExpansion extends AbstractTechniqueDomain
     /** 白色滤镜总时长（tick），6 秒 = 120 tick（旧滤镜参数，保留供参考） */
     private static final int WHITE_OVERLAY_TOTAL_TICKS = 120;
     /**
-     * Shader 白幕总时长：铺开约 2.1s；全白保持额外 2.2s（+44 tick）；开洞相对最初提速共 2 倍（66→17 tick）。
-     * 合计 115 tick。与 {@code domain_white_curtain.fsh} 中 spreadEnd≈0.365、holdEnd≈0.852 对齐。
+     * Shader 白幕总时长：铺开约 2.1s；全白保持额外 1.7s（+34 tick）；开洞相对最初提速共 2 倍（66→17 tick）。
+     * 合计 105 tick。与 {@code domain_white_curtain.fsh} 中 spreadEnd≈0.400、holdEnd≈0.838 对齐。
      */
-    private static final int WHITE_CURTAIN_TOTAL_TICKS = WHITE_OVERLAY_TOTAL_TICKS + 44 - 49;
+    private static final int WHITE_CURTAIN_TOTAL_TICKS = WHITE_OVERLAY_TOTAL_TICKS + 34 - 49;
     /** 白色滤镜淡入时长（tick） */
     private static final int WHITE_OVERLAY_FADE_IN_TICKS = 12;
     /** 白色滤镜淡出时长（tick） */
@@ -626,6 +626,7 @@ public final class LimitlessDomainExpansion extends AbstractTechniqueDomain
      * {@link #OPEN_DOMAIN_LETTERBOX_TICK} 时点）。
      * <p>
      * 纯客户端画面效果，<strong>不锁操作</strong>；范围口径与 {@link #broadcastDomainWhiteCurtain} 一致。
+     * 手势图仅发给施术者本人（与黑条同进退、同淡入淡出）。
      */
     private static void broadcastCinematicLetterbox(ServerPlayer caster)
     {
@@ -641,7 +642,8 @@ public final class LimitlessDomainExpansion extends AbstractTechniqueDomain
                     OPEN_DOMAIN_LETTERBOX_TOTAL_TICKS,
                     OPEN_DOMAIN_LETTERBOX_FADE_IN_TICKS,
                     OPEN_DOMAIN_LETTERBOX_FADE_OUT_TICKS,
-                    OPEN_DOMAIN_LETTERBOX_BAR_FRACTION);
+                    OPEN_DOMAIN_LETTERBOX_BAR_FRACTION,
+                    nearby.getUUID().equals(caster.getUUID()));
         }
     }
 
@@ -649,11 +651,11 @@ public final class LimitlessDomainExpansion extends AbstractTechniqueDomain
      * 向施法者周围 {@link #WHITE_OVERLAY_RADIUS} 格内玩家同步「扫描波」演出（开放式前摇
      * {@link #OPEN_DOMAIN_SCAN_WAVE_TICK} 时点）。
      * <p>
-     * 球心锚在施法者当前脚底：前摇期间不锁操作、玩家可自由移动，故用触发瞬间的位置
-     * （与 {@link #broadcastCinematicLetterbox} 同口径，纯画面效果、不锁操作）。
+     * <strong>球心由客户端每帧跟踪施法者脚底</strong>（随包发送施法者 UUID）：前摇期间不锁操作、
+     * 玩家可自由移动，只发一次快照的话人一走波心就留在原地，看起来「不是从脚下发出的」。
+     * 这里的 {@code centerX/Y/Z} 只是兜底值 —— 施法者不在客户端实体列表时使用。
      * <p>
-     * 取脚底而非身体中心：客户端的「地面扫描环」把球心所在水平面当作地面，
-     * 抬到身体中心会让环浮在膝盖高度。
+     * 取脚底而非身体中心：球心所在水平面就是客户端认定的「地面」，抬到身体中心会让环浮在膝盖高度。
      */
     private static void broadcastDomainScanWave(ServerPlayer caster)
     {
@@ -669,6 +671,7 @@ public final class LimitlessDomainExpansion extends AbstractTechniqueDomain
             }
             ModNetwork.sendDomainScanWaveSync(
                     nearby,
+                    caster.getUUID(),
                     centerX,
                     centerY,
                     centerZ,

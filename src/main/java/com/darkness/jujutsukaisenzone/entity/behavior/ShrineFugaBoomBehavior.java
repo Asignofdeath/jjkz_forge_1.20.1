@@ -182,14 +182,17 @@ public class ShrineFugaBoomBehavior extends EffectBehavior
             }
 
             DamageSource source = TechniqueDamageSources.techniqueSource(level, owner);
+            // 放行暴击：球体每 tick 扫一次（BOOM_DAMAGE_PER_TICK），但原版无敌帧在 hurt 里、
+            // actuallyHurt 之前就把重复命中吞掉，LivingHurtEvent（暴击乘区所在）只在 actuallyHurt
+            // 内派发 ⇒ 同一目标真实结算被压到最快每 10 tick 一次，掷骰频率与单发招式同一量级。
             if (target instanceof Player)
             {
-                TechniqueDamageSources.runWithType(SkillDamageType.TECHNIQUE, ShrineTechniqueSkillSet.SKILL_FUGA,
+                TechniqueDamageSources.runWithTypeCrit(SkillDamageType.TECHNIQUE, ShrineTechniqueSkillSet.SKILL_FUGA,
                         () -> target.hurt(source, damage));
             }
             else
             {
-                TechniqueDamageSources.runWithType(SkillDamageType.TECHNIQUE, ShrineTechniqueSkillSet.SKILL_FUGA,
+                TechniqueDamageSources.runWithTypeCrit(SkillDamageType.TECHNIQUE, ShrineTechniqueSkillSet.SKILL_FUGA,
                         () -> target.hurt(source, damage));
                 if (!target.isAlive())
                 {

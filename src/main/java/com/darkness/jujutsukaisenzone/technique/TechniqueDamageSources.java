@@ -14,12 +14,14 @@ import net.minecraft.world.damagesource.DamageType;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.Level;
+import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.entity.living.LivingDamageEvent;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.event.entity.living.LivingKnockBackEvent;
 import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.event.lifecycle.FMLLoadCompleteEvent;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.IdentityHashMap;
@@ -59,8 +61,9 @@ import java.util.function.Supplier;
  * 防御管线（{@code TechniqueDamageZoneEvents} 区 2）按它决定吃体抗还是术抗。
  * <p>
  * 暴击许可同理：本类维护 {@link #CRIT_OVERRIDE}（出伤点表态）+ {@link #critAllowed}（分型默认）。
- * 默认口径是「体术可暴、术式不可暴」，理由是术式里高频出伤太多；单发术式招式必须显式走
- * {@link #dealCrit} / {@link #runWithTypeCrit}。改出伤点之前先读 {@link #critAllowed} 的文档。
+ * 默认口径是「体术可暴、术式默认不暴」——这是<b>保守默认</b>（新增术式技能漏表态时只是不暴击），
+ * 不是「术式不该暴」；每个术式招式由出伤点显式走 {@link #dealCrit} / {@link #runWithTypeCrit} 放行。
+ * 改出伤点之前先读 {@link #critAllowed} 的文档。
  */
 @Mod.EventBusSubscriber(modid = JuJutsuKaisenZone.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public final class TechniqueDamageSources
@@ -144,6 +147,19 @@ public final class TechniqueDamageSources
     public static final String MSG_MARTIAL = "jjkz.martial";
     public static final String MSG_COMPOSITE = "jjkz.composite";
     public static final String MSG_BLACK_FLASH = "jjkz.black_flash";
+
+    /**
+     * 暴击版 message_id 的后缀：{@code jjkz.technique} → {@code jjkz.technique.crit}。
+     * <p>
+     * 跳字模组没有「本击是不是暴击」这个可查询维度（StylizedDamage 选择器里那个 {@code critical}
+     * 判据吃的是<b>原版摔落暴击</b>，与我们的暴击系统无关），所以「暴击换样式」只能靠
+     * message_id 区分。由 {@link #markCritDisplay} 在暴击成立时写进
+     * {@link #DISPLAY_MSG_OVERRIDE}，跳字侧注册带后缀样式的规则即可。
+     */
+    public static final String MSG_CRIT_SUFFIX = ".crit";
+    /** 暴击版分型 message_id（供跳字样式注册/匹配用）。 */
+    public static final String MSG_TECHNIQUE_CRIT = MSG_TECHNIQUE + MSG_CRIT_SUFFIX;
+    public static final String MSG_MARTIAL_CRIT = MSG_MARTIAL + MSG_CRIT_SUFFIX;
 
     /**
      * EF / 原版近战等无法换成 {@link NarrativeDamageSource} 时，把叙事 message_id 挂在 source 身份上。
@@ -287,8 +303,52 @@ public final class TechniqueDamageSources
         return map.isEmpty() ? null : map.get(source);
     }
 
-    /** 取消的 hurt 走不到 {@link LivingDamageEvent}，在此按 source 清投影。 */
-    @SubscribeEvent(priority = EventPriority.LOWEST)
+    /**
+     * 把本击的跳字 message_id 换成<b>暴击版</b>（{@code jjkz.technique} → {@code jjkz.technique.crit}），
+     * 让跳字模组能选到带暴击标记的样式。
+     * <p>
+     * ⛔ <b>只在暴击成立之后调用</b>（{@code TechniqueDamageZoneEvents} 区 C 判完
+     * {@code CritRules#applyCritZone} 再读 {@code HitCritState#wasCrit()}）。写入的是
+     * {@link #DISPLAY_MSG_OVERRIDE}，与 {@link #projectDisplayType} 共用同一张 per-source 表，
+     * 清空时机也一致（{@link LivingDamageEvent} LOWEST）——那一拍在 {@code setHealth} →
+     * {@code die()} 之前，所以死亡播报读 {@link DamageSource#getMsgId()} 时叠加层已经撤掉，
+     * 不会把 {@code death.attack.jjkz.technique} 这类键改坏。
+     * <p>
+     * <p>
+     * ⛔ <b>判据是「模组在不在」，不是 {@code ModRules.StylizedDamageStyles} 开关</b>：那个开关管的是
+     * 要不要把叙事分型<b>投影</b>成 message_id（{@link #projectDisplayType}），而本方法不做投影——
+     * 它读 {@link DamageSource#getMsgId()} <b>当前已有的值</b>再追加后缀。开关关闭时 {@code deal}
+     * 走普通 {@code DamageSource}，msgId 来自数据包注册表（{@code jjkz:technique} 的
+     * {@code message_id}），依旧是 {@code jjkz.technique}、依旧命中我们注册的样式 ⇒ 数字与配色
+     * 分毫不变，唯独暴击后缀永远不出现。所以判据与「样式/选择器有没有注册」对齐：它们就是在
+     * {@link com.darkness.jujutsukaisenzone.compat.StylizedDamagePresence#isLoaded()} 为真时注册的。
+     * <p>
+     * 幂等：已经是 {@code .crit} 结尾时直接返回，重复调用不会叠成 {@code .crit.crit}。
+     */
+    public static void markCritDisplay(DamageSource source)
+    {
+        if (source == null
+                || !com.darkness.jujutsukaisenzone.compat.StylizedDamagePresence.isLoaded())
+        {
+            return;
+        }
+        String base = source.getMsgId();
+        if (base == null || base.isEmpty() || base.endsWith(MSG_CRIT_SUFFIX))
+        {
+            return;
+        }
+        DISPLAY_MSG_OVERRIDE.get().put(source, base + MSG_CRIT_SUFFIX);
+    }
+
+    /**
+     * 取消的 hurt 走不到 {@link LivingDamageEvent}，在此按 source 清投影。
+     * <p>
+     * ⛔ <b>不由 {@code @SubscribeEvent} 自动订阅，也不许改回去</b>：注册时机本身就是功能的一部分，
+     * 见 {@link LateListenerRegistration}。另外本方法必须收到<b>已取消</b>的事件，
+     * 所以手动注册时 {@code receiveCancelled} 传 {@code true} —— {@code @SubscribeEvent}
+     * 的默认值是 {@code false}，会让这里的 {@code isCanceled()} 判断永远为 false（等于死代码，
+     * 被取消的那一击会在 {@link #DISPLAY_MSG_OVERRIDE} 里留一条永不清理的记录）。
+     */
     public static void clearDisplayMsgOverrideIfHurtCancelled(LivingHurtEvent event)
     {
         if (event.isCanceled())
@@ -300,8 +360,9 @@ public final class TechniqueDamageSources
     /**
      * 跳字模组通常在扣血量确定后才读 {@link DamageSource#getMsgId()}，
      * 故投影要留到 {@link LivingDamageEvent} 之后再清。
+     * <p>
+     * ⛔ 与上一个方法一样，<b>注册时机就是功能本身</b>，见 {@link LateListenerRegistration}。
      */
-    @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void clearDisplayMsgOverride(LivingDamageEvent event)
     {
         removeDisplayMsgOverride(event.getSource());
@@ -452,9 +513,12 @@ public final class TechniqueDamageSources
      * <p>
      * 与 {@link #deal(LivingEntity, LivingEntity, float, SkillDamageType)} 的差别只有一个：
      * 在结算栈内把暴击许可置为 {@code true}，让术式分型也能吃到乘区 C 的暴击判定。
-     * <b>只给单发招式用</b>（赫箭爆炸、星痕撞击 / 爆裂、法槌这类一次结算的）——
-     * 周期性 / 每 tick 出伤的招式走它，暴击提示会随 tick 刷屏，而且逐 tick 掷骰的期望
-     * 与单次掷骰无异，只是方差被平均掉。
+     * <p>
+     * <b>周期性 / 每 tick 出伤的招式同样可以用</b>——不必担心「逐 tick 掷骰刷屏」：原版无敌帧
+     * （{@code invulnerableTime > 10}）在 {@code hurt} 里、{@code actuallyHurt} 之前就吞掉重复命中，
+     * 而 {@code LivingHurtEvent}（暴击乘区所在）只在 {@code actuallyHurt} 内部派发 ⇒ 同一目标最快
+     * 每 10 tick 才真正掷一次骰，与单发招式同频。现已放行的解 / 苍 / 捌 / 茈 / 超远程茈 / 灶开
+     * 都是这类；判据详见 {@code CritSkillPolicy} 的类文档。
      */
     public static boolean dealCrit(LivingEntity target, @Nullable LivingEntity owner, float amount, SkillDamageType damageType)
     {
@@ -514,10 +578,18 @@ public final class TechniqueDamageSources
      *   <li>体术（{@link SkillDamageType#MARTIAL}）默认可暴击。这条默认值不能省：EpicFight
      *       基础攻击与原版近战<b>不走</b> {@link #deal}，拿不到任何表态，一旦默认改为「一律不可暴击」，
      *       现在唯一的暴击来源会被整个关掉。</li>
-     *   <li>术式 / 复合默认不可暴击。术式里「每 1~5 tick 出一次伤」的招式很多（苍、捌、解、茈、
-     *       灶开、领域斩击……），单发招式用 {@link #dealCrit} / {@link #runWithTypeCrit} 显式放行。</li>
+     *   <li>术式 / 复合默认不可暴击。这是<b>保守默认</b>（新增技能时「漏表态」的后果只是该暴的没暴，
+     *       而不是新技能一上线就失控），<b>不是</b>「术式不该暴」——现有术式招式是一个个显式放行的：
+     *       解（挥砍 / 切割）、苍、捌、茈、超远程茈、灶开爆炸，以及赫、法槌、星痕、黑闪冲击波。
+     *       复合一律不放行（{@code CritRules#canCrit} 刻意排除：处刑必杀是致死量改写）。</li>
      * </ul>
      * 默认取向刻意选「没表态就不给暴击」：漏标的后果是「该暴的没暴」，而不是「高频技能失控」。
+     * <p>
+     * ⚠️ <b>「高频」不再是拒绝暴击的理由</b>：原版无敌帧（{@code invulnerableTime > 10}）的判定在
+     * {@code hurt} 里、{@code actuallyHurt} 之前，而 {@code LivingHurtEvent}（暴击乘区所在）只在
+     * {@code actuallyHurt} 内部派发 ⇒ 同一目标最快每 10 tick 真正结算一次。所以解那种一 tick 调
+     * 90 次 {@code deal} 的柱扫，真实掷骰频率也是 2 次/秒，与单发招式同一量级；逐击独立掷骰的期望
+     * 增幅与击中次数无关（线性），只会降低方差。判据与例外详见 {@code CritSkillPolicy} 的类文档。
      */
     public static boolean critAllowed(@Nullable SkillDamageType damageType)
     {
@@ -634,7 +706,8 @@ public final class TechniqueDamageSources
      * <p>
      * 给「不能或不该改走 {@link #deal}、但确实是一次结算」的通道用：例如
      * {@code runWithType(TECHNIQUE, () -> target.hurt(thrownSource, dmg))} 这种直连 {@code hurt}
-     * 的写法，想参与暴击就换成它。高频通道不要用。
+     * 的写法，想参与暴击就换成它。周期性通道也可以用（无敌帧会把真实掷骰压到 2 次/秒，
+     * 见 {@link #dealCrit} 的说明），瓶颈在别处才需要另想办法。
      */
     public static void runWithTypeCrit(SkillDamageType damageType, Runnable action)
     {
@@ -727,6 +800,44 @@ public final class TechniqueDamageSources
         if (KNOCKBACK_GUARD.get().containsKey(event.getEntity()))
         {
             event.setCanceled(true);
+        }
+    }
+
+    /**
+     * 跳字投影清理监听器的<b>延迟注册</b>（{@link #clearDisplayMsgOverrideIfHurtCancelled} /
+     * {@link #clearDisplayMsgOverride}，都是 LOWEST）。
+     * <p>
+     * ⛔ <b>为什么必须手动注册、且必须等到 {@code FMLLoadCompleteEvent}</b>：
+     * Forge 对<b>同优先级</b>的监听器<b>不排序</b>，只按注册先后依次执行。跳字模组 StylizedDamage 的读取端
+     * （{@code DamageEventListener#onLivingDamage}，{@code @SubscribeEvent(priority = LOWEST)}）
+     * 是在它自己的 {@code commonSetup}（{@code StylizedDamageForge#commonSetup}）里才
+     * {@code MinecraftForge.EVENT_BUS.register(...)} 的；而 {@code @SubscribeEvent} 的自动订阅发生在
+     * mod 构造期，比 {@code commonSetup} <b>更早</b>。于是我们在 LOWEST 的清理先跑，
+     * 把 {@code .crit} 叠加层<b>在读取端之前</b>撤掉，读取端永远看不到后缀
+     * ⇒ <b>暴击标记在任何暴击率下都不出现</b>（0% 和 100% 的表现一模一样）。
+     * <p>
+     * {@code FMLLoadCompleteEvent} 在所有 mod 的 {@code commonSetup}（含其 {@code enqueueWork} 回调）
+     * 全部结束<b>之后</b>才触发，所以拿它当注册点能保证「读取端先注册、我们后注册」。
+     * ⛔ 把这两个方法改回 {@code @SubscribeEvent} 自动订阅，会立刻退回上面那个失效状态。
+     * <p>
+     * 注意：本注册<b>不依赖</b>跳字模组是否存在 —— 没有它只是没人读这个后缀，清理本身仍然要做，
+     * 否则 {@link #DISPLAY_MSG_OVERRIDE} 会随命中次数一直增长（per-source 表只在被清时才回收）。
+     */
+    @Mod.EventBusSubscriber(modid = JuJutsuKaisenZone.MODID, bus = Mod.EventBusSubscriber.Bus.MOD)
+    public static final class LateListenerRegistration
+    {
+        private LateListenerRegistration()
+        {
+        }
+
+        @SubscribeEvent
+        public static void onLoadComplete(FMLLoadCompleteEvent event)
+        {
+            // receiveCancelled=true：这一条就是要处理「被取消的 hurt」。
+            MinecraftForge.EVENT_BUS.addListener(EventPriority.LOWEST, true, LivingHurtEvent.class,
+                    TechniqueDamageSources::clearDisplayMsgOverrideIfHurtCancelled);
+            MinecraftForge.EVENT_BUS.addListener(EventPriority.LOWEST, false, LivingDamageEvent.class,
+                    TechniqueDamageSources::clearDisplayMsgOverride);
         }
     }
 }

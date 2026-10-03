@@ -17,8 +17,9 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * 技能战斗数值的<b>唯一权威来源</b>：真值来自 {@code config/jujutsukaisenzone-common.toml}
- * 的 {@code [skillCombat]} 段，配置未加载时退回 {@link #buildCodeDefaults()} 的代码默认值。
+ * 技能战斗数值的<b>唯一权威来源</b>：真值来自 {@link Config} 里各项 {@code defineInRange}
+ * 的默认值（本模组<b>没有配置文件</b>，见 {@link Config} 的类注释）；
+ * 未经 {@link #reloadFromSpecDefaults()} 时退回 {@link #buildCodeDefaults()} 的代码默认值。
  * <p>
  * <b>权威规则（新增 skillCombat 项时照此办理）</b>：
  * <ol>
@@ -54,8 +55,13 @@ public final class SkillCombatConfigRegistry
     {
     }
 
-    /** 从 Forge 配置文件重载（{@link Config} 加载/重载时调用）。 */
-    public static void reloadFromForgeConfig()
+    /**
+     * 用 {@link Config} 的运行期取值重建数值表（{@link Config} 类初始化时调用一次）。
+     * <p>
+     * ⛔ 方法名里刻意没有 "ForgeConfig"：本模组已不注册配置文件，{@code Config} 的取值就是
+     * spec 的默认值，所以这里不是「重载配置」，只是一次性的初始化。
+     */
+    public static void reloadFromSpecDefaults()
     {
         int baselineGrade = Config.skillCombatBaselineGrade;
         // ⚠️ 伤害类的 perRank 已交给强度面板（SkillDamageResolver）：等级成长统一由「术式强度」

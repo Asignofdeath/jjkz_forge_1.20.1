@@ -111,6 +111,32 @@
 - ⚠️ **区 0 扩到 `MARTIAL || COMPOSITE`，但必须排除处刑必杀**（`!isExecutionersComposite(...)`）：处刑剑的伤害量已在 HIGHEST 被改写成固定致死值，再乘一道面板倍率会让低强度玩家杀不死。复合在近战里只有两条路，这条判据正好分开它们。
 - ⚠️ **区 2 挂 `LivingDamageEvent`，对总减伤精确封顶**：`LivingHurtEvent` 里只交接「进入原版减免前的量 + 分型」，真正的护甲/抗性乘算在原版全部算完后用交接基准封顶（`defenseReductionCap` 默认 85%）。ZONE（区 3）在交接之后施加，不进封顶基准。
 
+## 暴击系统（2026-10-03 重估）
+
+代码：`technique/crit/{CritRules, HitCritState, CritSkillPolicy}` + `TechniqueDamageSources#critAllowed`。落在区 C（`LivingHurtEvent` @HIGH，区 1 之后）。
+
+### ⛔ 判据已换：「高频不参与暴击」作废（原判据事实错误）
+- **原版无敌帧决定的是「结算频率」，不是「调用频率」**：`LivingEntity#hurt` 里 `invulnerableTime > 10.0F && !source.is(BYPASSES_COOLDOWN)` 时，若 `amount <= lastHurt` 直接 `return false`（**不调 `actuallyHurt`**）；而 `LivingHurtEvent` 是在 `actuallyHurt` **内部**派的 ⇒ 被无敌帧吞掉的击**根本不进管线**。条件 `> 10` ⇒ 同一目标最快**每 10 tick** 真结算一次（2 Hz）。所以「一 tick 调 90 次 `deal` 的柱扫」真实掷骰频率与单发招式同量级。
+- **逐击独立掷骰的期望与击中次数线性相关**，高频只**降方差**不抬期望 ⇒ 原 javadoc「期望被平均掉」是反的。
+- **前提若要失效**：有人给伤害源挂 `bypasses_cooldown` 标签，上述结论全部推翻（已 `grep` 全库 = 0 处；也无任何技能用裸 `setHealth` 造成伤害）。
+- **`amount <= lastHurt` 的差分分支**：增量伤害仍会 `actuallyHurt(amount - lastHurt)` 并派事件 ⇒ 暴击有机会落在**很小的差值**上（已知边界，未处理）。
+
+### 运行时放行：出伤点表态，不是全局放开
+`CritRules#canCrit` 只放行 **MARTIAL / TECHNIQUE**（COMPOSITE 一律不放）。术式**默认保守拒绝**（漏表态只是不暴击），每个招式由出伤点显式走 `dealCrit` / `runWithTypeCrit` 放行。已放行 7 处：解、苍、捌、茈、超远程茈、灶开、赫。`CritSkillPolicy#NO_CRIT_SKILLS` 只剩 `SKILL_COLLAPSE`（复合分型本来就没资格）；`NO_CRIT_INFO_NODES` 只剩 `INFO_DOMAIN_FUMOSHINKAN`（领域斩击：严格 10 tick 间隔 ⇒ 第 10 tick 时 `invulnerableTime == 10`，`> 10.0F` 为假 ⇒ **每击都落地**，是全表唯一真不被节流的条目）。
+
+### ⛔ `CritRules#forceNext` 是玩家级队列 ⇒ 注入点必须先过 `critAllowed`
+`applyCritZone` 的放行闸门（`critAllowed`）排在 `consumeForced` **之前**：本击若不能暴击，标记不被消费而**悬挂到后续某一击**（还会把 1.50 起的固定倍率送过去）。所以唯一生产者 `TechniqueDamageZoneEvents#maybeForceRatioSpotCrit` 在 `CritRules.forceNext` 之前先 `if (!TechniqueDamageSources.critAllowed(type)) return;`。**新增生产者照此办理。**
+
+### ⛔ 暴击跳字只能靠「暴击版 message_id」（对方 `critical` 选择器不可用）
+反编译 stylizeddamage jar 坐实：`MatchRule` 里的伪类型 `"critical"` 吃的是 `DamageEventListener#isCriticalHit`，即**写死的原版摔落暴击**（`Player && !onGround() && fallDistance > 0 && !isInWater() && !isPassenger() && !isFallFlying()`）⇒ 本模组暴击**影响不到**它；`isPseudoType` 又只有 `{kill, heal, absorption}`。故换法：暴击成立时把 msgId 换成 `.crit` 结尾。
+- 生产：`TechniqueDamageSources#markCritDisplay(DamageSource)`（幂等、写入既有 `DISPLAY_MSG_OVERRIDE`，自动随 `LivingDamageEvent` LOWEST 清理）。调用点 = 区 C 判完 `applyCritZone` 后读 `HitCritState#wasCrit()`。
+- ⛔ **判据是 `StylizedDamagePresence.isLoaded()`，不是 `ModRules.StylizedDamageStyles` 开关**（2026-10-03 修正，曾挂错导致实机「什么都没有」）。那个开关管的是「要不要把叙事分型**投影**成 message_id」（`projectDisplayType`）；而 `deal` 在开关关闭时走**普通 `DamageSource`**，其 `getMsgId()` 来自数据包注册表（`damage_type/technique.json` 的 `"message_id": "jjkz.technique"`）⇒ 开关开/关对术式的 msgId **完全一样**，✦ 与配色分毫不变，只有暴击后缀消失。`markCritDisplay` 不是投影（读已有值再追加），故与「样式何时注册」对齐。
+- 消费：`StylizedDamageCompat` 注册 `STYLE_*_CRIT` 并加 `.match(MSG_*_CRIT)` 规则；`MSG_*_CRIT` **直接引用 `TechniqueDamageSources` 常量**防漂移。
+- ⛔ **`NarrativeDamageSource` 覆写了 `getMsgId()`，会完全遮住 `DamageSourceMixin`** ⇒ 必须在该覆写里先读 `peekDisplayMsgId(this)`（否则 `deal` 通道永远看不到暴击版）。
+- ⛔ **后缀是纯字体渲染，不是贴图**：`DamageNumberRenderer` 把 `prefix + number + suffix` 拼成一整串走 `Font.width` + `GuiGraphics.drawString` ⇒ **💥（U+1F4A5，SMP 辅助平面）无字形**，MC 默认字体链（`include/unifont`）只有 BMP。原版缺字兜底 = `SpecialGlyphs.MISSING`（**5×8 空心白框**，不是「什么都不画」），`FontTexture.add` 对 `isColored()==true` 走彩色图集能烘焙成功。现用 **`✸` U+2738**（Dingbats 块，`✦` U+2726 已证明该块可渲染）；备选 `✹`/`✺`/`❋`/`⚡`/「爆」。想上真·爆炸图只能走 `Style#icon`（对方按 `ResourceLocation` 贴图渲染，`blit` 拉伸成 `max(1, round(8×fontSize))` 正方形、颜色乘样式色，需自带 PNG）。
+- ⛔ **客户端对未匹配的 msgId 直接丢弃整条跳字**：`ClientPacketHandler#handleDamageSync` 在 `resolveMatchResult` 返回 `null` 时 `return`（不退回默认白字）。所以新增 `message_id` 时，**样式规则漏注册 = 那一击的数字整体消失**，不是「少个后缀」。
+- 对方自带诊断：`/stylizeddamage list`（样式 + 选择器绑定）、`/stylizeddamage reload`、`/stylizeddamage test <type> <amount>`。必定暴击：`/attribute @s jujutsukaisenzone:crit_chance base set 60`（默认 5，硬顶 60）。
+
 ## LDLib 界面（术式开发 / 全屏 GUI）
 
 入口：`client/gui/technique/TechniqueDevelopmentUI#open()`（`ui.setFullScreen()` + `ModularUIGuiContainer`）。
@@ -200,9 +226,36 @@ for k, v in files.most_common(20): print(v, '|', k)
 - `-proc:none` 跳过注解处理器（Mixin 处理器在这里不需要）。
 - 报错前**先看涉事文件的 mtime**：用户可能在 IDEA 里**同时编辑**该文件。2026-09-25 出现过「1 个错误」实为检查当时文件正被写入（差 25 秒），重跑即 0。
 - 查 Forge API 源码（比反编译靠谱）：解压上面那个官方 `-sources.jar`。例：`EntityAttributeModificationEvent` 的 `getTypes()` / `add()` 签名就是这么确认的。
-- 2026-09-27 基线：578 文件 / 292 jar / exit 0。
+- 2026-10-03 基线：**728 文件 / 292 jar / exit 0 / 0 错误 / 旁路 0**。⚠️ 重定向到文件时该脚本的输出是 **UTF-8**（Python 3.13 对重定向 stdout 默认 UTF-8），只有在控制台里那行 javac 报错文本才是 GBK —— 解错码会得到 `閿欒` 花码。
 - **2026-09-27 起 `tools/jjkz_static_check.py` 末尾多一段「配置常量旁路」守卫**（见下一节）：
   输出多一行 `配置常量旁路(应为 0): N`。判定口径与豁免标记见该节。
+- ⚠️ **脚本调的是裸 `javac`（走 PATH），不一定是 gradle 的 JDK 17**。2026-10-03 实测：bash 会话的 PATH 上是
+  **Oracle Java 21.0.12** ⇒ 产物 class 版本 **65**。任何 harness 若拿 JDK 17 编译就会报
+  「类文件具有错误的版本 65.0，应为 61.0」。**规则：harness 编译/运行必须和 `%TEMP%/jjkz_check_out` 用同一 JDK。**
+
+### 脱离游戏跑真实逻辑的 harness 范式（2026-10-03 立，很省时间）
+想在**不启动 Minecraft** 的情况下跑真实业务类（验证配置、静态初始化、纯逻辑），照这个来：
+1. **先喂 `FMLPaths`**：它是 **enum**，且有 **`public static void loadAbsolutePaths(Path rootPath)`**。
+   `FMLPaths.loadAbsolutePaths(Paths.get("<project>/run"))` ⇒ `CONFIGDIR` 等全部就位，
+   绕开「`FMLPaths.get()` 返回 null ⇒ 依赖它的 `<clinit>` 直接炸」。
+2. **补 MC 引导**：`net.minecraft.server.Bootstrap.bootStrap()`（它自己可能抛，但 `BuiltInRegistries`
+   会被初始化，后续真实类通常就能加载了）。
+3. **classpath 用 argfile**：292 个 jar 超 Windows 命令行长度上限（`WinError 206`），
+   写 `real_javac.txt` / `real_java.txt`，用 `javac @f` / `java @f` 调用；argfile 路径里的 `\` 要换成 `/`。
+4. 输出加 `-Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8`，否则中文日志会花。
+5. ⚠️ 纯 `java` 环境里 `Config.<clinit>` 只要碰到 MC 注册表就会失败 —— **不代表代码有问题**，
+   先确认失败位置在不在 MC 侧（例：`Config.loadDefaults()` 第 626~628 行是 MDK 遗留的 `ForgeRegistries.ITEMS` 示例）。
+
+## 网络层与包 ID 分配（2026-10-03）
+- 结构：`ModNetwork`（门面，业务只调它）→ `network/api/*Network`（按域分组）→ `NetworkRegistration`
+  → `network/registration/*PacketRegistrar`（**在这里分配固定线号**）→ `network/packet/*Packet`。
+  发送目标统一走 `network/NetworkSenders`（`toPlayer` / `toAll` / `toServer` / `toDimension` / `toTrackingAndSelf`）。
+- **ID 现状（2026-10-03）**：0~105 已用且无重复；`105 = SyncModConfigS2CPacket`；**下一个空闲 = 106**。
+  查法：`grep -rh "messageBuilder([A-Za-z0-9_]*\.class, *[0-9]*" .../network/registration/` 抽数字排序找空洞。
+- ⛔ **加/改包必须升 `ModNetwork.PROTOCOL_VERSION`**（现为 `"2"`）。它让「客户端缺这个包」在**连接阶段**
+  被干净拒掉；不升的话服务端会推来一个客户端不认识的 ID，客户端抛难懂的解码异常才掉线。
+- S2C 包的 `handle` 里引用 `Minecraft.getInstance()` 是既有惯例（如 `SyncBarrierRulesS2CPacket`），
+  服务端**不会执行** handle 方法体，所以不违反端安全。
 
 ## 配置来源与权威规则（2026-09-27）
 
@@ -211,9 +264,16 @@ for k, v in files.most_common(20): print(v, '|', k)
    `mob_combat_stats/vanilla.json`（怪物战斗属性 + `poise` 块）、
    `ten_shadows_shikigami_stats/{untamed,tamed_base}.json`、`capabilities/weapons/*.json`。
    `/reload` 热更，整合包可覆盖 ⇒ **内容向**的东西放这儿。
-2. **Forge 配置 TOML**：`Config.java`（`ModConfig.Type.COMMON`）→ `run/config/jujutsukaisenzone-common.toml`，
-   7 段：`[skillCombat] / [combatPower] / [combatDefense] / [domainBrain] / [domainGauge] /
-   [domainMeltdownRepair] / [se]`。**改完要重启**（旧认知：得删 `run/config/*.toml` 才生效）。
+2. **自写配置层（2026-10-03 起，已彻底不用 Forge 配置系统）**：
+   - `Config.java` = 模组作者改数值的唯一处（`defineInRange` 默认值）；
+   - `config/jujutsukaisenzone/settings.toml` = 高级玩家覆盖表，扁平 `dotted.key = value`，
+     **只开放数字**（布尔 / 列表关闭），越界夹回、解析失败退回默认，全程只警告不抛异常；
+   - 模型：`config/CfgSpec.java`（值容器，替代 `ForgeConfigSpec`）+ `config/ConfigFileLayer.java`
+     （文件层，无 watcher / 永不重写；只在启动与断线时读）。
+   - **联机时以服务端（房主 / 服主）为准**：登录时 `SyncModConfigS2CPacket`(#105) 把服务端的生效值
+     推给客户端，客户端整个盖掉本地；断开时恢复本地文件。详见 `MEMORY.md#配置系统`。
+   - 旧文件 `run/config/jujutsukaisenzone-common.toml` 已不存在（改名 `.toml.disabled`）。
+   细节见 `MEMORY.md#配置系统`。**改完要重启游戏。**
 3. **Java 常量**：`entity/data/*Config`（8 个）+ `technique/scaling/*SkillGrowth` + `PoiseRules` 常量族。
 
 ### skillCombat 的权威规则（新增项照此办理）
@@ -223,7 +283,7 @@ for k, v in files.most_common(20): print(v, '|', k)
 - 业务代码读取**一律走 `*SkillGrowth` / `SkillCombatConfigRegistry.resolve*`**，
   ⛔ 不许直接引用常量（直接引用同时丢掉配置修改与咒术等级成长）。
 - ⚠️ `damage` 类的 `perRank` 在 `Config.combatPowerScalingEnabled = true`（默认）时被乘 0
-  （等级成长改由「术式强度」面板承担，见 `SkillCombatConfigRegistry#reloadFromForgeConfig`）。
+  （等级成长改由「术式强度」面板承担，见 `SkillCombatConfigRegistry#reloadFromSpecDefaults`）。
   所以配置文件里能看到该键、但它当下不生效 —— **刻意行为，不是 bug**。
 - ⚠️ `entity/data/*Config` 混装两类东西：**配置项**（`DAMAGE` / `PULL_RADIUS`…）与
   **纯实现细节**（`BLOCK_PULL_SAMPLE_ATTEMPTS`、`*_INTERVAL`、`*_FADE_IN_TICKS`…）。
@@ -236,12 +296,12 @@ for k, v in files.most_common(20): print(v, '|', k)
   现有豁免 3 处：`LimitlessRedArrowBehavior` 字段占位 + 老存档兜底、`LimitlessRedBlockLaunch` 的 `if` 前占位。
 - 实现坑：必须先跳过以 `*` / `//` / `/*` 开头的行，否则 javadoc 里的 `{@code X.Y}` 全误报；
   豁免窗口用 `window` + `del window[:-3]`。
-- 当前基线：`srcs = 578  jars = 292  exit = 0  错误总行数: 0  配置常量旁路(应为 0): 0`。
+- 当前基线：`srcs = 728  jars = 292  exit = 0  错误总行数: 0  配置常量旁路(应为 0): 0`。
 
-### 尚未做的第三步（等用户拍板）
-配置通道是否从 Forge TOML 整体搬到数据包（`data/.../skill_combat/*.json` +
-`SimpleJsonResourceReloadListener`，照 `MobCombatStatsReloadListener`）。倾向做，但会替掉
-玩家侧配置入口（TOML 段 + `JjkzModConfigScreen`），属**体验变更**，不能自作主张。
+### ~~尚未做的第三步（等用户拍板）~~ → 2026-10-03 已按另一条路落地
+原设想是把配置通道整体搬到数据包（`data/.../skill_combat/*.json` + `SimpleJsonResourceReloadListener`）。
+用户最终选了更简单的方案：**自写一层配置**（`CfgSpec` + `ConfigFileLayer` + `settings.toml`），
+数据包那条路**不做了**。所以别再照这段去设计 JSON 配置表。
 
 ## EpicFight 硬直护盾（stun shield）——怪物韧性条的载体（2026-09-27）
 
@@ -446,6 +506,61 @@ counterMultiplier, beats, breakQualityFactor}`、`PoiseStats` 的第 6 个分量
   `ShrineKaiArrowBehavior`(1)、`LimitlessRemoteMurasakiBehavior`(1)。
   ⛔ **宿主从此不随技能数量增长**。未把 `configure` 改成链式返回（避免 16 个类的无谓 churn）。
 - ⚠️ `SpecialEffectFlight.tickLinear` 每 tick 会 `setDeltaMovement(Vec3.ZERO)`（原手写循环不设）。
+
+## 客户端后处理 / PostChain 与深度缓冲（2026-10-03 起）
+
+首次使用场景：领域展开「扫描波」要做**贴地形的球壳扫描**（亮环 = 地形表面上距球心恰好等于半径的等高线）。
+屏幕空间的全屏 quad 做不出来 —— 那只是「盖在屏幕上的一条线」，跟地形无关。必须走**深度反投影**。
+
+### 结论速查
+- ⛔ **本项目原版 `PostChain` 完全够用，不需要 Mixin、不需要 access transformer。** JCraft（`jcraft:za_warudo`）用 Mixin 是因为它要**冻结**深度（时停世界静止，快照一次反复用）；我们要的是**每帧实时深度**，走原版路子即可。
+- **1.20.1 的 `RenderTarget` 深度是一张独立纹理**（`TextureUtil.generateTextureId()` + `_glFramebufferTexture2D(GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthBufferId, 0)`），`getDepthTextureId()` / `copyDepthFrom(RenderTarget)` 都是 **public**。
+- ⛔ **`PostChain.passes` 是 private**（JCraft 靠 access widener 才能读）。不改 AT ⇒ 用 **`PostChain.addPass(name, in, out)`**（public，返回 `PostPass`）自己挂 pass，靠返回的 `PostPass#getEffect()` 拿 `EffectInstance` 设每帧 uniform。
+- ⛔ **`addPass` 必须写在 `resize()` 之前**：`ProjMat`（正交矩阵）是 `PostChain.resize()` 遍历 passes 逐个 `setOrthoMatrix` 下发的；顺序反了，新 pass 的 `ProjMat` 是 null ⇒ `Uniform.set(null)` NPE。
+- **深度挂成 sampler 的两条路**：① post JSON 的 pass 里写 `"auxtargets": [{ "name": "DepthSampler", "id": "<target>:depth" }]`（解析时 `addAuxAsset(name, rt::getDepthTextureId, rt.width, rt.height)`）；② 代码 `pass.addAuxAsset(...)`。我们用 ②（pass 是代码加的）。
+- **深度必须先进临时目标再采样**：`depthTarget.copyDepthFrom(mainTarget)`。原版自己也这么干（`itemEntityTarget` / `translucentTarget` / `particlesTarget`）。临时目标由 post JSON 的 `"targets"` 声明（`{"name":"depthMain"}`，不写 width/height 即全屏尺寸，且会进 `fullSizedTargets` 跟着窗口 resize）。
+- `EffectInstance.clear()` 每次 pass 结束会**解绑所有 sampler**（绑 texture 0）⇒ 不会出现「读写同一缓冲」的反馈环。
+- **`PostPass.process` 只自动下发** `ProjMat` / `InSize` / `OutSize` / `Time` / `ScreenSize`（还有 `AuxSizeN`），**不下发 `ModelViewMat`** ⇒ 全屏 quad 的 vsh 里**别用 ModelViewMat**。照抄原版 `assets/minecraft/shaders/program/blit.vsh`（`in vec4 Position; outPos = ProjMat * vec4(Position.xy, 0, 1); gl_Position = vec4(outPos.xy, 0.2, 1); texCoord = Position.xy / OutSize;`）即可，JCraft 的 `position_getter.vsh` 结构完全一样。
+- **注入点 = `RenderLevelStageEvent.Stage.AFTER_LEVEL`**（Forge 在 `GameRenderer:1128` 紧跟 `levelRenderer.renderLevel(...)` 之后派发）。此刻：主帧缓冲仍是 draw target、深度完整、GUI 与手持物都还没画。它**早于** `doEntityOutline()` 与 `renderItemInHand`（后者开头 `RenderSystem.clear(GL_DEPTH_BUFFER_BIT)`，所以被我们写脏的深度会被清掉）。
+- ⛔ **`PostChain` 不在原版资源重载的重建名单里** ⇒ 必须自己监听 `RegisterShadersEvent` 标记重建（`PostChain` 里的 program 已随旧资源失效）。该事件在 **MOD 总线**，渲染事件在 FORGE 总线，**一个类只能标一个 `@Mod.EventBusSubscriber`** ⇒ 单独开一个 `DomainScanWaveReloadListener`。
+- ⛔ **「以某个实体为中心」的后处理，球心/锚点必须每帧跟踪实体，不能只在触发瞬间发一次快照。** 演出默认不锁操作，实体一动快照就漂，表现为「效果不在施法者身上」。做法：包里带实体 UUID，客户端在 `ClientLevel#players()` 里按 UUID 找（本地玩家也在该列表内，`ClientPacketListener:418/1078` 坐实），用 `Entity#getPosition(partialTick)` 取**按 partialTick 插值的脚底位置**（`Entity.java:1528` = `Vec3(lerp(pt,xo,getX()), ...)`；直接读 `getX/Y/Z` 会在移动时一跳一跳），快照坐标降级为兜底（实体不在客户端列表时用）。
+
+### 每帧的调用次序（照 JCraft `PostEffect#render`）
+```
+1. setUniform...（含 InverseTransformMatrix，必须在改写矩阵之前抓）
+2. depthTarget.copyDepthFrom(mainTarget)
+3. RenderSystem.disableBlend / disableDepthTest / resetTextureMatrix
+4. （可选）模型视图 push + setIdentity + applyModelViewMatrix
+5. chain.process(partialTick)
+6. mainTarget.bindWrite(true) → disableBlend → defaultBlendFunc → enableDepthTest
+```
+
+### 世界坐标反投影口径
+- `InverseTransformMatrix = inv(RenderSystem.getProjectionMatrix() × RenderSystem.getModelViewMatrix())`，**两个矩阵都走 `RenderSystem`**（别混用 `RenderLevelStageEvent#getProjectionMatrix()`）。
+- 世界渲染阶段的 `ModelViewMat` **只含相机朝向、不含平移** ⇒ `shader` 里 `InverseTransformMatrix * clip` 得到的是「相机相对世界」，**必须再加回 `CameraPosition`** 才是绝对世界坐标。
+- fsh 里 `ndc = vPosition.xyz / vPosition.w`，`ndcZ = depth * 2.0 - 1.0`。
+- **`depth >= 1.0` 直接提前返回**：天空 / 无几何体像素不该参与扫描（这也是「不粘在屏幕上」的关键）。
+
+### 「扫过即灰、收回即复原」的写法（可复用）
+反投影出 `dist` 后，**「球内 = 已被扫过」**，所以有没有被扫过、要不要复原，全由 `dist < Radius` 一个判据给出 —— **半径本身就是唯一状态，不需要快照 / 不需要冻结深度**（JCraft 的时停要冻结深度是因为世界静止、需要反复用同一份快照）。
+```glsl
+float band = max(1.2, Radius * 0.045);                                  // 环带半宽，随半径增长
+float covered = 1.0 - smoothstep(0.0, band * 1.2, dist - Radius);
+float luma = dot(base, vec3(0.299, 0.587, 0.114));
+vec3 color = mix(base, vec3(luma), covered * GREY_STRENGTH * Intensity);
+color += WAVE_TINT * add * 1.5;                                         // 环必须叠在灰化之后
+```
+- ⛔ 顺序不能反：先叠环再灰，亮环会被一起灰掉、失去自发光感。
+- 去饱和用**向亮度插值**，别走 `rgb2hsv` 降 S —— 更便宜且不会因色相环回出偏色。
+- 过渡带取 `band * 1.2` 且落在环**外侧** ⇒ 「复原」正好发生在圈收回经过该像素的瞬间。
+- 后处理发生在 `AFTER_LEVEL` ⇒ 灰掉的只有世界几何，GUI / 手持物不受影响。
+
+### GLSL 坑
+- ⛔ `smoothstep(edge0, edge1, x)` 在 **`edge0 > edge1` 时规范上是未定义**（`smoothstep(Radius + 1., Radius, pct)` 这种「反向」写法 JCraft 也在用，但别学）。统一改写成 `1.0 - smoothstep(0.0, w, |x|)`。
+- 循环边界必须是常量（可 unroll）；别在循环里用 `continue` / `break`。
+
+### 参考实现
+- JCraft：`C:\D\MineMOD\jcraft-eoe-arch-1.20.1` —— `common/.../shaders/program/za_warudo.fsh`（球壳扫描本体 + 色相反转 / 饱和变化 / 鱼眼折射）、`client/rendering/api/PostEffect.java`（PostChain 薄包装）、`handler/ZaWarudoShaderHandler.java`（半径曲线、uniform 设置）、`mixin/client/GameRendererMixin.java`（渲染时点 + reloadShaders 重建）、`mixin/client/RenderTargetMixin.java`（冻结深度的 Mixin，我们用不到）。
 
 
 

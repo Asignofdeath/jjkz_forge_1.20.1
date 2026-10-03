@@ -9,6 +9,7 @@ import com.darkness.jujutsukaisenzone.network.packet.SyncCursedEnergyS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncCursedEnergyTraitS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncCursedGradeS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncFactionS2CPacket;
+import com.darkness.jujutsukaisenzone.network.packet.SyncModConfigS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncStarMarksS2CPacket;
 import com.darkness.jujutsukaisenzone.api.screen.ScreenShakeKind;
 import com.darkness.jujutsukaisenzone.photon.OwnerOnlyPhotonFxParams;
@@ -80,5 +81,11 @@ public final class PlayerSyncNetwork
     {
         NetworkSenders.toPlayer(viewer,
                 new SyncStarMarksS2CPacket(owner.getUUID(), marks));
+    }
+
+    /** 把服务端当前生效的数值推给玩家（联机时客户端以服务端为唯一真相）。 */
+    public static void sendModConfigSync(ServerPlayer player)
+    {
+        SyncModConfigS2CPacket.send(player);
     }
 }

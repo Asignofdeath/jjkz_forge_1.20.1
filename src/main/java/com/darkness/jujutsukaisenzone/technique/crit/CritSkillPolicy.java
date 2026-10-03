@@ -4,7 +4,6 @@ import com.darkness.jujutsukaisenzone.technique.commonskill.CommonTechniqueSkill
 import com.darkness.jujutsukaisenzone.technique.development.SkillTreeNodeDef;
 import com.darkness.jujutsukaisenzone.technique.development.TechniqueSkillTree;
 import com.darkness.jujutsukaisenzone.technique.development.TechniqueSkillTreeRegistry;
-import com.darkness.jujutsukaisenzone.technique.skillset.LimitlessTechniqueSkillSet;
 import com.darkness.jujutsukaisenzone.technique.skillset.RatioTechniqueSkillSet;
 import com.darkness.jujutsukaisenzone.technique.skillset.ShrineTechniqueSkillSet;
 import com.darkness.jujutsukaisenzone.technique.skillset.TechniqueSkill;
@@ -16,17 +15,28 @@ import java.util.Set;
  * 「不参与暴击」的技能声明——<b>展示层</b>，供技能悬停框标注用。
  * <p>
  * 与 {@code TechniqueDamageSources#critAllowed} 的分工：那一边管<b>运行时</b>放不放行
- * （默认口径是「体术可暴、术式不可暴」，单发术式招式由出伤点显式走 {@code dealCrit}），
- * 这里管<b>告诉玩家</b>。两边必须对齐，所以这份名单只收「按设计就不该暴击」的招式：
- * <ul>
- *   <li>高频 / 周期性出伤 —— 苍（每 4 tick）、捌（每 5 tick）、解（每 tick 扫柱高）、
- *       茈与超远程茈（每 tick 球内）、灶开爆炸（每 tick）</li>
- *   <li>坠落碎块 —— 瓦落瓦落（复合分型，本身不在 {@link CritRules#canCrit} 资格内）</li>
- * </ul>
- * ⚠️ 新增高频招式时把技能 id 加进来，并在出伤点确认它确实没有走 {@code dealCrit}。
- * 反过来，某个招式以后改成单次结算并放行暴击了，就要把它从这份名单里删掉。
+ * （默认口径仍是「体术可暴、术式不可暴」，术式招式由出伤点显式走 {@code dealCrit} /
+ * {@code runWithTypeCrit}），这里管<b>告诉玩家</b>。两边必须对齐。
  * <p>
- * 未列入的技能（十划、星弹、星间飞行、法槌、赫、星痕……）都不打这行标注。
+ * <b>名单判据（2026-10-03 修订）</b>：不再按「出伤频率」判。
+ * <p>
+ * 旧判据是「高频 / 周期性出伤不参与暴击」，列了苍（每 4 tick）、捌（每 5 tick）、解（每 tick 扫柱高）、
+ * 茈 / 超远程茈（每 tick 球内）、灶开爆炸（每 tick）。<b>这条判据已废</b>——
+ * 原版无敌帧（{@code invulnerableTime > 10}）的判定在 {@code hurt} 里、{@code actuallyHurt} 之前，
+ * 而 {@code LivingHurtEvent}（暴击乘区所在）只在 {@code actuallyHurt} <b>内部</b>派发，
+ * 所以一个目标最快每 10 tick 才真正结算一次。也就是说「出伤<b>调用</b>频率」可以高到 90 次/tick
+ * （解的柱扫），「真实<b>结算</b>频率」却一律被钉在 2 次/秒——所有高频技能在结算层面同频，
+ * 频率区分不出它们。而且逐击独立掷骰的期望增幅与击中次数无关（线性），只会<b>降低</b>方差。
+ * <p>
+ * 现行判据只有两条：
+ * <ol>
+ *   <li><b>分型没有暴击资格</b>——{@link CritRules#canCrit} 只放行体术与术式，
+ *       复合刻意排除（处刑必杀是致死量改写，不能再叠一道浮动）。</li>
+ *   <li><b>结算语义特殊</b>——例如致死量改写。</li>
+ * </ol>
+ * 目前整份名单只剩坍塌一条（见下）。
+ * <p>
+ * 未列入的技能（十划、星弹、星间飞行、法槌、赫、星痕、解、苍、捌、茈、灶开……）都不打这行标注。
  * <p>
  * <b>领域说明节点</b>另算（见 {@link #isNoCritInfoNode}）：领域不是可释放技能、没有 skillId，
  * 它是对应术式的说明节点，所以只能按 nodeId 定位。
@@ -38,30 +48,42 @@ import java.util.Set;
  *   <li>星痕撞击 —— {@code StarMarkRules} 的球撞击结算（有 {@code IMPACT_COOLDOWN_TICKS} 去重）</li>
  *   <li>星痕爆裂 —— {@code StarMarkDetonation#detonate}</li>
  *   <li>黑闪冲击波 —— {@code BlackFlashShockwaveBehavior}（一次性 AoE，且不隶属于任何技能）</li>
+ *   <li>解（挥砍 / 切割共用一处出伤）—— {@code ShrineKaiArrowBehavior#resolveAndSettleHits}</li>
+ *   <li>苍 —— {@code LimitlessBlueBehavior#tick}</li>
+ *   <li>捌 —— {@code ShrineHachiBehavior#dealDamage}</li>
+ *   <li>茈 —— {@code LimitlessPurpleArrowBehavior} 球内扫掠</li>
+ *   <li>超远程茈 —— {@code LimitlessRemoteMurasakiBehavior#damageLivingInSphere}</li>
+ *   <li>灶开爆炸 —— {@code ShrineFugaBoomBehavior#damageLivingInSphere}</li>
  *   <li>体术系（星间飞行、十划一击 / 冲撞 / 冲 / 一文字）—— 分型默认即放行，无需声明</li>
  * </ul>
+ * ⚠️ 上面 7 条术式（解 / 苍 / 捌 / 茈 / 超远程茈 / 灶开）之所以能放行，是因为它们的真实结算被
+ * 无敌帧压到 2 次/秒；<b>如果哪天给某个伤害类型挂上 {@code bypasses_cooldown} 标签，
+ * 这个前提立刻失效</b>，需要重新评估。<b>领域斩击不在此列</b>：它是严格每 10 tick 一次，
+ * 恰好卡在无敌帧边界（第 10 tick {@code invulnerableTime == 10}，条件 {@code > 10} 为假），
+ * 所以<b>每次都落地、不被节流</b>，仍保留「不参与暴击」标注。
+ * <p>
+ * ⚠️ 另外注意：{@code SKILL_KAI} 与 {@code SKILL_KAI_FLYOBJ} 共用同一个出伤点，
+ * 而该出伤点目前固定挂 {@code SKILL_KAI} 作为叙事 id——也就是说 flyobj 的伤害在归因上
+ * 算作 {@code SKILL_KAI}，{@code SKILL_KAI_FLYOBJ} 这一条对运行时没有任何影响（只影响悬停框）。
  */
 public final class CritSkillPolicy
 {
     /** 按设计不参与暴击的技能 id。 */
     private static final Set<String> NO_CRIT_SKILLS = Set.of(
-            // —— 无下限 ——
-            LimitlessTechniqueSkillSet.SKILL_BLUE,
-            LimitlessTechniqueSkillSet.SKILL_PURPLE,
-            LimitlessTechniqueSkillSet.SKILL_REMOTE_PURPLE,
-            // —— 御厨子 ——
-            ShrineTechniqueSkillSet.SKILL_KAI,
-            ShrineTechniqueSkillSet.SKILL_KAI_FLYOBJ,
-            ShrineTechniqueSkillSet.SKILL_HACHI,
-            ShrineTechniqueSkillSet.SKILL_FUGA,
             // —— 十划 ——
+            // 瓦落瓦落：掀起的坠落碎块走 FallingBlockEntity 自带碰撞，伤害分型是 COMPOSITE，
+            // 而 CritRules#canCrit 只放行 MARTIAL / TECHNIQUE ⇒ 它本来就没有暴击资格。
+            // 这一条与「频率」无关，是分型资格问题；留着是为了让悬停框如实告诉玩家。
             RatioTechniqueSkillSet.SKILL_COLLAPSE);
 
     /**
      * 按设计不参与暴击的<b>说明节点</b> nodeId。
      * <p>
-     * 目前只有「伏魔神龛」：领域斩击是每 10 tick 的持续伤害（{@code ShrineDomainExpansion}
-     * 的 {@code tickShrineSlashDamage}），属于高频出伤。其余三个领域不直接出伤，所以不列。
+     * 目前只有「伏魔神龛」：领域斩击是<b>严格每 10 tick</b> 的持续伤害（{@code ShrineDomainExpansion}
+     * 的 {@code tickShrineSlashDamage}）。它是整份名单里<b>唯一真的不被无敌帧节流</b>的条目——
+     * 第 10 tick 时 {@code invulnerableTime} 恰好等于 10，条件 {@code > 10.0F} 为假，
+     * 所以每一次斩击都会落地（2 次/秒），而解 / 苍 / 茈 那类「每 tick 扫」的招式反而被压到同一频率。
+     * 其余三个领域不直接出伤，所以不列。
      */
     private static final Set<String> NO_CRIT_INFO_NODES = Set.of(
             ShrineTechniqueSkillSet.INFO_DOMAIN_FUMOSHINKAN);

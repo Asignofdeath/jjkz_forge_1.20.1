@@ -27,11 +27,11 @@ import org.joml.Matrix4f;
 @Mod.EventBusSubscriber(modid = JuJutsuKaisenZone.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE, value = Dist.CLIENT)
 public final class DomainWhiteCurtainRenderer
 {
-    /** 默认总时长：约 5.75 秒（全白额外 2.2s，开洞已双倍提速）。 */
-    public static final int DEFAULT_DURATION_TICKS = 115;
+    /** 默认总时长：约 5.25 秒（全白额外 1.7s，开洞已双倍提速）。 */
+    public static final int DEFAULT_DURATION_TICKS = 105;
 
     /** 须与 {@code domain_white_curtain.fsh} 的 holdEnd 一致。 */
-    private static final float HOLD_END_PROGRESS = 0.852F;
+    private static final float HOLD_END_PROGRESS = 0.838F;
     /** 开洞瞬间中幅度衰减震动。 */
     private static final int HOLE_SHAKE_TICKS = 22;
     private static final float HOLE_SHAKE_MAX_DEG = 5.5F;

@@ -1055,7 +1055,7 @@ public final class JjkzCommands
         return Commands.literal("whiteCurtain")
                 .requires(source -> source.hasPermission(Commands.LEVEL_GAMEMASTERS))
                 .then(Commands.literal("play")
-                        .executes(ctx -> executeWhiteCurtainPlay(ctx.getSource().getPlayerOrException(), 115))
+                        .executes(ctx -> executeWhiteCurtainPlay(ctx.getSource().getPlayerOrException(), 105))
                         .then(Commands.argument("ticks", IntegerArgumentType.integer(1, 400))
                                 .executes(ctx -> executeWhiteCurtainPlay(
                                         ctx.getSource().getPlayerOrException(),

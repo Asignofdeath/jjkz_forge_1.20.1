@@ -12,7 +12,7 @@ import org.jetbrains.annotations.Nullable;
 
 /**
 
- * 「伏魔神龛」领域随咒术等级成长的数值表（数值来自 {@code config/jujutsukaisenzone-common.toml}）。
+ * 「伏魔神龛」领域随咒术等级成长的数值表（数值来自 {@code Config} 中 {@code [skillCombat.shrineDomain]} 各项的默认值，本模组无配置文件）。
 
  */
 

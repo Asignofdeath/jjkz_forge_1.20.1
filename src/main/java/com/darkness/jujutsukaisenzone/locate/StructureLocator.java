@@ -7,7 +7,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.HolderSet;
 import net.minecraft.core.Registry;
-import net.minecraft.core.SectionPos;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
@@ -26,6 +25,9 @@ import javax.annotation.Nullable;
 
 /**
  * 通用结构/模板片查找。
+ * <p>
+ * 若目标指定了模板片，则<strong>必须</strong>在已生成的 StructureStart 中匹配到该片才算成功，
+ * 绝不回退到「仅有宿主结构（如村庄）中心」的坐标。
  */
 public final class StructureLocator
 {
@@ -62,6 +64,13 @@ public final class StructureLocator
             return Optional.empty();
         }
 
+        ResourceLocation pieceId = target.templatePiece();
+        if (pieceId != null)
+        {
+            // 必须匹配到真实模板片；禁止回退到空村坐标
+            return findNearestPieceFromOrigin(level, origin, holder.value(), pieceId, radiusChunks);
+        }
+
         HolderSet<Structure> holderSet = HolderSet.direct(holder);
         Pair<BlockPos, Holder<Structure>> nearest = level.getChunkSource().getGenerator()
                 .findNearestMapStructure(level, holderSet, origin, radiusChunks, false);
@@ -69,37 +78,22 @@ public final class StructureLocator
         {
             return Optional.empty();
         }
-
-        BlockPos structurePos = nearest.getFirst();
-        ResourceLocation pieceId = target.templatePiece();
-        if (pieceId == null)
-        {
-            return Optional.of(structurePos);
-        }
-
-        Optional<BlockPos> piecePos = findPieceNear(level, structurePos, holder.value(), pieceId, radiusChunks);
-        return piecePos.isPresent() ? piecePos : Optional.of(structurePos);
+        return Optional.of(nearest.getFirst());
     }
 
     /**
-     * 在宿主结构附近扫描已生成的 StructureStart，匹配模板片中心。
-     * 若最近一座村没有该片，继续在半径内找其它村。
+     * 以原点为中心扫描已生成区块，只返回含指定模板片的最近坐标。
+     * 不含该片的宿主结构一律忽略。
      */
-    private static Optional<BlockPos> findPieceNear(
+    private static Optional<BlockPos> findNearestPieceFromOrigin(
             ServerLevel level,
-            BlockPos preferAround,
+            BlockPos origin,
             Structure host,
             ResourceLocation pieceId,
             int radiusChunks)
     {
-        Optional<BlockPos> atPrefer = findPieceInStructureAt(level, preferAround, host, pieceId);
-        if (atPrefer.isPresent())
-        {
-            return atPrefer;
-        }
-
-        int originChunkX = preferAround.getX() >> 4;
-        int originChunkZ = preferAround.getZ() >> 4;
+        int originChunkX = origin.getX() >> 4;
+        int originChunkZ = origin.getZ() >> 4;
         BlockPos best = null;
         double bestDist = Double.MAX_VALUE;
 
@@ -129,7 +123,7 @@ public final class StructureLocator
                     {
                         continue;
                     }
-                    double dist = piece.distSqr(preferAround);
+                    double dist = piece.distSqr(origin);
                     if (dist < bestDist)
                     {
                         bestDist = dist;
@@ -139,35 +133,10 @@ public final class StructureLocator
             }
             if (best != null && r >= 8)
             {
-                // 已有结果且扫过一定范围，可提前结束以省开销
                 break;
             }
         }
         return Optional.ofNullable(best);
-    }
-
-    private static Optional<BlockPos> findPieceInStructureAt(
-            ServerLevel level,
-            BlockPos pos,
-            Structure host,
-            ResourceLocation pieceId)
-    {
-        StructureStart start = level.structureManager().getStructureWithPieceAt(pos, host);
-        if (start == null || !start.isValid())
-        {
-            SectionPos section = SectionPos.of(pos);
-            ChunkAccess chunk = level.getChunk(section.x(), section.z(), ChunkStatus.STRUCTURE_STARTS, false);
-            if (chunk != null)
-            {
-                start = chunk.getStartForStructure(host);
-            }
-        }
-        if (start == null || !start.isValid())
-        {
-            return Optional.empty();
-        }
-        BlockPos piece = findPieceInStart(start, pieceId);
-        return Optional.ofNullable(piece);
     }
 
     @Nullable
@@ -201,6 +170,11 @@ public final class StructureLocator
             return element.toString().contains(want.getPath());
         }
         Optional<ResourceLocation> left = either.left();
-        return left.isPresent() && want.equals(left.get());
+        if (left.isEmpty())
+        {
+            return false;
+        }
+        ResourceLocation got = left.get();
+        return want.equals(got) || want.getPath().equals(got.getPath());
     }
 }

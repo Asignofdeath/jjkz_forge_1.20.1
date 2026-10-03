@@ -1,12 +1,10 @@
 package com.darkness.jujutsukaisenzone.technique.development;
 
-import com.darkness.jujutsukaisenzone.entity.data.LimitlessBlueConfig;
 import com.darkness.jujutsukaisenzone.entity.data.LimitlessPurpleConfig;
 import com.darkness.jujutsukaisenzone.entity.data.LimitlessRemoteMurasakiConfig;
 import com.darkness.jujutsukaisenzone.entity.data.ShrineFugaConfig;
-import com.darkness.jujutsukaisenzone.entity.data.ShrineHachiConfig;
-import com.darkness.jujutsukaisenzone.entity.data.ShrineKaiConfig;
 import com.darkness.jujutsukaisenzone.technique.SkillDamageResolver;
+import com.darkness.jujutsukaisenzone.technique.config.SkillCombatConfigRegistry;
 import com.darkness.jujutsukaisenzone.technique.description.TechniqueSkillStatFormat;
 import com.darkness.jujutsukaisenzone.technique.skill.GavelFormStats;
 import com.darkness.jujutsukaisenzone.technique.skill.JudgmentAccuseSkillLogic;
@@ -57,9 +55,15 @@ public final class SkillUpgradeStatCatalog
 
         switch (skillId)
         {
+            /*
+             * skillCombat 里的伤害倍率：弹窗基值必须与描述 / 出伤同源（registry），
+             * 不要再读 *Config 常量——常量只是 Forge 默认值，玩家改过 toml 后会对不上。
+             */
             case LimitlessTechniqueSkillSet.SKILL_BLUE -> lines.add(ratioLine(
                     "gui.jujutsukaisenzone.skill_upgrade.stat.damage",
-                    LimitlessBlueConfig.DAMAGE, fromLv, toLv));
+                    SkillCombatConfigRegistry.resolveFloat(
+                            SkillCombatConfigRegistry.SKILL_LIMITLESS_BLUE, "damage", null),
+                    fromLv, toLv));
             case LimitlessTechniqueSkillSet.SKILL_PURPLE -> lines.add(ratioLine(
                     "gui.jujutsukaisenzone.skill_upgrade.stat.tick_damage",
                     LimitlessPurpleConfig.ARROW_SPHERE_DAMAGE_PER_TICK, fromLv, toLv));
@@ -67,12 +71,21 @@ public final class SkillUpgradeStatCatalog
                     "gui.jujutsukaisenzone.skill_upgrade.stat.tick_damage",
                     LimitlessRemoteMurasakiConfig.ARROW_SPHERE_DAMAGE_PER_TICK, fromLv, toLv));
 
-            case ShrineTechniqueSkillSet.SKILL_KAI, ShrineTechniqueSkillSet.SKILL_KAI_FLYOBJ -> lines.add(ratioLine(
+            case ShrineTechniqueSkillSet.SKILL_KAI -> lines.add(ratioLine(
                     "gui.jujutsukaisenzone.skill_upgrade.stat.damage",
-                    ShrineKaiConfig.COLUMN_DAMAGE, fromLv, toLv));
+                    SkillCombatConfigRegistry.resolveFloat(
+                            SkillCombatConfigRegistry.SKILL_SHRINE_KAI, "damage", null),
+                    fromLv, toLv));
+            case ShrineTechniqueSkillSet.SKILL_KAI_FLYOBJ -> lines.add(ratioLine(
+                    "gui.jujutsukaisenzone.skill_upgrade.stat.damage",
+                    SkillCombatConfigRegistry.resolveFloat(
+                            SkillCombatConfigRegistry.SKILL_SHRINE_KAI_FLYOBJ, "damage", null),
+                    fromLv, toLv));
             case ShrineTechniqueSkillSet.SKILL_HACHI -> lines.add(ratioLine(
                     "gui.jujutsukaisenzone.skill_upgrade.stat.damage",
-                    ShrineHachiConfig.DAMAGE, fromLv, toLv));
+                    SkillCombatConfigRegistry.resolveFloat(
+                            SkillCombatConfigRegistry.SKILL_SHRINE_HACHI, "damage", null),
+                    fromLv, toLv));
             case ShrineTechniqueSkillSet.SKILL_FUGA -> lines.add(ratioLine(
                     "gui.jujutsukaisenzone.skill_upgrade.stat.tick_damage",
                     ShrineFugaConfig.BOOM_DAMAGE_PER_TICK, fromLv, toLv));

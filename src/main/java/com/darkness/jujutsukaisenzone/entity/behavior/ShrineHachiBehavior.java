@@ -117,7 +117,9 @@ public class ShrineHachiBehavior extends EffectBehavior
     private void dealDamage(SpecialEffectEntity entity, ServerLevel level, LivingEntity target)
     {
         LivingEntity owner = resolveOwner(entity, this.ownerUuid);
-        TechniqueDamageSources.deal(target, owner, ShrineSkillGrowth.hachiDamage(owner),
+        // 放行暴击：每 DAMAGE_INTERVAL(=5) tick 一次，且目标被锁死为单一生物；原版无敌帧会把
+        // 同一目标的真实结算压到最快每 10 tick 一次，掷骰频率与单发招式同一量级。
+        TechniqueDamageSources.dealCrit(target, owner, ShrineSkillGrowth.hachiDamage(owner),
                 ShrineTechniqueSkillSet.SKILL_HACHI);
     }
 

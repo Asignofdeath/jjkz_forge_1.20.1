@@ -16,7 +16,7 @@ import org.jetbrains.annotations.Nullable;
 
  * <p>
 
- * 真值来自 {@code config/jujutsukaisenzone-common.toml} 的 {@code [skillCombat.limitlessRed]} 段，
+ * 真值来自 {@code Config} 中 {@code [skillCombat.limitlessRed]} 各项的默认值（本模组无配置文件），
 
  * 经 {@link SkillCombatConfigRegistry} 汇总；配置未加载时退回 {@code LimitlessRedConfig} 上标注
 

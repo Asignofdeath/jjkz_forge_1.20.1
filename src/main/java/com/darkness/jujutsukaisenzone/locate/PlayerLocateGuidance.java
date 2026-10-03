@@ -46,7 +46,9 @@ public final class PlayerLocateGuidance
         if (found.isEmpty())
         {
             player.sendSystemMessage(Component.literal(
-                    "附近未找到「" + target.displayName() + "」（搜索半径 " + radiusChunks + " 区块）。"));
+                    "附近未找到已生成的「" + target.displayName()
+                            + "」模板（搜索已加载区块，半径约 " + Math.min(radiusChunks, 48)
+                            + " 区块）。空村不会作为目标。"));
             return false;
         }
         BlockPos pos = found.get();

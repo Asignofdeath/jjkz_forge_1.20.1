@@ -21,7 +21,10 @@ import java.util.UUID;
 
 public final class ModNetwork
 {
-    private static final String PROTOCOL_VERSION = "1";
+    // ⚠️ 加/改包必须升这个号：它让「客户端缺包」在连接阶段就被干净地拒掉，
+    // 而不是等登录后服务端推来一个客户端不认识的 ID、抛出难懂的解码异常再掉线。
+    // "2" = 新增 SyncModConfigS2CPacket(#105)。
+    private static final String PROTOCOL_VERSION = "2";
     public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
             ResourceLocation.fromNamespaceAndPath(JuJutsuKaisenZone.MODID, "main"),
             () -> PROTOCOL_VERSION,
@@ -194,6 +197,11 @@ public final class ModNetwork
     public static void sendCursedEnergyTraitSync(ServerPlayer player, String traitId)
     {
         PlayerSyncNetwork.sendCursedEnergyTraitSync(player, traitId);
+    }
+
+    public static void sendModConfigSync(ServerPlayer player)
+    {
+        PlayerSyncNetwork.sendModConfigSync(player);
     }
 
     public static void syncStylizedDamageStylesRule(ServerPlayer player, boolean enabled)
@@ -463,14 +471,15 @@ public final class ModNetwork
         VisualNetwork.sendDomainWhiteCurtainElevateSync(player);
     }
 
-    public static void sendCinematicLetterboxSync(ServerPlayer player, int totalTicks, int fadeInTicks, int fadeOutTicks, float barFraction)
+    public static void sendCinematicLetterboxSync(ServerPlayer player, int totalTicks, int fadeInTicks, int fadeOutTicks,
+                                                  float barFraction, boolean showGesture)
     {
-        VisualNetwork.sendCinematicLetterboxSync(player, totalTicks, fadeInTicks, fadeOutTicks, barFraction);
+        VisualNetwork.sendCinematicLetterboxSync(player, totalTicks, fadeInTicks, fadeOutTicks, barFraction, showGesture);
     }
 
-    public static void sendDomainScanWaveSync(ServerPlayer player, double centerX, double centerY, double centerZ, int totalTicks, float peakRadius)
+    public static void sendDomainScanWaveSync(ServerPlayer player, UUID casterUuid, double centerX, double centerY, double centerZ, int totalTicks, float peakRadius)
     {
-        VisualNetwork.sendDomainScanWaveSync(player, centerX, centerY, centerZ, totalTicks, peakRadius);
+        VisualNetwork.sendDomainScanWaveSync(player, casterUuid, centerX, centerY, centerZ, totalTicks, peakRadius);
     }
 
     public static void sendSpaceWarpSync(ServerPlayer player, boolean enabled, float intensity)

@@ -193,12 +193,18 @@ public final class TechniqueDamageZoneEvents
                 && type != null
                 && event.getAmount() > 0.0F)
         {
-            maybeForceRatioSpotCrit(critAttacker, target);
+            maybeForceRatioSpotCrit(critAttacker, target, type);
             float afterCrit = CritRules.applyCritZone(
                     critAttacker, type, event.getAmount(), critAttacker.getRandom());
             if (Math.abs(afterCrit - event.getAmount()) > 0.0001F)
             {
                 event.setAmount(afterCrit);
+            }
+            // 暴击成立 ⇒ 把跳字的 message_id 换成暴击版（StylizedDamage 据此选带暴击标记的样式）。
+            // 读的是本击刚写下的 HitCritState（入口 begin() 已清过），未暴击/被闸门拒绝时 wasCrit() 为 false。
+            if (HitCritState.wasCrit())
+            {
+                TechniqueDamageSources.markCritDisplay(source);
             }
         }
 
@@ -474,10 +480,26 @@ public final class TechniqueDamageZoneEvents
                 && isExecutionersComposite(attacker, target, source);
     }
 
-    /** 十划弱点：击破成功则强制本击暴击（浮动乘区仍 roll）。 */
-    private static void maybeForceRatioSpotCrit(ServerPlayer attacker, LivingEntity target)
+    /**
+     * 十划弱点：击破成功则强制本击暴击（浮动乘区仍 roll）。
+     * <p>
+     * ⛔ <b>注入前必须先过 {@link TechniqueDamageSources#critAllowed}</b>：强制暴击标记是
+     * <b>玩家级全局状态</b>（不是本击属性），而 {@link CritRules#applyCritZone} 的放行闸门
+     * 排在 {@code consumeForced} 之前——本击若不能暴击，标记不会被消费，会悬挂到后续某一击
+     * 才被吃掉。术式放行暴击之后（解 / 苍 / 茈 / 灶开……都已放行），就会出现
+     * 「术式打中弱点、标记却被另一招消费」的串味，而且带过去的是十划的固定倍率
+     * （{@link RatioSpotLogic#forcedCritMult}，1.50 起）。加这道闸门后「注入」与「消费」
+     * 必然发生在同一击，标记不再跨击存活。
+     * <p>
+     * 副作用（已被接受）：本击不能暴击时不再击破弱点，光点保留给后续可暴击的一击。
+     */
+    private static void maybeForceRatioSpotCrit(ServerPlayer attacker, LivingEntity target, SkillDamageType type)
     {
         if (!PlayerTechniqueData.isRatio(attacker))
+        {
+            return;
+        }
+        if (!TechniqueDamageSources.critAllowed(type))
         {
             return;
         }

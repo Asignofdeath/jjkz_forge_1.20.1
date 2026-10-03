@@ -10,6 +10,7 @@ import com.darkness.jujutsukaisenzone.network.packet.StarMarkClearC2SPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncStarMarksS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncCombatPowerS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncLocateGuidanceS2CPacket;
+import com.darkness.jujutsukaisenzone.network.packet.SyncModConfigS2CPacket;
 import net.minecraftforge.network.NetworkDirection;
 import net.minecraftforge.network.simple.SimpleChannel;
 
@@ -70,6 +71,11 @@ public final class PlayerPacketRegistrar
                 .encoder(SyncLocateGuidanceS2CPacket::encode)
                 .decoder(SyncLocateGuidanceS2CPacket::decode)
                 .consumerMainThread(SyncLocateGuidanceS2CPacket::handle)
+                .add();
+        channel.messageBuilder(SyncModConfigS2CPacket.class, 105, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(SyncModConfigS2CPacket::encode)
+                .decoder(SyncModConfigS2CPacket::decode)
+                .consumerMainThread(SyncModConfigS2CPacket::handle)
                 .add();
     }
 }

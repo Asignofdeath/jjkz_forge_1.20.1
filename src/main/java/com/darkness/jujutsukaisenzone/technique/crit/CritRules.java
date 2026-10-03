@@ -41,8 +41,9 @@ public final class CritRules
      * 复合刻意排除：处刑必杀是致死量改写，不该再叠一道暴击浮动。
      * 黑闪主拳本身是体术分型，靠暴击门槛触发，不走复合。
      * <p>
-     * ⚠️ 这只是「分型层面的资格」。术式里高频出伤的招式很多，是否<b>真的</b>放行由出伤点表态，
-     * 见 {@code TechniqueDamageSources#critAllowed}（术式默认不放行，单发招式走 {@code dealCrit}）。
+     * ⚠️ 这只是「分型层面的资格」。术式是否<b>真的</b>放行由出伤点表态，见
+     * {@code TechniqueDamageSources#critAllowed}（术式默认保守拒绝，每个术式招式由出伤点显式
+     * 走 {@code dealCrit} / {@code runWithTypeCrit} 放行——解 / 苍 / 捌 / 茈 / 灶开等都已放行）。
      */
     public static boolean canCrit(@Nullable SkillDamageType type)
     {
@@ -73,6 +74,13 @@ public final class CritRules
     /**
      * 标记下一次强制暴击，并用固定倍率结算（例如十划弱点）。
      * {@code fixedMult <= 0} 时与 {@link #forceNext(ServerPlayer)} 相同。
+     * <p>
+     * ⛔ <b>调用方必须保证「注入的标记当击就会被消费」</b>：这是一份<b>玩家级</b>待消费队列，
+     * 而 {@link #applyCritZone} 的放行闸门（{@code critAllowed}）排在 {@link #consumeForced}
+     * 之前——本击若不能暴击，标记不会被消费而悬挂到后续某一击。所以唯一的生产者
+     * {@code TechniqueDamageZoneEvents#maybeForceRatioSpotCrit} 在注入前先过
+     * {@code TechniqueDamageSources#critAllowed}。新增生产者时照做，否则会把本招式的固定倍率
+     * 送给别的招式。
      */
     public static void forceNext(ServerPlayer player, float fixedMult)
     {
