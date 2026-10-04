@@ -1,4 +1,9 @@
 
+JuJutsuKaisen Zone
+==================
+资源声明 / Asset Statement：见同目录 ASSETS.md
+（本模组为《咒术回战》非商业二次创作同人作品，与官方无任何隶属关系。）
+
 Source installation information for modders
 -------------------------------------------
 This code follows the Minecraft Forge installation methodology. It will apply

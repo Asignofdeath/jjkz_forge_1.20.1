@@ -233,6 +233,15 @@ public final class TechniqueSkillDescriptions
         TechniqueSkillDescriptionRegistry.register(
                 LimitlessTechniqueSkillSet.SKILL_INSTANT_DOMAIN,
                 (player, techniqueId, skill) -> new Object[0]);
+
+        /*
+         * 领域本体「无量空处」：随习得领域展开自动点亮的机制型节点，描述无动态数值占位。
+         * 文案原本挂在开发树的说明节点上（skill_tree.* 键），节点改成 skill 节点后迁到这里，
+         * 与其余技能共用同一套 .desc / .brief 两页。
+         */
+        TechniqueSkillDescriptionRegistry.register(
+                LimitlessTechniqueSkillSet.SKILL_DOMAIN,
+                (player, techniqueId, skill) -> new Object[0]);
     }
 
     private static void registerShrineSkills()
@@ -273,6 +282,23 @@ public final class TechniqueSkillDescriptions
                         TechniqueSkillStatFormat.formatSecondsFromTicks(ShrineFugaConfig.BOOM_LIFETIME_TICKS),
                         SkillDamageResolver.ratioText(ShrineFugaConfig.BOOM_DAMAGE_PER_TICK)
                 });
+
+        /*
+         * 机制型：「真正的咒术」——不占槽位；解锁后可用通用圆盘切换领域瞬发模式。
+         * 描述无动态数值占位。
+         */
+        TechniqueSkillDescriptionRegistry.register(
+                ShrineTechniqueSkillSet.SKILL_INSTANT_DOMAIN,
+                (player, techniqueId, skill) -> new Object[0]);
+
+        /*
+         * 领域本体「伏魔神龛」：随习得领域展开自动点亮的机制型节点，描述无动态数值占位。
+         * 文案原本挂在开发树的说明节点上（skill_tree.* 键），节点改成 skill 节点后迁到这里，
+         * 与其余技能共用同一套 .desc / .brief 两页。
+         */
+        TechniqueSkillDescriptionRegistry.register(
+                ShrineTechniqueSkillSet.SKILL_DOMAIN,
+                (player, techniqueId, skill) -> new Object[0]);
     }
 
     private static void registerJudgmentSkills()
@@ -341,6 +367,15 @@ public final class TechniqueSkillDescriptions
                         TechniqueSkillStatFormat.formatNumber(
                                 JudgmentTrialSkillLogic.MAX_DEATH_SENTENCE_DEBUFF_BONUS_PERCENT)
                 });
+
+        /*
+         * 领域本体「诛伏赐死」：随习得领域展开自动点亮的机制型节点，描述无动态数值占位。
+         * 文案原本挂在开发树的说明节点上（skill_tree.* 键），节点改成 skill 节点后迁到这里，
+         * 与其余技能共用同一套 .desc / .brief 两页。
+         */
+        TechniqueSkillDescriptionRegistry.register(
+                JudgmentTechniqueSkillSet.SKILL_DOMAIN,
+                (player, techniqueId, skill) -> new Object[0]);
     }
 
     /**
@@ -581,6 +616,15 @@ public final class TechniqueSkillDescriptions
                         TechniqueSkillStatFormat.formatNumber(StarMarkRules.MAX_BALL_SPEED),
                         Integer.toString(StarMarkRules.SLING_MAX_PER_BALL)
                 });
+
+        /*
+         * 领域本体「爱与幽会」：随习得领域展开自动点亮的机制型节点，描述无动态数值占位。
+         * 文案原本挂在开发树的说明节点上（skill_tree.* 键），节点改成 skill 节点后迁到这里，
+         * 与其余技能共用同一套 .desc / .brief 两页。
+         */
+        TechniqueSkillDescriptionRegistry.register(
+                LoveRendezvousTechniqueSkillSet.SKILL_DOMAIN,
+                (player, techniqueId, skill) -> new Object[0]);
     }
 
     private static void registerCommonSkills()

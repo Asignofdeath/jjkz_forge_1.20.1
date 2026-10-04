@@ -39,8 +39,8 @@ import java.util.function.Supplier;
  * <ul>
  *   <li>{@code CursedGradeKillEvents#resolveKiller} 三条判据（getEntity / getDirectEntity /
  *       getLastHurtByMob）全部落空 ⇒ 术式击杀不给咒术经验</li>
- *   <li>{@code TechniqueIntelligenceDropEvents} / {@code SinfulOneKillEvents} / {@code BlackFlashEvents}
- *       一律只看 {@code getSource().getEntity()} ⇒ 术式击杀也不掉术式情报、不记罪恶者、不判黑闪</li>
+ *   <li>{@code SinfulOneKillEvents} / {@code BlackFlashEvents}
+ *       一律只看 {@code getSource().getEntity()} ⇒ 术式击杀也不记罪恶者、不判黑闪</li>
  * </ul>
  * 这里只补归因：伤害类型用本模组自己的 {@link #TECHNIQUE_DAMAGE_TYPE}（见其文档说明为何不再借
  * {@code MAGIC}），变的只有「谁打的」。

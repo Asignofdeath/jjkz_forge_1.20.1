@@ -3,24 +3,20 @@ package com.darkness.jujutsukaisenzone.client;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.client.ClientCommandHandler;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.util.ArrayDeque;
 import java.util.Locale;
 
 /**
  * 诛伏赐死结界构建完成时，在<strong>客户端</strong>以本地玩家身份执行 CMDCam 的 {@code /cam} 命令。
  * <p>
- * 命令队列与间隔同 {@link LimitlessDomainCmdCamClient}。结界完成（t=0）立即编排双镜头路径；
+ * 命令队列与间隔同 {@link CmdCamScheduler}。结界完成（t=0）立即编排双镜头路径；
  * {@value #TICKS_BEFORE_PLAYBACK} tick（3 秒）后 {@code cam load} + 回放（A 3s → B 2s）。
  */
 public final class JudgmentDomainCmdCamClient
 {
     private static final Logger LOGGER = LogManager.getLogger();
-    private static final int TICKS_AFTER_NORMAL_COMMAND = 1;
-    private static final int TICKS_AFTER_CAM_SAVE = 5;
     private static final int TICKS_AFTER_LOAD_CAMERA_A = 5;
     private static final int TICKS_AFTER_START_CAMERA_A_PLAYBACK = 60;
     private static final int TICKS_AFTER_LOAD_CAMERA_B = 5;
@@ -42,8 +38,10 @@ public final class JudgmentDomainCmdCamClient
     private static final float ROLL = 0.0F;
     private static final float FOV_DEFAULT = 70.0F;
 
-    private static final ArrayDeque<String> CAM_COMMAND_QUEUE = new ArrayDeque<>();
-    private static int ticksUntilNextCamCommand = 0;
+    private static final CmdCamScheduler CAM = CmdCamScheduler.create(JudgmentDomainCmdCamClient::ticksAfterCommand)
+            .afterEach(JudgmentDomainCmdCamClient::onCamCommandRan)
+            .beforeEachTick(JudgmentDomainCmdCamClient::tickPlaybackCountdown);
+
     private static int playbackDelayTicks;
     private static boolean pathsReady;
     private static boolean playbackTriggered;
@@ -61,48 +59,17 @@ public final class JudgmentDomainCmdCamClient
         playbackDelayTicks = TICKS_BEFORE_PLAYBACK;
         pathsReady = false;
         playbackTriggered = false;
-        synchronized (CAM_COMMAND_QUEUE)
-        {
-            CAM_COMMAND_QUEUE.clear();
-            ticksUntilNextCamCommand = 0;
-        }
+        CAM.clear();
         beginCameraSetup(domainCenter);
         LOGGER.info("[CMDCam] Judgment domain: setup started, playback in {} ticks.", TICKS_BEFORE_PLAYBACK);
     }
 
-    static void tickScheduledCamCommands()
+    private static void onCamCommandRan(String cmd)
     {
-        tickPlaybackCountdown();
-
-        synchronized (CAM_COMMAND_QUEUE)
+        if (cmd.equals("cam save " + CMDCAM_PATH_B_NAME))
         {
-            if (ticksUntilNextCamCommand > 0)
-            {
-                ticksUntilNextCamCommand--;
-                if (ticksUntilNextCamCommand > 0)
-                {
-                    return;
-                }
-            }
-            if (CAM_COMMAND_QUEUE.isEmpty())
-            {
-                return;
-            }
-            String cmd = CAM_COMMAND_QUEUE.pollFirst();
-            if (cmd == null)
-            {
-                return;
-            }
-            runCamImmediate(cmd);
-            if (cmd.equals("cam save " + CMDCAM_PATH_B_NAME))
-            {
-                pathsReady = true;
-                tryEnqueuePlayback();
-            }
-            if (!CAM_COMMAND_QUEUE.isEmpty())
-            {
-                ticksUntilNextCamCommand = ticksAfterCommand(cmd);
-            }
+            pathsReady = true;
+            tryEnqueuePlayback();
         }
     }
 
@@ -131,13 +98,11 @@ public final class JudgmentDomainCmdCamClient
         }
 
         playbackTriggered = true;
-        synchronized (CAM_COMMAND_QUEUE)
-        {
-            CAM_COMMAND_QUEUE.addLast("cam load " + CMDCAM_PATH_A_NAME);
-            CAM_COMMAND_QUEUE.addLast(CAM_START_PLAYBACK_A);
-            CAM_COMMAND_QUEUE.addLast("cam load " + CMDCAM_PATH_B_NAME);
-            CAM_COMMAND_QUEUE.addLast(CAM_START_PLAYBACK_B);
-        }
+        CAM.append(
+                "cam load " + CMDCAM_PATH_A_NAME,
+                CAM_START_PLAYBACK_A,
+                "cam load " + CMDCAM_PATH_B_NAME,
+                CAM_START_PLAYBACK_B);
     }
 
     private static void beginCameraSetup(BlockPos center)
@@ -148,7 +113,7 @@ public final class JudgmentDomainCmdCamClient
             LOGGER.warn("[CMDCam] Judgment domain camera setup skipped: local player is null.");
             return;
         }
-        if (ClientCommandHandler.getDispatcher() == null)
+        if (!CmdCamScheduler.dispatcherReady())
         {
             LOGGER.warn("[CMDCam] Client command dispatcher not ready; skipped judgment domain camera setup.");
             return;
@@ -182,32 +147,17 @@ public final class JudgmentDomainCmdCamClient
         float b2Yaw = yawToward(b2x, b2y, b2z, lookX, lookY, lookZ);
         float b2Pitch = pitchToward(b2x, b2y, b2z, lookX, lookY, lookZ);
 
-        synchronized (CAM_COMMAND_QUEUE)
-        {
-            CAM_COMMAND_QUEUE.clear();
-            ticksUntilNextCamCommand = 0;
-
-            CAM_COMMAND_QUEUE.add("cam mode outside");
-            CAM_COMMAND_QUEUE.add("cam clear");
-            CAM_COMMAND_QUEUE.add(camAddWithOrientation(cx, a1y, cz, CAMERA_A_YAW, PITCH_DOWN, FOV_DEFAULT));
-            CAM_COMMAND_QUEUE.add(camAddWithOrientation(cx, a2y, cz, CAMERA_A_YAW, PITCH_DOWN, FOV_DEFAULT));
-            CAM_COMMAND_QUEUE.add("cam save " + CMDCAM_PATH_A_NAME);
-            CAM_COMMAND_QUEUE.add("cam clear");
-            CAM_COMMAND_QUEUE.add(camAddWithOrientation(b1x, b1y, b1z, b1Yaw, b1Pitch, FOV_DEFAULT));
-            CAM_COMMAND_QUEUE.add(camAddWithOrientation(b2x, b2y, b2z, b2Yaw, b2Pitch, FOV_DEFAULT));
-            CAM_COMMAND_QUEUE.add("cam save " + CMDCAM_PATH_B_NAME);
-            CAM_COMMAND_QUEUE.add("cam clear");
-
-            String first = CAM_COMMAND_QUEUE.pollFirst();
-            if (first != null)
-            {
-                runCamImmediate(first);
-                if (!CAM_COMMAND_QUEUE.isEmpty())
-                {
-                    ticksUntilNextCamCommand = ticksAfterCommand(first);
-                }
-            }
-        }
+        CAM.replaceAndStart(
+                "cam mode outside",
+                "cam clear",
+                camAddWithOrientation(cx, a1y, cz, CAMERA_A_YAW, PITCH_DOWN, FOV_DEFAULT),
+                camAddWithOrientation(cx, a2y, cz, CAMERA_A_YAW, PITCH_DOWN, FOV_DEFAULT),
+                "cam save " + CMDCAM_PATH_A_NAME,
+                "cam clear",
+                camAddWithOrientation(b1x, b1y, b1z, b1Yaw, b1Pitch, FOV_DEFAULT),
+                camAddWithOrientation(b2x, b2y, b2z, b2Yaw, b2Pitch, FOV_DEFAULT),
+                "cam save " + CMDCAM_PATH_B_NAME,
+                "cam clear");
     }
 
     private static String camAddWithOrientation(
@@ -245,7 +195,7 @@ public final class JudgmentDomainCmdCamClient
     {
         if (commandJustRun.startsWith("cam save "))
         {
-            return TICKS_AFTER_CAM_SAVE;
+            return CmdCamScheduler.TICKS_AFTER_SAVE_OR_LOAD;
         }
         if (commandJustRun.equals(CAM_START_PLAYBACK_A))
         {
@@ -259,16 +209,6 @@ public final class JudgmentDomainCmdCamClient
         {
             return TICKS_AFTER_LOAD_CAMERA_B;
         }
-        return TICKS_AFTER_NORMAL_COMMAND;
-    }
-
-    private static void runCamImmediate(String commandWithoutSlash)
-    {
-        boolean consumed = ClientCommandHandler.runCommand(commandWithoutSlash);
-        if (!consumed)
-        {
-            LOGGER.warn("[CMDCam] Command not handled as client command (is CMDCam installed on this client?): {}",
-                    commandWithoutSlash);
-        }
+        return CmdCamScheduler.TICKS_AFTER_NORMAL_COMMAND;
     }
 }

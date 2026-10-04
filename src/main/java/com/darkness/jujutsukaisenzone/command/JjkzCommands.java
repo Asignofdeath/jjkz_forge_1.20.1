@@ -10,6 +10,15 @@ import com.darkness.jujutsukaisenzone.entity.StaffRole;
 import com.darkness.jujutsukaisenzone.entity.WedgeEntity;
 import com.darkness.jujutsukaisenzone.locate.PlayerLocateGuidance;
 import com.darkness.jujutsukaisenzone.locate.StructureLocateTarget;
+import com.darkness.jujutsukaisenzone.music.ModMusic;
+import com.darkness.jujutsukaisenzone.music.ModMusicTrack;
+import com.darkness.jujutsukaisenzone.music.ModMusicTracks;
+import com.darkness.jujutsukaisenzone.music.MusicPriority;
+import com.darkness.jujutsukaisenzone.player.PlayerQuestData;
+import com.darkness.jujutsukaisenzone.quest.MainQuestDef;
+import com.darkness.jujutsukaisenzone.quest.MainQuestDefs;
+import com.darkness.jujutsukaisenzone.quest.MainQuestLogic;
+import com.darkness.jujutsukaisenzone.quest.MainQuestStatus;
 import com.darkness.jujutsukaisenzone.gameplay.ModRules;
 import com.darkness.jujutsukaisenzone.gameplay.CurseSpiritSpawnGrade;
 import com.darkness.jujutsukaisenzone.gameplay.TengenWedgeBarrierLogic;
@@ -93,8 +102,8 @@ public final class JjkzCommands
     static
     {
         Map<String, String> gettingStarted = new LinkedHashMap<>();
-        gettingStarted.put("阵营选择", "首次登录点击聊天栏选择；也可用 /jjkz select。需要教程帮助时使用 /jjkz ask。");
-        gettingStarted.put("生得术式", "选择术师/咒灵阵营后随机觉醒。");
+        gettingStarted.put("阵营选择", "可用 /jjkz select。需要教程帮助时使用 /jjkz ask。");
+        gettingStarted.put("生得术式", "不会随阵营选择自动觉醒。");
         gettingStarted.put("天与咒缚", "咒力换超强肉体；肉体换咒力的咒缚可能在后续加入。");
         gettingStarted.put("咒力", "蓝条。");
         gettingStarted.put("咒术等级", "击杀生物升级。");
@@ -195,6 +204,8 @@ public final class JjkzCommands
                         .then(buildCurseSpiritSpawnBranch())
                         .then(buildCouncilStaffBranch())
                         .then(buildLocateBranch())
+                        .then(buildQuestBranch())
+                        .then(buildMusicBranch())
                         .then(buildWhiteOverlayBranch())
                         .then(buildWhiteCurtainBranch())
                         .then(buildSpaceWarpBranch())
@@ -1801,5 +1812,178 @@ public final class JjkzCommands
     private static int executeLocateLiaison(ServerPlayer player)
     {
         return PlayerLocateGuidance.start(player, StructureLocateTarget.PLAINS_LIAISON_OFFICE) ? 1 : 0;
+    }
+
+    /**
+     * 主线任务调试：{@code /jjkz quest track|untrack|status|complete|reset}。
+     */
+    private static LiteralArgumentBuilder<CommandSourceStack> buildQuestBranch()
+    {
+        LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal("quest");
+        root.then(Commands.literal("track")
+                .then(Commands.argument("id", StringArgumentType.word())
+                        .executes(ctx ->
+                        {
+                            ServerPlayer player = ctx.getSource().getPlayerOrException();
+                            String id = StringArgumentType.getString(ctx, "id");
+                            return MainQuestLogic.track(player, id, true) ? 1 : 0;
+                        })));
+        root.then(Commands.literal("追踪")
+                .then(Commands.argument("id", StringArgumentType.word())
+                        .executes(ctx ->
+                        {
+                            ServerPlayer player = ctx.getSource().getPlayerOrException();
+                            String id = StringArgumentType.getString(ctx, "id");
+                            return MainQuestLogic.track(player, id, true) ? 1 : 0;
+                        })));
+        root.then(Commands.literal("untrack")
+                .executes(ctx ->
+                {
+                    MainQuestLogic.untrack(ctx.getSource().getPlayerOrException(), true);
+                    return 1;
+                }));
+        root.then(Commands.literal("取消追踪")
+                .executes(ctx ->
+                {
+                    MainQuestLogic.untrack(ctx.getSource().getPlayerOrException(), true);
+                    return 1;
+                }));
+        root.then(Commands.literal("status")
+                .executes(ctx -> executeQuestStatus(ctx.getSource().getPlayerOrException())));
+        root.then(Commands.literal("状态")
+                .executes(ctx -> executeQuestStatus(ctx.getSource().getPlayerOrException())));
+        root.then(Commands.literal("complete")
+                .then(Commands.argument("id", StringArgumentType.word())
+                        .executes(ctx ->
+                        {
+                            ServerPlayer player = ctx.getSource().getPlayerOrException();
+                            MainQuestLogic.complete(player, StringArgumentType.getString(ctx, "id"), true);
+                            return 1;
+                        })));
+        root.then(Commands.literal("完成")
+                .then(Commands.argument("id", StringArgumentType.word())
+                        .executes(ctx ->
+                        {
+                            ServerPlayer player = ctx.getSource().getPlayerOrException();
+                            MainQuestLogic.complete(player, StringArgumentType.getString(ctx, "id"), true);
+                            return 1;
+                        })));
+        root.then(Commands.literal("reset")
+                .executes(ctx ->
+                {
+                    MainQuestLogic.resetAll(ctx.getSource().getPlayerOrException());
+                    ctx.getSource().getPlayerOrException().sendSystemMessage(
+                            Component.translatable("message.jujutsukaisenzone.quest.reset"));
+                    return 1;
+                }));
+        root.then(Commands.literal("重置")
+                .executes(ctx ->
+                {
+                    MainQuestLogic.resetAll(ctx.getSource().getPlayerOrException());
+                    ctx.getSource().getPlayerOrException().sendSystemMessage(
+                            Component.translatable("message.jujutsukaisenzone.quest.reset"));
+                    return 1;
+                }));
+        return root;
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> buildMusicBranch()
+    {
+        LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal("music")
+                .requires(source -> source.hasPermission(Commands.LEVEL_GAMEMASTERS));
+        root.then(Commands.literal("list")
+                .executes(ctx -> executeMusicList(ctx.getSource().getPlayerOrException())));
+        root.then(Commands.literal("stop")
+                .executes(ctx ->
+                {
+                    ModMusic.stop(ctx.getSource().getPlayerOrException(), 0);
+                    ctx.getSource().getPlayerOrException().sendSystemMessage(
+                            Component.translatable("message.jujutsukaisenzone.music.stopped"));
+                    return 1;
+                }));
+        root.then(Commands.literal("play")
+                .then(Commands.argument("id", StringArgumentType.word())
+                        .suggests((ctx, builder) ->
+                        {
+                            for (ModMusicTrack track : ModMusicTracks.all())
+                            {
+                                builder.suggest(track.id());
+                            }
+                            return builder.buildFuture();
+                        })
+                        .executes(ctx -> executeMusicPlay(
+                                ctx.getSource().getPlayerOrException(),
+                                StringArgumentType.getString(ctx, "id"),
+                                MusicPriority.STORY))
+                        .then(Commands.argument("priority", StringArgumentType.word())
+                                .suggests((ctx, builder) ->
+                                {
+                                    builder.suggest("story");
+                                    builder.suggest("combat");
+                                    builder.suggest("appreciation");
+                                    return builder.buildFuture();
+                                })
+                                .executes(ctx -> executeMusicPlay(
+                                        ctx.getSource().getPlayerOrException(),
+                                        StringArgumentType.getString(ctx, "id"),
+                                        parseMusicPriority(StringArgumentType.getString(ctx, "priority")))))));
+        return root;
+    }
+
+    private static MusicPriority parseMusicPriority(String raw)
+    {
+        return switch (raw.toLowerCase())
+        {
+            case "combat", "战斗" -> MusicPriority.COMBAT;
+            case "appreciation", "鉴赏" -> MusicPriority.APPRECIATION;
+            default -> MusicPriority.STORY;
+        };
+    }
+
+    private static int executeMusicPlay(ServerPlayer player, String trackId, MusicPriority priority)
+    {
+        if (ModMusicTracks.byId(trackId) == null)
+        {
+            player.sendSystemMessage(Component.translatable("message.jujutsukaisenzone.music.unknown", trackId));
+            return 0;
+        }
+        ModMusicTrack track = ModMusicTracks.byId(trackId);
+        ModMusic.play(player, trackId, priority, track.loop(), ModMusic.DEFAULT_FADE_MS);
+        player.sendSystemMessage(Component.translatable(
+                "message.jujutsukaisenzone.music.playing",
+                trackId,
+                priority.name()));
+        return 1;
+    }
+
+    private static int executeMusicList(ServerPlayer player)
+    {
+        if (ModMusicTracks.isEmpty())
+        {
+            player.sendSystemMessage(Component.translatable("message.jujutsukaisenzone.music.empty"));
+            return 1;
+        }
+        for (ModMusicTrack track : ModMusicTracks.all())
+        {
+            player.sendSystemMessage(Component.literal("- " + track.id() + " | ")
+                    .append(track.title())
+                    .append(Component.literal(" | "))
+                    .append(track.source()));
+        }
+        return 1;
+    }
+
+    private static int executeQuestStatus(ServerPlayer player)
+    {
+        String tracked = PlayerQuestData.getTrackedId(player);
+        player.sendSystemMessage(Component.literal("追踪中: " + (tracked == null ? "无" : tracked)));
+        for (MainQuestDef def : MainQuestDefs.all())
+        {
+            MainQuestStatus status = PlayerQuestData.status(player, def);
+            player.sendSystemMessage(Component.literal(
+                    "- " + def.id() + " [" + status.name() + "] "
+                            + Component.translatable(def.titleKey()).getString()));
+        }
+        return 1;
     }
 }

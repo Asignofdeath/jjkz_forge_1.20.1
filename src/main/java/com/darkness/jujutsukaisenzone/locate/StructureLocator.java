@@ -12,6 +12,8 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.ChunkStatus;
+import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.level.levelgen.structure.Structure;
 import net.minecraft.world.level.levelgen.structure.StructurePiece;
 import net.minecraft.world.level.levelgen.structure.StructureStart;
@@ -28,6 +30,9 @@ import javax.annotation.Nullable;
  * <p>
  * 若目标指定了模板片，则<strong>必须</strong>在已生成的 StructureStart 中匹配到该片才算成功，
  * 绝不回退到「仅有宿主结构（如村庄）中心」的坐标。
+ * <p>
+ * 未指定模板片时，会把 {@code findNearestMapStructure} 的粗坐标 refinement 到真实片中心或地表高度
+ * （原版 locate 常把 Y 固定为 0，超平坦上会差几十格）。
  */
 public final class StructureLocator
 {
@@ -58,8 +63,8 @@ public final class StructureLocator
         }
 
         Registry<Structure> structures = level.registryAccess().registryOrThrow(Registries.STRUCTURE);
-        Holder.Reference<Structure> holder = structures.getHolder(target.hostStructure()).orElse(null);
-        if (holder == null)
+        HolderSet<Structure> holderSet = resolveHolderSet(structures, target);
+        if (holderSet == null)
         {
             return Optional.empty();
         }
@@ -67,18 +72,126 @@ public final class StructureLocator
         ResourceLocation pieceId = target.templatePiece();
         if (pieceId != null)
         {
+            if (target.hostStructure() == null)
+            {
+                return Optional.empty();
+            }
+            Holder.Reference<Structure> holder = structures.getHolder(target.hostStructure()).orElse(null);
+            if (holder == null)
+            {
+                return Optional.empty();
+            }
             // 必须匹配到真实模板片；禁止回退到空村坐标
             return findNearestPieceFromOrigin(level, origin, holder.value(), pieceId, radiusChunks);
         }
 
-        HolderSet<Structure> holderSet = HolderSet.direct(holder);
         Pair<BlockPos, Holder<Structure>> nearest = level.getChunkSource().getGenerator()
                 .findNearestMapStructure(level, holderSet, origin, radiusChunks, false);
         if (nearest == null)
         {
             return Optional.empty();
         }
-        return Optional.of(nearest.getFirst());
+        return Optional.of(refineStructurePos(level, nearest.getSecond().value(), nearest.getFirst(), null));
+    }
+
+    /**
+     * 最近目标结构的真实包围盒（用于清村等）。找不到已生成 StructureStart 时为空。
+     */
+    public static Optional<BoundingBox> findNearestBounds(
+            ServerLevel level,
+            BlockPos origin,
+            StructureLocateTarget target,
+            int radiusChunks)
+    {
+        if (radiusChunks <= 0 || target.templatePiece() != null)
+        {
+            return Optional.empty();
+        }
+        Registry<Structure> structures = level.registryAccess().registryOrThrow(Registries.STRUCTURE);
+        HolderSet<Structure> holderSet = resolveHolderSet(structures, target);
+        if (holderSet == null)
+        {
+            return Optional.empty();
+        }
+        Pair<BlockPos, Holder<Structure>> nearest = level.getChunkSource().getGenerator()
+                .findNearestMapStructure(level, holderSet, origin, radiusChunks, false);
+        if (nearest == null)
+        {
+            return Optional.empty();
+        }
+        Structure structure = nearest.getSecond().value();
+        BlockPos coarse = nearest.getFirst();
+        ChunkAccess chunk = level.getChunk(
+                coarse.getX() >> 4, coarse.getZ() >> 4, ChunkStatus.STRUCTURE_STARTS, true);
+        if (chunk == null)
+        {
+            return Optional.empty();
+        }
+        StructureStart start = chunk.getStartForStructure(structure);
+        if (start == null || !start.isValid() || start.getPieces().isEmpty())
+        {
+            return Optional.empty();
+        }
+        return Optional.of(start.getBoundingBox());
+    }
+
+    @Nullable
+    private static HolderSet<Structure> resolveHolderSet(Registry<Structure> structures, StructureLocateTarget target)
+    {
+        if (target.structureTag() != null)
+        {
+            return structures.getTag(target.structureTag()).orElse(null);
+        }
+        if (target.hostStructure() == null)
+        {
+            return null;
+        }
+        Holder.Reference<Structure> holder = structures.getHolder(target.hostStructure()).orElse(null);
+        return holder == null ? null : HolderSet.direct(holder);
+    }
+
+    /**
+     * 把 locate 粗坐标校正为已生成片的包围盒中心；否则用该 XZ 的地表高度。
+     */
+    private static BlockPos refineStructurePos(
+            ServerLevel level,
+            Structure structure,
+            BlockPos coarse,
+            @Nullable ResourceLocation pieceId)
+    {
+        int chunkX = coarse.getX() >> 4;
+        int chunkZ = coarse.getZ() >> 4;
+        // 强制拉到 STRUCTURE_STARTS，拿到真实片
+        ChunkAccess chunk = level.getChunk(chunkX, chunkZ, ChunkStatus.STRUCTURE_STARTS, true);
+        if (chunk != null)
+        {
+            StructureStart start = chunk.getStartForStructure(structure);
+            if (start != null && start.isValid())
+            {
+                BlockPos refined = pieceId != null
+                        ? findPieceInStart(start, pieceId)
+                        : findStartCenter(start);
+                if (refined != null)
+                {
+                    return refined;
+                }
+            }
+        }
+
+        int surfaceY = level.getHeight(Heightmap.Types.WORLD_SURFACE, coarse.getX(), coarse.getZ());
+        return new BlockPos(coarse.getX(), surfaceY, coarse.getZ());
+    }
+
+    @Nullable
+    private static BlockPos findStartCenter(StructureStart start)
+    {
+        if (start.getPieces().isEmpty())
+        {
+            return null;
+        }
+        BoundingBox box = start.getBoundingBox();
+        // 用包围盒底部中心偏上一点，更接近入口/地面而不是屋顶
+        return new BlockPos(box.getCenter().getX(), box.minY() + 1, box.getCenter().getZ());
     }
 
     /**
@@ -152,7 +265,8 @@ public final class StructureLocator
             {
                 continue;
             }
-            return poolPiece.getBoundingBox().getCenter();
+            BoundingBox box = poolPiece.getBoundingBox();
+            return new BlockPos(box.getCenter().getX(), box.minY() + 1, box.getCenter().getZ());
         }
         return null;
     }

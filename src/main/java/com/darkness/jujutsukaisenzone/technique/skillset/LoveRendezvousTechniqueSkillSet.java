@@ -101,10 +101,20 @@ public final class LoveRendezvousTechniqueSkillSet extends AbstractInnateTechniq
      */
     public static final String SKILL_STAR_CHAIN = "love_rendezvous_star_chain";
 
+    /** 领域「爱与幽会」在开发树上的 nodeId。 */
+    public static final String NODE_DOMAIN_AIYUYOUHUI = "love_rendezvous_domain_aiyuyouhui";
+    /**
+     * 领域「爱与幽会」的 skillId：机制型，随「习得领域展开」自动点亮，不消耗术式情报。
+     * 将来若给本术式加瞬发 / 开放式一类的领域模式节点，都以它为前置。
+     */
+    public static final String SKILL_DOMAIN = "love_rendezvous_domain";
+
     /** 引力弹弓的解锁标记（机制型技能唯一的实质字段）。命名照 {@code *_unlock*} 约定，随登录同步到客户端。 */
     private static final String TAG_SLING_UNLOCK = "jujutsukaisenzone_love_rendezvous_sling_unlock";
     /** 「在星间穿梭」的解锁标记，命名与同步方式同上。 */
     private static final String TAG_CHAIN_UNLOCK = "jujutsukaisenzone_love_rendezvous_chain_unlock";
+    /** 领域的解锁标记：领域节点走条件自动点亮，实际不读它，仅为满足机制型技能的字段口径。 */
+    private static final String TAG_DOMAIN_UNLOCK = "jujutsukaisenzone_love_rendezvous_domain_unlock";
 
     private static final int SLOT_STAR_MARK = 1;
     private static final int SLOT_STAR_PULL = 2;
@@ -177,7 +187,26 @@ public final class LoveRendezvousTechniqueSkillSet extends AbstractInnateTechniq
             TAG_CHAIN_UNLOCK,
             "");
 
-    private static final List<TechniqueSkill> MECHANICS = List.of(MECHANIC_SLING, MECHANIC_CHAIN);
+    /**
+     * 机制型：领域「爱与幽会」在开发树上的落点。
+     * <p>
+     * 解锁与否<b>不写在存档里</b> —— 节点走 {@code autoUnlockWhenConditionsMet}，每次判定都实时看
+     * 「有没有习得领域展开」，所以领域状态变了节点跟着变，不需要额外维护一份开关。
+     */
+    private static final TechniqueSkill MECHANIC_DOMAIN = new TechniqueSkill(
+            SKILL_DOMAIN,
+            0,
+            Component.literal("爱与幽会"),
+            "textures/item/love_rendezvous.png",
+            0,
+            0,
+            0,
+            "",
+            TAG_DOMAIN_UNLOCK,
+            "");
+
+    private static final List<TechniqueSkill> MECHANICS =
+            List.of(MECHANIC_SLING, MECHANIC_CHAIN, MECHANIC_DOMAIN);
 
     private static final TechniqueSkillTree SKILL_TREE = TechniqueSkillTree.builder(PlayerTechniqueData.TECHNIQUE_LOVE_RENDEZVOUS)
             .node(SkillTreeNodeDef.skill("love_rendezvous_star_mark", SKILL_STAR_MARK).autoGranted().build())
@@ -278,22 +307,22 @@ public final class LoveRendezvousTechniqueSkillSet extends AbstractInnateTechniq
                     .visibleWhen(UnlockCondition.alwaysVisible())
                     .build())
             /*
-             * 说明节点：「爱与幽会」领域展开——域内独有的三条强化（撞击即引爆、引爆传染升级成连锁、
+             * 领域「爱与幽会」——域内独有的三条强化（撞击即引爆、引爆传染升级成连锁、
              * 飞行中的球改走完全制导），见 {@code LoveRendezvousDomainExpansion} 与
-             * {@code StarMarkRules} 的域内分支。与另外三个术式的领域说明节点同一立场：只讲领域
+             * {@code StarMarkRules} 的域内分支。与另外三个术式的领域节点同一立场：只讲领域
              * <b>额外</b>给了什么，领域本身的展开 / 维持 / 崩解走通用那套，不在这里重复。
              *
-             * 文案同样必须是纯静态（说明节点不吃 %s），域内的规则变化全部写成定性描述。
+             * 习得领域展开的<b>瞬间自动点亮</b>，不消耗术式情报、也不需要点选；它是将来任何
+             * 领域模式节点（瞬发 / 开放式）的共同前置，所以必须是真实的 skill 节点。
              *
              * 前置取终结技「飞行，穿越」：领域放大的正是那一脚踢出去的球，与无量空处挂「茈」、
              * 伏魔神龛挂「捌」同一做法——领域节点挂在术式的招牌大招之后，而不是树的最后一级。
              */
-            .node(SkillTreeNodeDef.info("love_rendezvous_domain_aiyuyouhui")
-                    .titleKey("skill_tree.jujutsukaisenzone.love_rendezvous_domain_aiyuyouhui.title")
-                    .iconPath("textures/item/love_rendezvous.png")
-                    .descriptionKey("skill_tree.jujutsukaisenzone.love_rendezvous_domain_aiyuyouhui.desc")
+            .node(SkillTreeNodeDef.skill(NODE_DOMAIN_AIYUYOUHUI, SKILL_DOMAIN)
                     .requires("love_rendezvous_star_flight")
+                    .conditions(UnlockCondition.hasDomainExpansion())
                     .visibleWhen(UnlockCondition.hasDomainExpansion())
+                    .autoUnlockWhenConditionsMet()
                     .build())
             .build();
 

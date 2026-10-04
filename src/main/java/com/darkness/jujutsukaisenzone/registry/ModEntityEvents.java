@@ -1,7 +1,9 @@
 package com.darkness.jujutsukaisenzone.registry;
 
 import com.darkness.jujutsukaisenzone.JuJutsuKaisenZone;
+import com.darkness.jujutsukaisenzone.client.renderer.entity.CutsceneActorRenderer;
 import com.darkness.jujutsukaisenzone.client.renderer.entity.GavelProjectileRenderer;
+import com.darkness.jujutsukaisenzone.client.renderer.entity.Grade3CurseSpiritARenderer;
 import com.darkness.jujutsukaisenzone.client.renderer.entity.ChubukushishiRenderer;
 import com.darkness.jujutsukaisenzone.client.renderer.entity.CourtSeatRenderer;
 import com.darkness.jujutsukaisenzone.client.renderer.entity.DemonSubduingShrineRenderer;
@@ -11,6 +13,7 @@ import com.darkness.jujutsukaisenzone.client.renderer.entity.JujutsuCouncilStaff
 import com.darkness.jujutsukaisenzone.client.renderer.entity.MahoragaRenderer;
 import com.darkness.jujutsukaisenzone.client.renderer.entity.WedgeRenderer;
 import com.darkness.jujutsukaisenzone.entity.JadeDogEntity;
+import com.darkness.jujutsukaisenzone.entity.Grade3CurseSpiritAEntity;
 import com.darkness.jujutsukaisenzone.entity.JujutsuCouncilStaffEntity;
 import com.darkness.jujutsukaisenzone.entity.MahoragaEntity;
 import com.darkness.jujutsukaisenzone.entity.SpecialEffectEntity;
@@ -37,6 +40,7 @@ public final class ModEntityEvents
         event.put(ModEntities.JADE_DOG.get(), JadeDogEntity.createAttributes().build());
         event.put(ModEntities.MAHORAGA.get(), MahoragaEntity.createAttributes().build());
         event.put(ModEntities.JUJUTSU_COUNCIL_STAFF.get(), JujutsuCouncilStaffEntity.createAttributes().build());
+        event.put(ModEntities.GRADE_3_CURSE_SPIRIT_A.get(), Grade3CurseSpiritAEntity.createAttributes().build());
     }
 
     @Mod.EventBusSubscriber(modid = JuJutsuKaisenZone.MODID, bus = Mod.EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
@@ -59,6 +63,8 @@ public final class ModEntityEvents
             event.registerEntityRenderer(ModEntities.JADE_DOG.get(), JadeDogRenderer::new);
             event.registerEntityRenderer(ModEntities.MAHORAGA.get(), MahoragaRenderer::new);
             event.registerEntityRenderer(ModEntities.JUJUTSU_COUNCIL_STAFF.get(), JujutsuCouncilStaffRenderer::new);
+            event.registerEntityRenderer(ModEntities.CUTSCENE_ACTOR.get(), CutsceneActorRenderer::new);
+            event.registerEntityRenderer(ModEntities.GRADE_3_CURSE_SPIRIT_A.get(), Grade3CurseSpiritARenderer::new);
         }
     }
 }

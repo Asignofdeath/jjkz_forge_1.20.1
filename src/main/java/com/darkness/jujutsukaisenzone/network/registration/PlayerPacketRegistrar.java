@@ -11,6 +11,16 @@ import com.darkness.jujutsukaisenzone.network.packet.SyncStarMarksS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncCombatPowerS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncLocateGuidanceS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncModConfigS2CPacket;
+import com.darkness.jujutsukaisenzone.network.packet.SyncQuestProgressS2CPacket;
+import com.darkness.jujutsukaisenzone.network.packet.SyncQuestMissionBriefingS2CPacket;
+import com.darkness.jujutsukaisenzone.network.packet.SyncQuestTrackS2CPacket;
+import com.darkness.jujutsukaisenzone.network.packet.TrackQuestC2SPacket;
+import com.darkness.jujutsukaisenzone.network.packet.SyncQuestBlackoutS2CPacket;
+import com.darkness.jujutsukaisenzone.network.packet.SyncQuestLetterboxS2CPacket;
+import com.darkness.jujutsukaisenzone.network.packet.SyncCgLookClampS2CPacket;
+import com.darkness.jujutsukaisenzone.network.packet.MainQuest11CabinCmdCamS2CPacket;
+import com.darkness.jujutsukaisenzone.network.packet.SyncMusicPlayS2CPacket;
+import com.darkness.jujutsukaisenzone.network.packet.SyncMusicStopS2CPacket;
 import net.minecraftforge.network.NetworkDirection;
 import net.minecraftforge.network.simple.SimpleChannel;
 
@@ -76,6 +86,56 @@ public final class PlayerPacketRegistrar
                 .encoder(SyncModConfigS2CPacket::encode)
                 .decoder(SyncModConfigS2CPacket::decode)
                 .consumerMainThread(SyncModConfigS2CPacket::handle)
+                .add();
+        channel.messageBuilder(SyncQuestTrackS2CPacket.class, 106, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(SyncQuestTrackS2CPacket::encode)
+                .decoder(SyncQuestTrackS2CPacket::decode)
+                .consumerMainThread(SyncQuestTrackS2CPacket::handle)
+                .add();
+        channel.messageBuilder(SyncQuestProgressS2CPacket.class, 107, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(SyncQuestProgressS2CPacket::encode)
+                .decoder(SyncQuestProgressS2CPacket::decode)
+                .consumerMainThread(SyncQuestProgressS2CPacket::handle)
+                .add();
+        channel.messageBuilder(TrackQuestC2SPacket.class, 108, NetworkDirection.PLAY_TO_SERVER)
+                .encoder(TrackQuestC2SPacket::encode)
+                .decoder(TrackQuestC2SPacket::decode)
+                .consumerMainThread(TrackQuestC2SPacket::handle)
+                .add();
+        channel.messageBuilder(SyncQuestBlackoutS2CPacket.class, 109, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(SyncQuestBlackoutS2CPacket::encode)
+                .decoder(SyncQuestBlackoutS2CPacket::decode)
+                .consumerMainThread(SyncQuestBlackoutS2CPacket::handle)
+                .add();
+        channel.messageBuilder(MainQuest11CabinCmdCamS2CPacket.class, 110, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(MainQuest11CabinCmdCamS2CPacket::encode)
+                .decoder(MainQuest11CabinCmdCamS2CPacket::decode)
+                .consumerMainThread(MainQuest11CabinCmdCamS2CPacket::handle)
+                .add();
+        channel.messageBuilder(SyncQuestLetterboxS2CPacket.class, 111, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(SyncQuestLetterboxS2CPacket::encode)
+                .decoder(SyncQuestLetterboxS2CPacket::decode)
+                .consumerMainThread(SyncQuestLetterboxS2CPacket::handle)
+                .add();
+        channel.messageBuilder(SyncCgLookClampS2CPacket.class, 112, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(SyncCgLookClampS2CPacket::encode)
+                .decoder(SyncCgLookClampS2CPacket::decode)
+                .consumerMainThread(SyncCgLookClampS2CPacket::handle)
+                .add();
+        channel.messageBuilder(SyncMusicPlayS2CPacket.class, 113, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(SyncMusicPlayS2CPacket::encode)
+                .decoder(SyncMusicPlayS2CPacket::decode)
+                .consumerMainThread(SyncMusicPlayS2CPacket::handle)
+                .add();
+        channel.messageBuilder(SyncMusicStopS2CPacket.class, 114, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(SyncMusicStopS2CPacket::encode)
+                .decoder(SyncMusicStopS2CPacket::decode)
+                .consumerMainThread(SyncMusicStopS2CPacket::handle)
+                .add();
+        channel.messageBuilder(SyncQuestMissionBriefingS2CPacket.class, 115, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(SyncQuestMissionBriefingS2CPacket::encode)
+                .decoder(SyncQuestMissionBriefingS2CPacket::decode)
+                .consumerMainThread(SyncQuestMissionBriefingS2CPacket::handle)
                 .add();
     }
 }

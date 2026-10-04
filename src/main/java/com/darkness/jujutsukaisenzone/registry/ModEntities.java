@@ -3,7 +3,9 @@ package com.darkness.jujutsukaisenzone.registry;
 import com.darkness.jujutsukaisenzone.JuJutsuKaisenZone;
 import com.darkness.jujutsukaisenzone.entity.ChubukushishiEntity;
 import com.darkness.jujutsukaisenzone.entity.CourtSeatEntity;
+import com.darkness.jujutsukaisenzone.entity.CutsceneActorEntity;
 import com.darkness.jujutsukaisenzone.entity.DemonSubduingShrineEntity;
+import com.darkness.jujutsukaisenzone.entity.Grade3CurseSpiritAEntity;
 import com.darkness.jujutsukaisenzone.entity.JudgeEntity;
 import com.darkness.jujutsukaisenzone.entity.GavelProjectileEntity;
 import com.darkness.jujutsukaisenzone.entity.JadeDogEntity;
@@ -114,6 +116,26 @@ public final class ModEntities
                             .clientTrackingRange(10)
                             .fireImmune()
                             .build("jujutsu_council_staff"));
+
+    /** CG / 任务演出 Geo 演员（无 AI，不进存档） */
+    public static final RegistryObject<EntityType<CutsceneActorEntity>> CUTSCENE_ACTOR =
+            ENTITY_TYPES.register("cutscene_actor",
+                    () -> EntityType.Builder.<CutsceneActorEntity>of(
+                                    CutsceneActorEntity::new, MobCategory.MISC)
+                            .sized(0.6F, 1.8F)
+                            .clientTrackingRange(16)
+                            .updateInterval(5)
+                            .fireImmune()
+                            .build("cutscene_actor"));
+
+    /** 三级咒灵甲（暂用尸壳模型占位） */
+    public static final RegistryObject<EntityType<Grade3CurseSpiritAEntity>> GRADE_3_CURSE_SPIRIT_A =
+            ENTITY_TYPES.register("grade_3_curse_spirit_a",
+                    () -> EntityType.Builder.<Grade3CurseSpiritAEntity>of(
+                                    Grade3CurseSpiritAEntity::new, MobCategory.MONSTER)
+                            .sized(0.6F, 1.95F)
+                            .clientTrackingRange(8)
+                            .build("grade_3_curse_spirit_a"));
 
     private ModEntities()
     {

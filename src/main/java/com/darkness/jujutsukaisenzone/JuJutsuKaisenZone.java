@@ -1,7 +1,10 @@
 package com.darkness.jujutsukaisenzone;
 
 import com.mojang.logging.LogUtils;
+import com.darkness.jujutsukaisenzone.client.MusicPlayerKeyHandler;
+import com.darkness.jujutsukaisenzone.client.QuestJournalKeyHandler;
 import com.darkness.jujutsukaisenzone.client.TechniqueDevelopmentKeyHandler;
+import com.darkness.jujutsukaisenzone.music.ModMusicTracks;
 import com.darkness.jujutsukaisenzone.client.gui.SkillBarConfigScreen;
 import com.darkness.jujutsukaisenzone.compat.EpicFightCompat;
 import com.darkness.jujutsukaisenzone.event.TechniqueSkillKeyEvents;
@@ -15,6 +18,7 @@ import com.darkness.jujutsukaisenzone.registry.ModEffects;
 import com.darkness.jujutsukaisenzone.registry.ModEntities;
 import com.darkness.jujutsukaisenzone.registry.ModItems;
 import com.darkness.jujutsukaisenzone.registry.ModSounds;
+import com.darkness.jujutsukaisenzone.worldgen.ModStructureTypes;
 import com.darkness.jujutsukaisenzone.technique.commonskill.CommonKeySkillRegistry;
 import com.darkness.jujutsukaisenzone.technique.commonskill.BarrierTechniqueCommonKeySkill;
 import com.darkness.jujutsukaisenzone.technique.commonskill.MimicryCommonKeySkill;
@@ -86,6 +90,8 @@ public class JuJutsuKaisenZone
         ModEffects.register(modEventBus);
         ModAttributes.register(modEventBus);
         ModSounds.register(modEventBus);
+        ModMusicTracks.register(modEventBus);
+        ModStructureTypes.register(modEventBus);
         ModNetwork.register();
         CommandWheelNetwork.register();
 
@@ -172,6 +178,8 @@ public class JuJutsuKaisenZone
             CommonKeySkillRegistry.registerKeyMappings(event);
             event.register(SKILL_BAR_CONFIG_KEY);
             event.register(TechniqueDevelopmentKeyHandler.KEY_MAPPING);
+            event.register(QuestJournalKeyHandler.KEY_MAPPING);
+            event.register(MusicPlayerKeyHandler.KEY_MAPPING);
             event.register(TechniqueSkillKeyEvents.KEY_ADJUST_MODE);
             event.register(TechniqueSkillKeyEvents.KEY_ADJUST_TIER_DOWN);
             event.register(TechniqueSkillKeyEvents.KEY_ADJUST_TIER_UP);

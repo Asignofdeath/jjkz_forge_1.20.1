@@ -9,6 +9,7 @@ import com.darkness.jujutsukaisenzone.entity.DemonSubduingShrineEntity;
 import com.darkness.jujutsukaisenzone.entity.SpecialEffectEntity;
 import com.darkness.jujutsukaisenzone.network.ModNetwork;
 import com.darkness.jujutsukaisenzone.player.PlayerCursedEnergyData;
+import com.darkness.jujutsukaisenzone.player.PlayerDomainModeData;
 import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
 import com.darkness.jujutsukaisenzone.registry.ModEntities;
 import com.darkness.jujutsukaisenzone.registry.ModSounds;
@@ -196,6 +197,27 @@ public final class ShrineDomainExpansion extends AbstractTechniqueDomain
         setDomainName(DOMAIN_NAME);
     }
 
+    /**
+     * 瞬发展开的实例配置：只铺天空盒、不放结界壳，构建完保持完成态 2 秒再自动关。
+     * <p>
+     * 与无下限瞬发同口径，见 {@code AbstractDomainExpansion} 的 skybox-only / auto-close 路径；
+     * 也会跳过常规路径那套演出（神龛、指令运镜、战前锁定、领域斩击）。
+     * <p>
+     * 天空盒直接用终态 {@link #SHRINE_DOMAIN_SKYBOX_TEXTURE}（常规路径是构建完
+     * {@link #SHRINE_SKYBOX_SWAP_DELAY_TICKS} 刻后才换过去），省掉换天空盒那道演出。
+     */
+    @Override
+    protected void configureDomainInstance(ServerPlayer player, BarrierInstance instance)
+    {
+        if (!PlayerDomainModeData.isInstant(player))
+        {
+            return;
+        }
+        instance.setSkyboxOnlyExpand(true);
+        instance.setAutoCloseOnComplete(true);
+        instance.setCustomSkyboxTexture(SHRINE_DOMAIN_SKYBOX_TEXTURE);
+    }
+
     @Override
     protected void applyDomainSpecificEffect(ServerPlayer player, BarrierInstance instance)
     {
@@ -212,6 +234,10 @@ public final class ShrineDomainExpansion extends AbstractTechniqueDomain
      * 伏魔神龛的施放逻辑：先进入蓄力状态，5 秒后才真正展开领域。
      * <p>
      * 如果玩家已在自己的领域内，立即解除领域（不经过蓄力）。
+     * <p>
+     * 瞬发模式（{@link PlayerDomainModeData#isInstant}，需解锁「真正的咒术」）：跳过蓄力与领域演出，
+     * 直接展开一个只铺天空盒的短命领域，构建完保持约 2 秒后自动关闭；不召神龛、不上运镜、
+     * 不锁目标、不开领域斩击 —— 与无量空处瞬发同口径。
      */
     @Override
     public void cast(ServerPlayer player)
@@ -231,6 +257,43 @@ public final class ShrineDomainExpansion extends AbstractTechniqueDomain
 
         if (TechniqueMeltdownEffect.blockDomainExpansion(player))
         {
+            return;
+        }
+
+        /*
+         * 瞬发（「真正的咒术」解锁后经通用圆盘切到）：跳过 5 秒蓄力与整套领域演出，直接展开。
+         * 把常规路径的「蓄力开始」与「蓄力结束」两拍压成一拍：同一套音效 / 手势 / 起始特效，
+         * 只是不再等待。前置校验与常规路径逐条一致。
+         */
+        if (PlayerDomainModeData.isInstant(player))
+        {
+            if (castingDelayMap.containsKey(uuid))
+            {
+                castingDelayMap.remove(uuid);
+                EpicFightCompat.stopShrineDomainExpansionAnimation(player);
+                stopShrineDomainExpansionSound(player);
+                stopShrineCastFilter(player);
+            }
+            if (DomainExpansionRouter.isPositionInAnyDomain(player.serverLevel(), player.blockPosition()))
+            {
+                player.displayClientMessage(
+                        Component.literal("无法展开领域，因为领域对抗还没做").withStyle(ChatFormatting.RED), true);
+                return;
+            }
+            if (!hasLearnedDomainExpansion(player))
+            {
+                player.displayClientMessage(Component.literal("尚未习得领域展开").withStyle(ChatFormatting.RED), true);
+                return;
+            }
+            if (!hasLearnedTechnique(player))
+            {
+                return;
+            }
+            broadcastShrineDomainExpansionSound(player, player.serverLevel());
+            EpicFightCompat.playShrineDomainExpansionAnimation(player);
+            attachShrineDomainStartFxToPlayer(player);
+            scheduleShrineGhostFaceFx(player);
+            super.cast(player);
             return;
         }
 

@@ -1,0 +1,14 @@
+{
+  "structures": [
+    {
+      "structure": "jujutsukaisenzone:plains_liaison_office",
+      "weight": 1
+    }
+  ],
+  "placement": {
+    "type": "minecraft:random_spread",
+    "salt": 829174563,
+    "spacing": 1,
+    "separation": 0
+  }
+}

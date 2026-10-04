@@ -554,6 +554,18 @@ public final class SkillUnlockLogic
         {
             return PlayerTechniqueData.getInnateTechnique(player).equals(techniqueId);
         }
+        /*
+         * 条件满足即视为已解锁：不消耗术式情报，玩家也不需要点选。
+         * 各术式的<b>领域节点</b>是唯一用例 —— 领域展开是在开发树之外习得的
+         * （{@code PlayerDomainExpansionData}），树上的那个节点只是这条外部进度的一个落点，
+         * 所以「习得领域展开」与「节点点亮」必须是同一件事，不该再由玩家花情报去买一次。
+         * 判据与 {@link #canUnlockSkill} / {@link #tryUnlockSkill} 里的条件检查同源
+         * （{@code UnlockConditionEvaluator.evaluateAll}），两处不会走偏。
+         */
+        if (node.autoUnlockWhenConditionsMet())
+        {
+            return UnlockConditionEvaluator.evaluateAll(player, node.unlockConditions());
+        }
         Optional<TechniqueSkill> skillOpt = findSkillDefinition(techniqueId, node.skillId());
         if (skillOpt.isEmpty())
         {

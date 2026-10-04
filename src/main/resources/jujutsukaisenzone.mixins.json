@@ -7,11 +7,14 @@
   "plugin": "",
   "mixins": [
     "DamageSourceMixin",
-    "RangedAttributeAccessor"
+    "RangedAttributeAccessor",
+    "SetPathPacketMixin"
   ],
   "client": [
     "client.AbstractClientPlayerMixin",
-    "client.CreativeModeInventoryScreenMixin"
+    "client.CreativeModeInventoryScreenMixin",
+    "client.EntityTurnMixin",
+    "client.MusicManagerMixin"
   ],
   "server": []
 }

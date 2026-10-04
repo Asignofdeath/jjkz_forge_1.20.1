@@ -9,6 +9,7 @@ import com.darkness.jujutsukaisenzone.entity.behavior.ShrineHachiBehavior;
 import com.darkness.jujutsukaisenzone.entity.behavior.ShrineKaiArrowBehavior;
 import com.darkness.jujutsukaisenzone.entity.behavior.ShrineKaiDelayBehavior;
 import com.darkness.jujutsukaisenzone.entity.data.ShrineFugaConfig;
+import com.darkness.jujutsukaisenzone.player.BarrierTechniqueLevel;
 import com.darkness.jujutsukaisenzone.player.PlayerCursedEnergyData;
 import com.darkness.jujutsukaisenzone.player.PlayerHoldReleaseChargeData;
 import com.darkness.jujutsukaisenzone.player.PlayerMimicryData;
@@ -47,6 +48,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 /**
  * 御厨子（伏魔神龛）术式：解、捌等招式。
@@ -103,13 +105,50 @@ public final class ShrineTechniqueSkillSet extends AbstractInnateTechniqueSkillS
     public static final String SKILL_FUGA = "shrine_fuga";
     public static final String REF_BLACK_FLASH_3 = "ref_shrine_black_flash_3";
     public static final String REF_SEANCE_COMPLETE = "ref_seance_technique_complete";
+    /** 领域「伏魔神龛」在开发树上的 nodeId。 */
+    public static final String NODE_DOMAIN_FUMOSHINKAN = "shrine_domain_fumoshinkan";
+
     /**
-     * 领域「伏魔神龛」<b>说明节点</b>的 nodeId。
+     * 领域「伏魔神龛」的 skillId。
      * <p>
-     * 领域没有 skillId（它不是可释放技能，只是个说明节点），所以「本领域斩击不参与暴击」这条
-     * 描述标注只能按 nodeId 定位，见 {@code CritSkillPolicy#isNoCritInfoNode}。
+     * 领域不是可释放技能，但开发树上的节点是 <b>skill 节点</b>（不是说明节点）：它是一个
+     * 机制型技能，随「习得领域展开」自动点亮（{@code autoUnlockWhenConditionsMet}），
+     * 玩家不花术式情报。瞬发 / 开放式一类领域模式节点都以它为前置。
+     * 「本领域斩击不参与暴击」这条标注因此可以按 skillId 定位，见 {@code CritSkillPolicy}。
      */
-    public static final String INFO_DOMAIN_FUMOSHINKAN = "shrine_domain_fumoshinkan";
+    public static final String SKILL_DOMAIN = "shrine_domain";
+
+    /** 机制型：解锁「领域模式 · 瞬发」（叙事名「真正的咒术」）。 */
+    public static final String SKILL_INSTANT_DOMAIN = "shrine_instant_domain";
+    /**
+     * 「结界术达到掌握」的展示引用节点 nodeId。
+     * <p>
+     * 与无下限树里的同名节点是两棵树各自的节点，故这里另取一个 id，避免任何按 nodeId 的查表串台。
+     */
+    public static final String REF_BARRIER_MASTERED = "ref_shrine_barrier_mastered";
+
+    private static final String TAG_DOMAIN_UNLOCK = "jujutsukaisenzone_shrine_domain_unlock";
+    private static final String TAG_INSTANT_DOMAIN_UNLOCK = "jujutsukaisenzone_shrine_instant_domain_unlock";
+    private static final String ICON_DOMAIN = "textures/item/slash_technique_sukuna.png";
+    private static final String ICON_INSTANT_DOMAIN = "textures/item/slash_technique_sukuna.png";
+
+    /**
+     * 机制型：领域「伏魔神龛」在开发树上的落点。
+     * <p>
+     * 不占槽位、无咒力、无冷却。解锁与否<b>不写在存档里</b> —— 节点走
+     * {@code autoUnlockWhenConditionsMet}，每次判定都实时看「有没有习得领域展开」，
+     * 所以领域被忘掉 / 改动时节点跟着灭，不需要额外维护一份开关。
+     */
+    private static final TechniqueSkill MECHANIC_DOMAIN = new TechniqueSkill(
+            SKILL_DOMAIN, 0, Component.literal("伏魔神龛"), ICON_DOMAIN,
+            0, 0, 0, "", TAG_DOMAIN_UNLOCK, "");
+
+    /** 机制型技能：无槽位、无咒力、无冷却，只做解锁开关（与无下限「0.2秒的领域展开」同口径）。 */
+    private static final TechniqueSkill MECHANIC_INSTANT_DOMAIN = new TechniqueSkill(
+            SKILL_INSTANT_DOMAIN, 0, Component.literal("真正的咒术"), ICON_INSTANT_DOMAIN,
+            0, 0, 0, "", TAG_INSTANT_DOMAIN_UNLOCK, "");
+
+    private static final List<TechniqueSkill> MECHANICS = List.of(MECHANIC_DOMAIN, MECHANIC_INSTANT_DOMAIN);
 
     private static final List<TechniqueSkill> SKILLS = Arrays.asList(
             new TechniqueSkill(SKILL_KAI, 1, Component.literal("「解」挥砍"),
@@ -154,18 +193,40 @@ public final class ShrineTechniqueSkillSet extends AbstractInnateTechniqueSkillS
                     .requires(REF_SEANCE_COMPLETE)
                     .intelCost(600)
                     .build())
-            .node(SkillTreeNodeDef.info(INFO_DOMAIN_FUMOSHINKAN)
-                    .titleKey("skill_tree.jujutsukaisenzone.shrine_domain_fumoshinkan.title")
-                    .iconPath("textures/item/slash_technique_sukuna.png")
-                    .descriptionKey("skill_tree.jujutsukaisenzone.shrine_domain_fumoshinkan.desc")
+            /*
+             * 领域「伏魔神龛」：习得领域展开的<b>瞬间自动点亮</b>，不消耗术式情报、也不需要点选。
+             * 它是瞬发 / 开放式一类领域模式节点的共同前置，所以必须是真实的 skill 节点
+             * （说明节点不参与连线与解锁判定，挂不住任何东西）。
+             */
+            .node(SkillTreeNodeDef.skill(NODE_DOMAIN_FUMOSHINKAN, SKILL_DOMAIN)
                     .requires("shrine_hachi")
+                    .conditions(UnlockCondition.hasDomainExpansion())
                     .visibleWhen(UnlockCondition.hasDomainExpansion())
+                    .autoUnlockWhenConditionsMet()
+                    .build())
+            .node(SkillTreeNodeDef.reference(
+                    REF_BARRIER_MASTERED,
+                    SkillTreeReferenceKind.BARRIER_TECHNIQUE_LEVEL,
+                    BarrierTechniqueLevel.MASTERED.name()
+            ).requires(NODE_DOMAIN_FUMOSHINKAN).build())
+            /*
+             * 机制型：「真正的咒术」——解锁通用圆盘「领域模式」的瞬发档。
+             * 条件与无下限「0.2秒的领域展开」一致：已习得领域展开 + 结界术达到掌握；
+             * 前置节点用引用节点展示结界等级。领域节点本身在未习得领域展开时隐藏，故这里同步隐藏。
+             */
+            .node(SkillTreeNodeDef.skill("shrine_instant_domain", SKILL_INSTANT_DOMAIN)
+                    .requires(NODE_DOMAIN_FUMOSHINKAN, REF_BARRIER_MASTERED)
+                    .conditions(
+                            UnlockCondition.hasDomainExpansion(),
+                            UnlockCondition.minBarrierTechniqueLevel(BarrierTechniqueLevel.MASTERED))
+                    .visibleWhen(UnlockCondition.hasDomainExpansion())
+                    .intelCost(300)
                     .build())
             .build();
 
     static
     {
-        SKILL_TREE.validateAgainstSkills(SKILLS);
+        SKILL_TREE.validateAgainstSkills(Stream.concat(SKILLS.stream(), MECHANICS.stream()).toList());
     }
 
     private ShrineTechniqueSkillSet()
@@ -182,6 +243,12 @@ public final class ShrineTechniqueSkillSet extends AbstractInnateTechniqueSkillS
     public List<TechniqueSkill> getConfigurableSkills()
     {
         return SKILLS;
+    }
+
+    @Override
+    public List<TechniqueSkill> getMechanicSkills()
+    {
+        return MECHANICS;
     }
 
     @Override

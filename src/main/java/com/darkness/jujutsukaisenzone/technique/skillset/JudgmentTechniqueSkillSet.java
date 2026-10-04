@@ -82,6 +82,14 @@ public final class JudgmentTechniqueSkillSet extends AbstractInnateTechniqueSkil
      */
     public static final String SKILL_AGGRAVATION = "judgment_aggravation";
 
+    /** 领域「诛伏赐死」在开发树上的 nodeId。 */
+    public static final String NODE_DOMAIN_ZHUFUCISI = "judgment_domain_zhufucisi";
+    /**
+     * 领域「诛伏赐死」的 skillId：机制型，随「习得领域展开」自动点亮，不消耗术式情报。
+     * 将来若给审判加瞬发 / 开放式一类的领域模式节点，都以它为前置。
+     */
+    public static final String SKILL_DOMAIN = "judgment_domain";
+
     private static final String TAG_JUDGMENT_UNLOCK_SLOT_1 = "jujutsukaisenzone_judgment_unlock_slot_1";
     private static final String TAG_JUDGMENT_LEVEL_SLOT_1 = "jujutsukaisenzone_judgment_level_slot_1";
     private static final String TAG_JUDGMENT_COOLDOWN_SLOT_1 = "jujutsukaisenzone_judgment_cooldown_slot_1";
@@ -99,11 +107,13 @@ public final class JudgmentTechniqueSkillSet extends AbstractInnateTechniqueSkil
     private static final String TAG_GAVEL_FORMS_UNLOCK = "jujutsukaisenzone_judgment_gavel_forms_unlock";
     private static final String TAG_SENTENCING_UNLOCK = "jujutsukaisenzone_judgment_sentencing_unlock";
     private static final String TAG_AGGRAVATION_UNLOCK = "jujutsukaisenzone_judgment_aggravation_unlock";
+    private static final String TAG_DOMAIN_UNLOCK = "jujutsukaisenzone_judgment_domain_unlock";
 
     /** 机制型技能的图标：暂借同套主动技能的图标，待补美术后替换。 */
     private static final String ICON_GAVEL = "textures/gui/technique/gavel.png";
     private static final String ICON_TRIAL = "textures/gui/technique/trial.png";
     private static final String ICON_ACCUSE = "textures/gui/technique/accuse.png";
+    private static final String ICON_DOMAIN = "textures/item/trial_technique.png";
 
     private static final List<TechniqueSkill> SKILLS = Arrays.asList(
             new TechniqueSkill(SKILL_GAVEL, SLOT_GAVEL, Component.literal("法槌"),
@@ -150,8 +160,18 @@ public final class JudgmentTechniqueSkillSet extends AbstractInnateTechniqueSkil
             SKILL_AGGRAVATION, 0, Component.literal("从重论处"), ICON_ACCUSE, 0, 0, 0, "",
             TAG_AGGRAVATION_UNLOCK, "");
 
+    /**
+     * 机制型：领域「诛伏赐死」在开发树上的落点。
+     * <p>
+     * 解锁与否<b>不写在存档里</b> —— 节点走 {@code autoUnlockWhenConditionsMet}，每次判定都实时看
+     * 「有没有习得领域展开」，所以领域状态变了节点跟着变，不需要额外维护一份开关。
+     */
+    private static final TechniqueSkill MECHANIC_DOMAIN = new TechniqueSkill(
+            SKILL_DOMAIN, 0, Component.literal("诛伏赐死"), ICON_DOMAIN, 0, 0, 0, "",
+            TAG_DOMAIN_UNLOCK, "");
+
     private static final List<TechniqueSkill> MECHANICS =
-            List.of(MECHANIC_GAVEL_FORMS, MECHANIC_SENTENCING, MECHANIC_AGGRAVATION);
+            List.of(MECHANIC_GAVEL_FORMS, MECHANIC_SENTENCING, MECHANIC_AGGRAVATION, MECHANIC_DOMAIN);
 
     private static final TechniqueSkillTree SKILL_TREE = TechniqueSkillTree.builder(PlayerTechniqueData.TECHNIQUE_JUDGMENT)
             .node(SkillTreeNodeDef.skill("judgment_gavel", SKILL_GAVEL).autoGranted().build())
@@ -175,12 +195,16 @@ public final class JudgmentTechniqueSkillSet extends AbstractInnateTechniqueSkil
                     .requires("judgment_gavel")
                     .intelCost(500)
                     .build())
-            .node(SkillTreeNodeDef.info("judgment_domain_zhufucisi")
-                    .titleKey("skill_tree.jujutsukaisenzone.judgment_domain_zhufucisi.title")
-                    .iconPath("textures/item/trial_technique.png")
-                    .descriptionKey("skill_tree.jujutsukaisenzone.judgment_domain_zhufucisi.desc")
+            /*
+             * 领域「诛伏赐死」：习得领域展开的<b>瞬间自动点亮</b>，不消耗术式情报、也不需要点选。
+             * 它是将来任何领域模式节点（瞬发 / 开放式）的共同前置，所以必须是真实的 skill 节点
+             * （说明节点不参与连线与解锁判定，挂不住任何东西）。
+             */
+            .node(SkillTreeNodeDef.skill(NODE_DOMAIN_ZHUFUCISI, SKILL_DOMAIN)
                     .requires("judgment_trial")
+                    .conditions(UnlockCondition.hasDomainExpansion())
                     .visibleWhen(UnlockCondition.hasDomainExpansion())
+                    .autoUnlockWhenConditionsMet()
                     .build())
             /*
              * 说明节点「上诉」：原本写在「诛伏赐死」说明末尾。它讲的是<b>领域关闭之后</b>的另一套流程

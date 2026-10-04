@@ -34,12 +34,12 @@ import java.util.Set;
  *       复合刻意排除（处刑必杀是致死量改写，不能再叠一道浮动）。</li>
  *   <li><b>结算语义特殊</b>——例如致死量改写。</li>
  * </ol>
- * 目前整份名单只剩坍塌一条（见下）。
+ * 目前整份名单只有坍塌与伏魔神龛两条（见下）。
  * <p>
  * 未列入的技能（十划、星弹、星间飞行、法槌、赫、星痕、解、苍、捌、茈、灶开……）都不打这行标注。
  * <p>
- * <b>领域说明节点</b>另算（见 {@link #isNoCritInfoNode}）：领域不是可释放技能、没有 skillId，
- * 它是对应术式的说明节点，所以只能按 nodeId 定位。
+ * <b>领域</b>同样按 skillId 登记：领域在开发树上是随「习得领域展开」自动点亮的 skill 节点
+ * （机制型技能），所以它与别的招式共用同一条判定路径，不再需要按 nodeId 另开一份名单。
  * <p>
  * <b>运行时放行出伤点清单</b>（本表必须与它们一致；新增技能时逐条对照，改一处就得看这里）：
  * <ul>
@@ -74,19 +74,17 @@ public final class CritSkillPolicy
             // 瓦落瓦落：掀起的坠落碎块走 FallingBlockEntity 自带碰撞，伤害分型是 COMPOSITE，
             // 而 CritRules#canCrit 只放行 MARTIAL / TECHNIQUE ⇒ 它本来就没有暴击资格。
             // 这一条与「频率」无关，是分型资格问题；留着是为了让悬停框如实告诉玩家。
-            RatioTechniqueSkillSet.SKILL_COLLAPSE);
-
-    /**
-     * 按设计不参与暴击的<b>说明节点</b> nodeId。
-     * <p>
-     * 目前只有「伏魔神龛」：领域斩击是<b>严格每 10 tick</b> 的持续伤害（{@code ShrineDomainExpansion}
-     * 的 {@code tickShrineSlashDamage}）。它是整份名单里<b>唯一真的不被无敌帧节流</b>的条目——
-     * 第 10 tick 时 {@code invulnerableTime} 恰好等于 10，条件 {@code > 10.0F} 为假，
-     * 所以每一次斩击都会落地（2 次/秒），而解 / 苍 / 茈 那类「每 tick 扫」的招式反而被压到同一频率。
-     * 其余三个领域不直接出伤，所以不列。
-     */
-    private static final Set<String> NO_CRIT_INFO_NODES = Set.of(
-            ShrineTechniqueSkillSet.INFO_DOMAIN_FUMOSHINKAN);
+            RatioTechniqueSkillSet.SKILL_COLLAPSE,
+            // —— 领域 ——
+            // 伏魔神龛：领域斩击是<b>严格每 10 tick</b> 的持续伤害（{@code ShrineDomainExpansion}
+            // 的 {@code tickShrineSlashDamage}）。它是整份名单里<b>唯一真的不被无敌帧节流</b>的条目——
+            // 第 10 tick 时 {@code invulnerableTime} 恰好等于 10，条件 {@code > 10.0F} 为假，
+            // 所以每一次斩击都会落地（2 次/秒），而解 / 苍 / 茈 那类「每 tick 扫」的招式反而被压到同一频率。
+            // 其余三个领域不直接出伤，所以不列。
+            //
+            // ⚠️ 领域节点在开发树上是 skill 节点（随习得领域展开自动点亮），所以按 skillId 登记，
+            // 与上面那些招式走同一条判定路径；它不再是说明节点，别再回头按 nodeId 找它。
+            ShrineTechniqueSkillSet.SKILL_DOMAIN);
 
     private CritSkillPolicy()
     {
@@ -103,23 +101,15 @@ public final class CritSkillPolicy
         return skillId != null && NO_CRIT_SKILLS.contains(skillId);
     }
 
-    /** 该说明节点是否按设计不参与暴击（领域节点的 skillId 为空，它的悬停框走这条）。 */
-    public static boolean isNoCritInfoNode(String nodeId)
-    {
-        return nodeId != null && NO_CRIT_INFO_NODES.contains(nodeId);
-    }
-
     /**
-     * 启动自检：两份声明名单必须与技能表对得上（由 {@code JuJutsuKaisenZone} 在全部技能集注册后调用）。
+     * 启动自检：声明名单必须与技能表对得上（由 {@code JuJutsuKaisenZone} 在全部技能集注册后调用）。
      * <p>
      * 查的是<b>字符串名单最典型的腐化方式</b>——拼错、改名后漏改、节点种类变了：
      * <ul>
      *   <li>名单里的技能 id 必须存在于已注册技能表（技能节点或公共技能）。拼错 ⇒ 那行标注
-     *       <b>永远不出现</b>，界面上只是"少了一行字"，没有任何报错。</li>
-     *   <li>名单里的说明节点必须真的是<b>领域</b>说明节点（靠
-     *       {@code visibleWhen(UnlockCondition.hasDomainExpansion())} 判定）。条件被改成别的 ⇒
-     *       悬停框里那行标注同样静默消失。</li>
-     *   <li>两份名单都不许为空：清空等于把标注功能关掉，应当是有意的改动而不是手滑。</li>
+     *       <b>永远不出现</b>，界面上只是"少了一行字"，没有任何报错。领域也走这一条：
+     *       领域节点是随习得自动点亮的 skill 节点，所以它有 skillId，登记时按 skillId 写。</li>
+     *   <li>名单不许为空：清空等于把标注功能关掉，应当是有意的改动而不是手滑。</li>
      * </ul>
      * ⚠️ <b>本自检查不到的一件事</b>：「某个单发招式忘了走 {@code dealCrit}」——出伤点手里只有
      * owner、拿不到 skillId，运行时无法把伤害归到技能上，所以「新增的术式单发招式漏了放行」
@@ -131,7 +121,6 @@ public final class CritSkillPolicy
     public static void validate()
     {
         Set<String> knownSkillIds = new LinkedHashSet<>();
-        Set<String> knownDomainInfoNodeIds = new LinkedHashSet<>();
         for (TechniqueSkillTree tree : TechniqueSkillTreeRegistry.all())
         {
             for (SkillTreeNodeDef node : tree.nodes())
@@ -139,10 +128,6 @@ public final class CritSkillPolicy
                 if (node.skillId() != null && !node.skillId().isBlank())
                 {
                     knownSkillIds.add(node.skillId());
-                }
-                if (node.isDomainInfoNode())
-                {
-                    knownDomainInfoNodeIds.add(node.nodeId());
                 }
             }
         }
@@ -152,9 +137,9 @@ public final class CritSkillPolicy
             knownSkillIds.add(skill.skillId());
         }
 
-        if (NO_CRIT_SKILLS.isEmpty() || NO_CRIT_INFO_NODES.isEmpty())
+        if (NO_CRIT_SKILLS.isEmpty())
         {
-            throw new IllegalStateException("暴击声明表被清空了：CritSkillPolicy 的两份名单都至少要有内容，"
+            throw new IllegalStateException("暴击声明表被清空了：CritSkillPolicy 的名单至少要有内容，"
                     + "否则「不参与暴击」标注会静默消失");
         }
         if (knownSkillIds.isEmpty())
@@ -168,15 +153,6 @@ public final class CritSkillPolicy
             {
                 throw new IllegalStateException("「不参与暴击」名单里是未知技能 id：" + skillId
                         + "——拼错了，或技能改名后这里没跟着改（后果是那行标注永不出现在界面上）");
-            }
-        }
-        for (String nodeId : NO_CRIT_INFO_NODES)
-        {
-            if (!knownDomainInfoNodeIds.contains(nodeId))
-            {
-                throw new IllegalStateException("「不参与暴击」名单里的说明节点不是领域说明节点：" + nodeId
-                        + "——领域节点靠 visibleWhen(UnlockCondition.hasDomainExpansion()) 判定，"
-                        + "可见性条件改成别的就会掉出名单");
             }
         }
     }

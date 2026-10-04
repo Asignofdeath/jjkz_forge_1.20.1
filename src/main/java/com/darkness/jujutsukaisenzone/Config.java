@@ -253,7 +253,7 @@ public class Config
 
     private static final CfgSpec.BooleanValue DAMAGE_VARIANCE_ENABLED = BUILDER
             .comment("是否启用伤害浮动乘区（每次命中在 ±spread 内均匀随机，破除固定出伤）")
-            .define("damageVariance.enabled", false);
+            .define("damageVariance.enabled", true);
 
     private static final CfgSpec.DoubleValue DAMAGE_VARIANCE_SPREAD = BUILDER
             .comment("伤害浮动幅度：0.10 = 每次命中在 90%~110% 之间随机")

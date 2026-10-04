@@ -2,29 +2,26 @@ package com.darkness.jujutsukaisenzone.client;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.client.ClientCommandHandler;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.util.ArrayDeque;
 import java.util.Locale;
 
 /**
  * 伏魔神龛结界构建完成时，在<strong>客户端</strong>以本地玩家身份执行 CMDCam 的 {@code /cam} 命令（Forge 客户端命令分发器，无前导斜杠）。
  * <p>
- * 命令队列与间隔同 {@link LimitlessDomainCmdCamClient}；结界完成（t=0）起计 {@value #TICKS_BEFORE_CAM_START} tick（3 秒）后才 {@code cam load} + {@code cam start 2s}。
+ * 命令队列与间隔同 {@link CmdCamScheduler}；结界完成（t=0）起计 {@value #TICKS_BEFORE_CAM_START} tick（3 秒）后才 {@code cam load} + {@code cam start 2s}。
  */
 public final class ShrineDomainCmdCamClient
 {
     private static final Logger LOGGER = LogManager.getLogger();
-    private static final int TICKS_AFTER_NORMAL_COMMAND = 1;
-    private static final int TICKS_AFTER_CAM_SAVE = 5;
     private static final int TICKS_AFTER_LOAD_CAMERA = 5;
     /** 结界完成到回放：60 tick = 3 秒（自 t=0 起计，与路径编排并行） */
     private static final int TICKS_BEFORE_CAM_START = 60;
 
     public static final String CMDCAM_PATH_NAME = "shrine_domain_camera";
     private static final String CAM_START_PLAYBACK = "cam start 2s";
+    private static final String CAM_DISABLE_SMOOTH_START = "cam smooth_start false";
 
     private static final float SHRINE_CAM_YAW = 180.0F;
     private static final double FORWARD_DIST_NEAR = 3.0D;
@@ -39,8 +36,10 @@ public final class ShrineDomainCmdCamClient
     private static final float FOV_ZOOM_IN = 65.0F;
     private static final float FOV_ZOOM_OUT = 100.0F;
 
-    private static final ArrayDeque<String> CAM_COMMAND_QUEUE = new ArrayDeque<>();
-    private static int ticksUntilNextCamCommand = 0;
+    private static final CmdCamScheduler CAM = CmdCamScheduler.create(ShrineDomainCmdCamClient::ticksAfterCommand)
+            .afterEach(ShrineDomainCmdCamClient::onCamCommandRan)
+            .beforeEachTick(ShrineDomainCmdCamClient::tickCamStartCountdown);
+
     private static int camStartDelayTicks;
     private static boolean pathSaved;
     private static boolean playbackTriggered;
@@ -51,7 +50,7 @@ public final class ShrineDomainCmdCamClient
 
     /**
      * 编排（t=0 立即开始）：{@code mode outside} → {@code clear} → 3×{@code add} → {@code save} → {@code clear}<br>
-     * 回放（t=60）：{@code load shrine_domain_camera} → {@code start 2s}
+     * 回放（t=60）：{@code load shrine_domain_camera} → {@code smooth_start false} → {@code start 2s}
      */
     public static void applyCameraPathSetup(double px, double py, double pz, float yRot)
     {
@@ -60,7 +59,7 @@ public final class ShrineDomainCmdCamClient
         {
             return;
         }
-        if (ClientCommandHandler.getDispatcher() == null)
+        if (!CmdCamScheduler.dispatcherReady())
         {
             LOGGER.warn("[CMDCam] Client command dispatcher not ready; skipped shrine domain camera setup.");
             return;
@@ -81,65 +80,24 @@ public final class ShrineDomainCmdCamClient
         double y3 = py + HEIGHT_LOW;
         double z3 = pz + forward.z * FORWARD_DIST_FAR;
 
-        synchronized (CAM_COMMAND_QUEUE)
-        {
-            CAM_COMMAND_QUEUE.clear();
-            ticksUntilNextCamCommand = 0;
-            CAM_COMMAND_QUEUE.add("cam mode outside");
-            CAM_COMMAND_QUEUE.add("cam clear");
-            CAM_COMMAND_QUEUE.add(camAddWithOrientation(x1, y1, z1, PITCH_HIGH, FOV_DEFAULT));
-            CAM_COMMAND_QUEUE.add(camAddWithOrientation(x2, y2, z2, PITCH_NEAR, FOV_ZOOM_IN));
-            CAM_COMMAND_QUEUE.add(camAddWithOrientation(x3, y3, z3, PITCH_FAR, FOV_ZOOM_OUT));
-            CAM_COMMAND_QUEUE.add("cam save " + CMDCAM_PATH_NAME);
-            CAM_COMMAND_QUEUE.add("cam clear");
-
-            String first = CAM_COMMAND_QUEUE.pollFirst();
-            if (first != null)
-            {
-                runCamImmediate(first);
-                if (!CAM_COMMAND_QUEUE.isEmpty())
-                {
-                    ticksUntilNextCamCommand = ticksAfterCommand(first);
-                }
-            }
-        }
+        CAM.replaceAndStart(
+                "cam mode outside",
+                "cam clear",
+                camAddWithOrientation(x1, y1, z1, PITCH_HIGH, FOV_DEFAULT),
+                camAddWithOrientation(x2, y2, z2, PITCH_NEAR, FOV_ZOOM_IN),
+                camAddWithOrientation(x3, y3, z3, PITCH_FAR, FOV_ZOOM_OUT),
+                "cam save " + CMDCAM_PATH_NAME,
+                "cam clear");
 
         LOGGER.info("[CMDCam] Shrine domain: setup started, playback in {} ticks.", TICKS_BEFORE_CAM_START);
     }
 
-    static void tickScheduledCamCommands()
+    private static void onCamCommandRan(String cmd)
     {
-        tickCamStartCountdown();
-
-        synchronized (CAM_COMMAND_QUEUE)
+        if (cmd.equals("cam save " + CMDCAM_PATH_NAME))
         {
-            if (ticksUntilNextCamCommand > 0)
-            {
-                ticksUntilNextCamCommand--;
-                if (ticksUntilNextCamCommand > 0)
-                {
-                    return;
-                }
-            }
-            if (CAM_COMMAND_QUEUE.isEmpty())
-            {
-                return;
-            }
-            String cmd = CAM_COMMAND_QUEUE.pollFirst();
-            if (cmd == null)
-            {
-                return;
-            }
-            runCamImmediate(cmd);
-            if (cmd.equals("cam save " + CMDCAM_PATH_NAME))
-            {
-                pathSaved = true;
-                tryEnqueuePlayback();
-            }
-            if (!CAM_COMMAND_QUEUE.isEmpty())
-            {
-                ticksUntilNextCamCommand = ticksAfterCommand(cmd);
-            }
+            pathSaved = true;
+            tryEnqueuePlayback();
         }
     }
 
@@ -168,11 +126,7 @@ public final class ShrineDomainCmdCamClient
         }
 
         playbackTriggered = true;
-        synchronized (CAM_COMMAND_QUEUE)
-        {
-            CAM_COMMAND_QUEUE.addLast("cam load " + CMDCAM_PATH_NAME);
-            CAM_COMMAND_QUEUE.addLast(CAM_START_PLAYBACK);
-        }
+        CAM.append("cam load " + CMDCAM_PATH_NAME, CAM_DISABLE_SMOOTH_START, CAM_START_PLAYBACK);
     }
 
     private static String camAddWithOrientation(double x, double y, double z, float pitch, float fov)
@@ -193,22 +147,12 @@ public final class ShrineDomainCmdCamClient
     {
         if (commandJustRun.startsWith("cam save "))
         {
-            return TICKS_AFTER_CAM_SAVE;
+            return CmdCamScheduler.TICKS_AFTER_SAVE_OR_LOAD;
         }
         if (commandJustRun.startsWith("cam load " + CMDCAM_PATH_NAME))
         {
             return TICKS_AFTER_LOAD_CAMERA;
         }
-        return TICKS_AFTER_NORMAL_COMMAND;
-    }
-
-    private static void runCamImmediate(String commandWithoutSlash)
-    {
-        boolean consumed = ClientCommandHandler.runCommand(commandWithoutSlash);
-        if (!consumed)
-        {
-            LOGGER.warn("[CMDCam] Command not handled as client command (is CMDCam installed on this client?): {}",
-                    commandWithoutSlash);
-        }
+        return CmdCamScheduler.TICKS_AFTER_NORMAL_COMMAND;
     }
 }

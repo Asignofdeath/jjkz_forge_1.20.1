@@ -27,6 +27,7 @@ public final class SkillTreeNodeDef
     private final int intelCost;
     private final int vanillaXpLevelCost;
     private final boolean autoGranted;
+    private final boolean autoUnlockWhenConditionsMet;
 
     SkillTreeNodeDef(
             String nodeId,
@@ -43,7 +44,8 @@ public final class SkillTreeNodeDef
             List<UnlockCondition> visibilityConditions,
             int intelCost,
             int vanillaXpLevelCost,
-            boolean autoGranted)
+            boolean autoGranted,
+            boolean autoUnlockWhenConditionsMet)
     {
         this.nodeId = nodeId;
         this.kind = kind;
@@ -60,6 +62,7 @@ public final class SkillTreeNodeDef
         this.intelCost = Math.max(0, intelCost);
         this.vanillaXpLevelCost = Math.max(0, vanillaXpLevelCost);
         this.autoGranted = autoGranted;
+        this.autoUnlockWhenConditionsMet = autoUnlockWhenConditionsMet;
     }
 
     public String nodeId()
@@ -144,6 +147,18 @@ public final class SkillTreeNodeDef
         return autoGranted;
     }
 
+    /**
+     * 「解锁条件一满足就视为已解锁」——不消耗术式情报，也不需要玩家点选。
+     * <p>
+     * 与 {@link #autoGranted()} 的差别只在判据：{@code autoGranted} 看「有没有这个术式」，
+     * 本标记看 {@link #unlockConditions()}。各术式的<b>领域节点</b>用它：领域展开是在开发树之外
+     * 习得的（{@code PlayerDomainExpansionData}），所以那个节点不该可买，而应在习得的一瞬间自动点亮。
+     */
+    public boolean autoUnlockWhenConditionsMet()
+    {
+        return autoUnlockWhenConditionsMet;
+    }
+
     public boolean isSkillNode()
     {
         return kind == SkillTreeNodeKind.SKILL;
@@ -165,22 +180,30 @@ public final class SkillTreeNodeDef
     }
 
     /**
-     * 判定这个说明节点是不是「领域说明节点」——即它的可见性条件声明了「已习得领域展开」。
+     * 判定这个节点是不是「领域系节点」——即它在<b>任意一份条件表</b>里声明了「已习得领域展开」。
      * <p>
-     * 按条件判定而不是按节点 id：领域节点在各术式里命名各异（诛伏赐死 / 无量空处 / 伏魔神龛 /
-     * 爱与幽会），唯一的共同点是这条可见性条件；将来新增领域说明节点会自动带上标注，不必回来登记。
+     * 按条件判定而不是按节点 id：领域节点在各术式里命名各异（无量空处 / 伏魔神龛 / 诛伏赐死 /
+     * 爱与幽会），唯一的共同点是这条条件；将来新增领域节点会自动带上标注，不必回来登记。
      * <p>
+     * 两份条件表都要看，因为领域系节点有三种形态：
+     * <ul>
+     *   <li>领域本体节点（{@code skill}，如「伏魔神龛」）——条件在 {@link #unlockConditions()}；
+     *       它就是「习得领域展开」这件事在树上的落点，瞬发 / 开放式都挂在它下面。</li>
+     *   <li>领域模式节点（{@code skill}，瞬发 / 开放式）——条件同样在 {@link #unlockConditions()}，
+     *       它们同属领域系，悬停框要一并打标注。</li>
+     *   <li>只讲领域规则的说明节点（{@code info}，如「上诉」）——条件在 {@link #visibilityConditions()}。</li>
+     * </ul>
      * 两处读者共用这一个判据（勿各自实现一份）：{@code SkillTreeNodeWidget} 的悬停框据此打
-     * 「领域展开」标注行；{@code CritSkillPolicy#validate} 据此校验「不参与暴击的说明节点」
-     * 确实是领域节点——不是的话那行标注永远不会出现。
+     * 「领域展开」标注行；{@code CritSkillPolicy#validate} 据此校验领域斩击的暴击声明。
      */
-    public boolean isDomainInfoNode()
+    public boolean isDomainNode()
     {
-        if (!isInfoNode())
-        {
-            return false;
-        }
-        for (UnlockCondition condition : visibilityConditions)
+        return declaresDomainExpansion(unlockConditions) || declaresDomainExpansion(visibilityConditions);
+    }
+
+    private static boolean declaresDomainExpansion(List<UnlockCondition> conditions)
+    {
+        for (UnlockCondition condition : conditions)
         {
             if (condition.type() == UnlockConditionType.HAS_DOMAIN_EXPANSION)
             {
@@ -250,6 +273,7 @@ public final class SkillTreeNodeDef
         private int intelCost;
         private int vanillaXpLevelCost;
         private boolean autoGranted;
+        private boolean autoUnlockWhenConditionsMet;
 
         private Builder(String nodeId, SkillTreeNodeKind kind)
         {
@@ -343,6 +367,20 @@ public final class SkillTreeNodeDef
             return this;
         }
 
+        /**
+         * 解锁条件满足即视为已解锁：不消耗术式情报，玩家也不需要点选。
+         * <p>
+         * 用于「跟着外部进度自动点亮」的节点——各术式的领域节点是唯一用例：领域展开在开发树之外
+         * 习得，树上的那个节点只是这条进度的一个落点（见 {@link #conditions}）。
+         * 与 {@link #autoGranted()} 一样，本标记只在 {@code SkillTreeNodeDef} 里落地，
+         * 由 {@code SkillUnlockLogic#isSkillNodeUnlocked} 认。
+         */
+        public Builder autoUnlockWhenConditionsMet()
+        {
+            this.autoUnlockWhenConditionsMet = true;
+            return this;
+        }
+
         public SkillTreeNodeDef build()
         {
             return new SkillTreeNodeDef(
@@ -360,7 +398,8 @@ public final class SkillTreeNodeDef
                     visibilityConditions,
                     intelCost,
                     vanillaXpLevelCost,
-                    autoGranted
+                    autoGranted,
+                    autoUnlockWhenConditionsMet
             );
         }
     }

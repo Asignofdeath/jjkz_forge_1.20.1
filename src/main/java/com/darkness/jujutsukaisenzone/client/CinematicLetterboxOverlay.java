@@ -25,7 +25,7 @@ import net.minecraftforge.fml.common.Mod;
  * 下方黑条居中绘制无量空处日语原文「領域展開　無量空処」，随黑条同强度淡入淡出。
  * 施术者客户端额外在屏幕中央绘制领域展开手势图，进退场与黑条同一套 fade。
  * <p>
- * 若希望黑条不盖 HUD，把订阅事件换成 {@code RenderGuiOverlayEvent.Pre} 即可（届时黑条落在 HUD 之下）。
+ * 任务对话不要用本类：对话走 {@link QuestCinematicLetterboxOverlay}（可换台词、无手势）。
  */
 @Mod.EventBusSubscriber(modid = JuJutsuKaisenZone.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE, value = Dist.CLIENT)
 public final class CinematicLetterboxOverlay

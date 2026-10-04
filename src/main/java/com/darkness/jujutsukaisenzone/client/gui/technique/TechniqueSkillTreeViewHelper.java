@@ -331,6 +331,15 @@ public final class TechniqueSkillTreeViewHelper
 
     private static String getUnlockedSubtitle(Player player, String techniqueId, SkillTreeNodeDef node)
     {
+        /*
+         * 领域系节点（领域本体 / 瞬发 / 开放式）的措辞跟着领域走。
+         * 领域本体是随「习得领域展开」自动点亮的，不是玩家花 SP 解放出来的，
+         * 写「已解放」会把两件不同的事说成同一件。
+         */
+        if (node.isDomainNode())
+        {
+            return "已习得";
+        }
         if (SkillUnlockLogic.isMechanicSkill(techniqueId, node.skillId()))
         {
             return "已解放";

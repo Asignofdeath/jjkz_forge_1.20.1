@@ -1,6 +1,5 @@
 package com.darkness.jujutsukaisenzone.event;
 
-import com.darkness.jujutsukaisenzone.JuJutsuKaisenZone;
 import com.darkness.jujutsukaisenzone.player.PlayerFactionData;
 import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
@@ -8,31 +7,22 @@ import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.Style;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraftforge.event.entity.player.PlayerEvent.PlayerLoggedInEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
 
-@Mod.EventBusSubscriber(modid = JuJutsuKaisenZone.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE)
+/**
+ * 阵营选择提示。开局不再自动弹出，叙事流程需要时再调用 {@link #sendFactionChoiceMessage}。
+ */
 public final class FactionEvents
 {
     private FactionEvents()
     {
     }
 
-    @SubscribeEvent
-    public static void onPlayerLogin(PlayerLoggedInEvent event)
+    public static void sendFactionChoiceMessage(ServerPlayer player)
     {
-        if (!(event.getEntity() instanceof ServerPlayer player))
-        {
-            return;
-        }
-        if (PlayerFactionData.hasFaction(player))
-        {
-            return;
-        }
         player.sendSystemMessage(buildFactionChoiceMessage());
     }
-    private static MutableComponent buildFactionChoiceMessage()
+
+    public static MutableComponent buildFactionChoiceMessage()
     {
         MutableComponent line = Component.literal("选择阵营：");
         line.append(clickableLabel("【咒术师】", PlayerFactionData.FACTION_SORCERER));

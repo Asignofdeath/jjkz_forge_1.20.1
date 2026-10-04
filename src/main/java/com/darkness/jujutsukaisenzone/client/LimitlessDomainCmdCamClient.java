@@ -1,29 +1,17 @@
 package com.darkness.jujutsukaisenzone.client;
 
-import com.darkness.jujutsukaisenzone.JuJutsuKaisenZone;
 import net.minecraft.client.Minecraft;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.client.ClientCommandHandler;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-
-import java.util.ArrayDeque;
 
 /**
  * 无量空处结界构建完成时，在<strong>客户端</strong>以本地玩家身份执行 CMDCam 的 {@code /cam} 命令（Forge 客户端命令分发器，无前导斜杠）。
  * <p>
- * 命令按队列执行：默认间隔 {@link #TICKS_AFTER_NORMAL_COMMAND} 刻；{@code cam save} 之后 {@link #TICKS_AFTER_CAM_SAVE} 刻；另有镜头回放段的专用间隔常量。
+ * 命令按队列执行：默认间隔 {@link CmdCamScheduler#TICKS_AFTER_NORMAL_COMMAND} 刻；{@code cam save} 之后 {@link CmdCamScheduler#TICKS_AFTER_SAVE_OR_LOAD} 刻；另有镜头回放段的专用间隔常量。
  */
 public final class LimitlessDomainCmdCamClient
 {
     private static final Logger LOGGER = LogManager.getLogger();
-    /** 普通命令执行完毕后，再隔多少刻执行下一条。 */
-    private static final int TICKS_AFTER_NORMAL_COMMAND = 1;
-    /** {@code cam save} 执行完毕后，再隔多少刻执行下一条。 */
-    private static final int TICKS_AFTER_CAM_SAVE = 5;
     /** {@code cam load limitless_domain_cameraA} 之后到 {@code cam start 4s} 的间隔。 */
     private static final int TICKS_AFTER_LOAD_CAMERA_A = 5;
     /** {@code cam start 4s} 之后到 {@code cam load limitless_domain_cameraB} 的间隔。 */
@@ -43,9 +31,7 @@ public final class LimitlessDomainCmdCamClient
     private static final float CAMERA_B_POINT2_YAW = 90.0F;
     private static final float CAMERA_B_POINT2_PITCH = 0.0F;
 
-    private static final ArrayDeque<String> CAM_COMMAND_QUEUE = new ArrayDeque<>();
-    /** 距离下一条命令还剩多少客户端刻；{@code 0} 表示当前不在等待间隔（由 tick 驱动取下一条）。 */
-    private static int ticksUntilNextCamCommand = 0;
+    private static final CmdCamScheduler CAM = CmdCamScheduler.create(LimitlessDomainCmdCamClient::ticksAfterCommand);
 
     private LimitlessDomainCmdCamClient()
     {
@@ -66,7 +52,7 @@ public final class LimitlessDomainCmdCamClient
      * 12) 再间隔 {@value #TICKS_AFTER_START_CAMERA_A_PLAYBACK} 刻：{@code cam load limitless_domain_cameraB}<br>
      * 13) 间隔 {@value #TICKS_AFTER_LOAD_CAMERA_B} 刻：{@code cam start 6s}
      * <p>
-     * 默认相邻间隔 {@value #TICKS_AFTER_NORMAL_COMMAND} 刻；{@code cam save} 之后 {@value #TICKS_AFTER_CAM_SAVE} 刻；回放段间隔见上。
+     * 默认相邻间隔 {@link CmdCamScheduler#TICKS_AFTER_NORMAL_COMMAND} 刻；{@code cam save} 之后 {@link CmdCamScheduler#TICKS_AFTER_SAVE_OR_LOAD} 刻；回放段间隔见上。
      *
      * @param px 玩家实体 X（与服务端 {@link net.minecraft.world.entity.Entity#getX()} 一致）
      * @param py 玩家实体 Y
@@ -79,7 +65,7 @@ public final class LimitlessDomainCmdCamClient
         {
             return;
         }
-        if (ClientCommandHandler.getDispatcher() == null)
+        if (!CmdCamScheduler.dispatcherReady())
         {
             LOGGER.warn("[CMDCam] Client command dispatcher not ready; skipped limitless domain camera setup.");
             return;
@@ -94,71 +80,28 @@ public final class LimitlessDomainCmdCamClient
         double b1y = py + 1.5D;
         double b1z = pz - 18.0D;
 
-        synchronized (CAM_COMMAND_QUEUE)
-        {
-            CAM_COMMAND_QUEUE.clear();
-            ticksUntilNextCamCommand = 0;
-            CAM_COMMAND_QUEUE.add("cam mode outside");
-            CAM_COMMAND_QUEUE.add("cam clear");
-            CAM_COMMAND_QUEUE.add("cam add " + a1x + " " + a1y + " " + a1z);
-            CAM_COMMAND_QUEUE.add("cam add " + a2x + " " + a2y + " " + a2z + " " + CAMERA_A_POINT2_YAW + " " + CAMERA_A_POINT2_PITCH);
-            CAM_COMMAND_QUEUE.add("cam save " + CMDCAM_PATH_A_NAME);
-            CAM_COMMAND_QUEUE.add("cam clear");
-            CAM_COMMAND_QUEUE.add("cam add " + b1x + " " + b1y + " " + b1z);
-            CAM_COMMAND_QUEUE.add("cam add " + b1x + " " + b1y + " " + b1z + " " + CAMERA_B_POINT2_YAW + " " + CAMERA_B_POINT2_PITCH);
-            CAM_COMMAND_QUEUE.add("cam save " + CMDCAM_PATH_B_NAME);
-            CAM_COMMAND_QUEUE.add("cam clear");
-            CAM_COMMAND_QUEUE.add("cam load " + CMDCAM_PATH_A_NAME);
-            CAM_COMMAND_QUEUE.add(CAM_START_PLAYBACK_A);
-            CAM_COMMAND_QUEUE.add("cam load " + CMDCAM_PATH_B_NAME);
-            CAM_COMMAND_QUEUE.add(CAM_START_PLAYBACK_B);
-
-            String first = CAM_COMMAND_QUEUE.pollFirst();
-            if (first != null)
-            {
-                runCamImmediate(first);
-                if (!CAM_COMMAND_QUEUE.isEmpty())
-                {
-                    ticksUntilNextCamCommand = ticksAfterCommand(first);
-                }
-            }
-        }
-    }
-
-    static void tickScheduledCamCommands()
-    {
-        synchronized (CAM_COMMAND_QUEUE)
-        {
-            if (ticksUntilNextCamCommand > 0)
-            {
-                ticksUntilNextCamCommand--;
-                if (ticksUntilNextCamCommand > 0)
-                {
-                    return;
-                }
-            }
-            if (CAM_COMMAND_QUEUE.isEmpty())
-            {
-                return;
-            }
-            String cmd = CAM_COMMAND_QUEUE.pollFirst();
-            if (cmd == null)
-            {
-                return;
-            }
-            runCamImmediate(cmd);
-            if (!CAM_COMMAND_QUEUE.isEmpty())
-            {
-                ticksUntilNextCamCommand = ticksAfterCommand(cmd);
-            }
-        }
+        CAM.replaceAndStart(
+                "cam mode outside",
+                "cam clear",
+                "cam add " + a1x + " " + a1y + " " + a1z,
+                "cam add " + a2x + " " + a2y + " " + a2z + " " + CAMERA_A_POINT2_YAW + " " + CAMERA_A_POINT2_PITCH,
+                "cam save " + CMDCAM_PATH_A_NAME,
+                "cam clear",
+                "cam add " + b1x + " " + b1y + " " + b1z,
+                "cam add " + b1x + " " + b1y + " " + b1z + " " + CAMERA_B_POINT2_YAW + " " + CAMERA_B_POINT2_PITCH,
+                "cam save " + CMDCAM_PATH_B_NAME,
+                "cam clear",
+                "cam load " + CMDCAM_PATH_A_NAME,
+                CAM_START_PLAYBACK_A,
+                "cam load " + CMDCAM_PATH_B_NAME,
+                CAM_START_PLAYBACK_B);
     }
 
     private static int ticksAfterCommand(String commandJustRun)
     {
         if (commandJustRun.startsWith("cam save "))
         {
-            return TICKS_AFTER_CAM_SAVE;
+            return CmdCamScheduler.TICKS_AFTER_SAVE_OR_LOAD;
         }
         if (commandJustRun.equals(CAM_START_PLAYBACK_A))
         {
@@ -172,38 +115,6 @@ public final class LimitlessDomainCmdCamClient
         {
             return TICKS_AFTER_LOAD_CAMERA_B;
         }
-        return TICKS_AFTER_NORMAL_COMMAND;
-    }
-
-    /**
-     * @param commandWithoutSlash 见 {@link ClientCommandHandler#runCommand(String)}
-     */
-    private static void runCamImmediate(String commandWithoutSlash)
-    {
-        boolean consumed = ClientCommandHandler.runCommand(commandWithoutSlash);
-        if (!consumed)
-        {
-            LOGGER.warn("[CMDCam] Command not handled as client command (is CMDCam installed on this client?): {}", commandWithoutSlash);
-        }
-    }
-
-    @Mod.EventBusSubscriber(modid = JuJutsuKaisenZone.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE, value = Dist.CLIENT)
-    public static final class CamCommandScheduleTicker
-    {
-        private CamCommandScheduleTicker()
-        {
-        }
-
-        @SubscribeEvent
-        public static void onClientTick(TickEvent.ClientTickEvent event)
-        {
-            if (event.phase != TickEvent.Phase.END)
-            {
-                return;
-            }
-            tickScheduledCamCommands();
-            ShrineDomainCmdCamClient.tickScheduledCamCommands();
-            JudgmentDomainCmdCamClient.tickScheduledCamCommands();
-        }
+        return CmdCamScheduler.TICKS_AFTER_NORMAL_COMMAND;
     }
 }

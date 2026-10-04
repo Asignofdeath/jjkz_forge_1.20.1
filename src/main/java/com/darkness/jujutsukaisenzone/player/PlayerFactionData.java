@@ -56,7 +56,6 @@ public final class PlayerFactionData
             FactionAdvancements.grantForFaction(serverPlayer, factionId);
             ModNetwork.sendFactionSync(serverPlayer, factionId);
             GradeAdvancements.syncForPlayer(serverPlayer);
-            PlayerTechniqueData.tryRandomAwakenInnateTechnique(serverPlayer);
             return;
         }
         player.getPersistentData().putString(TAG_FACTION, factionId == null ? "" : factionId);

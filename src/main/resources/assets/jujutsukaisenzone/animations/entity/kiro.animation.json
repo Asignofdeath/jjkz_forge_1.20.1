@@ -1,0 +1,152 @@
+{
+	"format_version": "1.8.0",
+	"animations": {
+		"geo_human_entity_stand_idle": {
+			"loop": true,
+			"animation_length": 2,
+			"bones": {
+				"Waist": {
+					"scale": {
+						"0.0": {
+							"vector": [1, 1, 1]
+						},
+						"1.0": {
+							"vector": [1, 1.01, 1]
+						},
+						"2.0": {
+							"vector": [1, 1, 1]
+						}
+					}
+				},
+				"Right Arm": {
+					"rotation": {
+						"0.0": {
+							"vector": [0, 0, 0]
+						},
+						"1.0": {
+							"vector": [0, 0, 5]
+						},
+						"2.0": {
+							"vector": [0, 0, 0]
+						}
+					}
+				},
+				"Left Arm": {
+					"rotation": {
+						"0.0": {
+							"vector": [0, 0, 0]
+						},
+						"1.0": {
+							"vector": [0, 0, -5]
+						},
+						"2.0": {
+							"vector": [0, 0, 0]
+						}
+					}
+				}
+			}
+		},
+		"craft_at_the_workbench": {
+			"loop": true,
+			"animation_length": 1.375,
+			"bones": {
+				"Waist": {
+					"rotation": {
+						"vector": [
+							32,
+							0,
+							0
+						]
+					}
+				},
+				"Right Arm": {
+					"rotation": {
+						"0.0": {
+							"vector": [
+								-95.1406,
+								7.7257,
+								-2.0832
+							]
+						},
+						"0.6667": {
+							"vector": [
+								-77.31,
+								10.4084,
+								6.3291
+							]
+						},
+						"1.375": {
+							"vector": [
+								-95.1406,
+								7.7257,
+								-2.0832
+							]
+						}
+					}
+				},
+				"Left Arm": {
+					"rotation": {
+						"0.0": {
+							"vector": [
+								-63.8421,
+								8.7572,
+								-10.966
+							]
+						},
+						"0.6667": {
+							"vector": [
+								-72.0305,
+								18.0892,
+								-3.1996
+							]
+						},
+						"1.375": {
+							"vector": [
+								-63.8421,
+								8.7572,
+								-10.966
+							]
+						}
+					}
+				}
+			}
+		},
+		"reach_out_your_hand": {
+			"animation_length": 4,
+			"bones": {
+				"Right Arm": {
+					"rotation": {
+						"0.0": {
+							"vector": [
+								0,
+								0,
+								0
+							]
+						},
+						"0.5417": {
+							"vector": [
+								-87.5,
+								0,
+								0
+							]
+						},
+						"3.0": {
+							"vector": [
+								-87.5,
+								0,
+								0
+							]
+						},
+						"4.0": {
+							"vector": [
+								0,
+								0,
+								0
+							]
+						}
+					}
+				}
+			}
+		}
+	}
+}

@@ -2,6 +2,7 @@ package com.darkness.jujutsukaisenzone.player;
 
 import com.darkness.jujutsukaisenzone.JuJutsuKaisenZone;
 import com.darkness.jujutsukaisenzone.technique.development.SpNodeInstance;
+import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
@@ -148,6 +149,13 @@ public final class JjkzPlayerDataStorage extends SavedData
         private static final String TAG_MELTDOWN_REPAIRS_TODAY = "meltdownRepairsToday";
         private static final String TAG_MELTDOWN_REPAIR_COUNT_DAY = "meltdownRepairCountDay";
         private static final String TAG_MELTDOWN_REPAIR_LEARNED = "meltdownRepairLearned";
+        private static final String TAG_MAIN_QUEST_BOOTSTRAPPED = "mainQuestBootstrapped";
+        private static final String TAG_COMPLETED_MAIN_QUESTS = "completedMainQuests";
+        private static final String TAG_TRACKED_MAIN_QUEST = "trackedMainQuest";
+        private static final String TAG_MAIN_11_INTRO_DONE = "main11IntroDone";
+        private static final String TAG_MAIN_11_TALK_DONE = "main11TalkDone";
+        private static final String TAG_MAIN_11_KITTED = "main11Kitted";
+        private static final String TAG_MAIN_11_CABIN = "main11Cabin";
 
         boolean cursedEnergyInitialized;
         int cursedEnergyBaseMax;
@@ -196,6 +204,14 @@ public final class JjkzPlayerDataStorage extends SavedData
         int meltdownRepairsToday;
         long meltdownRepairCountDay = -1L;
         boolean meltdownRepairLearned;
+        /** 是否已做过主线链头引导（1.1 自动解锁并追踪）。 */
+        boolean mainQuestBootstrapped;
+        final java.util.LinkedHashSet<String> completedMainQuests = new java.util.LinkedHashSet<>();
+        String trackedMainQuest = "";
+        boolean main11IntroDone;
+        boolean main11TalkDone;
+        boolean main11Kitted;
+        @javax.annotation.Nullable BlockPos main11CabinPos;
 
         private static PlayerDataEntry load(CompoundTag tag)
         {
@@ -291,6 +307,29 @@ public final class JjkzPlayerDataStorage extends SavedData
                     ? tag.getLong(TAG_MELTDOWN_REPAIR_COUNT_DAY)
                     : -1L;
             entry.meltdownRepairLearned = tag.getBoolean(TAG_MELTDOWN_REPAIR_LEARNED);
+            entry.mainQuestBootstrapped = tag.getBoolean(TAG_MAIN_QUEST_BOOTSTRAPPED);
+            entry.completedMainQuests.clear();
+            if (tag.contains(TAG_COMPLETED_MAIN_QUESTS, Tag.TAG_LIST))
+            {
+                ListTag completed = tag.getList(TAG_COMPLETED_MAIN_QUESTS, Tag.TAG_STRING);
+                for (int i = 0; i < completed.size(); i++)
+                {
+                    String questId = completed.getString(i);
+                    if (questId != null && !questId.isBlank())
+                    {
+                        entry.completedMainQuests.add(questId);
+                    }
+                }
+            }
+            entry.trackedMainQuest = tag.getString(TAG_TRACKED_MAIN_QUEST);
+            entry.main11IntroDone = tag.getBoolean(TAG_MAIN_11_INTRO_DONE);
+            entry.main11TalkDone = tag.getBoolean(TAG_MAIN_11_TALK_DONE);
+            entry.main11Kitted = tag.getBoolean(TAG_MAIN_11_KITTED);
+            if (tag.contains(TAG_MAIN_11_CABIN, Tag.TAG_COMPOUND))
+            {
+                CompoundTag cabin = tag.getCompound(TAG_MAIN_11_CABIN);
+                entry.main11CabinPos = new BlockPos(cabin.getInt("x"), cabin.getInt("y"), cabin.getInt("z"));
+            }
             return entry;
         }
 
@@ -359,6 +398,28 @@ public final class JjkzPlayerDataStorage extends SavedData
             tag.putInt(TAG_MELTDOWN_REPAIRS_TODAY, Math.max(0, meltdownRepairsToday));
             tag.putLong(TAG_MELTDOWN_REPAIR_COUNT_DAY, meltdownRepairCountDay);
             tag.putBoolean(TAG_MELTDOWN_REPAIR_LEARNED, meltdownRepairLearned);
+            tag.putBoolean(TAG_MAIN_QUEST_BOOTSTRAPPED, mainQuestBootstrapped);
+            ListTag completedQuests = new ListTag();
+            for (String questId : completedMainQuests)
+            {
+                if (questId != null && !questId.isBlank())
+                {
+                    completedQuests.add(net.minecraft.nbt.StringTag.valueOf(questId));
+                }
+            }
+            tag.put(TAG_COMPLETED_MAIN_QUESTS, completedQuests);
+            tag.putString(TAG_TRACKED_MAIN_QUEST, trackedMainQuest == null ? "" : trackedMainQuest);
+            tag.putBoolean(TAG_MAIN_11_INTRO_DONE, main11IntroDone);
+            tag.putBoolean(TAG_MAIN_11_TALK_DONE, main11TalkDone);
+            tag.putBoolean(TAG_MAIN_11_KITTED, main11Kitted);
+            if (main11CabinPos != null)
+            {
+                CompoundTag cabin = new CompoundTag();
+                cabin.putInt("x", main11CabinPos.getX());
+                cabin.putInt("y", main11CabinPos.getY());
+                cabin.putInt("z", main11CabinPos.getZ());
+                tag.put(TAG_MAIN_11_CABIN, cabin);
+            }
             return tag;
         }
 

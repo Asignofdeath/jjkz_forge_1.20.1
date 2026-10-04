@@ -56,7 +56,7 @@ public final class TechniqueSkillSetRegistry
         return Optional.ofNullable(REGISTRY.get(techniqueId));
     }
 
-    /** 已注册的可觉醒生得术式 id 列表（用于阵营选择后随机觉醒）。 */
+    /** 已注册的可觉醒生得术式 id 列表。 */
     public static List<String> getRegisteredTechniqueIds()
     {
         return List.copyOf(REGISTRY.keySet());

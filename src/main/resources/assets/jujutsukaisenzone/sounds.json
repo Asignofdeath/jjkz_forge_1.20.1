@@ -302,5 +302,35 @@
         "name": "jujutsukaisenzone:character/sukuna/zongai_tanoshimeta"
       }
     ]
+  },
+  "quest.task_brief": {
+    "sounds": [{ "name": "jujutsukaisenzone:quest/task_brief" }]
+  },
+  "quest.main_1_1.talk.1": {
+    "sounds": [{ "name": "jujutsukaisenzone:quest/main_1_1/talk_1" }]
+  },
+  "quest.main_1_1.talk.2": {
+    "sounds": [{ "name": "jujutsukaisenzone:quest/main_1_1/talk_2" }]
+  },
+  "quest.main_1_1.talk.3": {
+    "sounds": [{ "name": "jujutsukaisenzone:quest/main_1_1/talk_3" }]
+  },
+  "quest.main_1_1.talk.4": {
+    "sounds": [{ "name": "jujutsukaisenzone:quest/main_1_1/talk_4" }]
+  },
+  "quest.main_1_1.talk.5": {
+    "sounds": [{ "name": "jujutsukaisenzone:quest/main_1_1/talk_5" }]
+  },
+  "quest.main_1_1.talk.7": {
+    "sounds": [{ "name": "jujutsukaisenzone:quest/main_1_1/talk_7" }]
+  },
+  "quest.main_1_1.talk.8": {
+    "sounds": [{ "name": "jujutsukaisenzone:quest/main_1_1/talk_8" }]
+  },
+  "quest.main_1_1.talk.10": {
+    "sounds": [{ "name": "jujutsukaisenzone:quest/main_1_1/talk_10" }]
+  },
+  "quest.main_1_1.talk.11": {
+    "sounds": [{ "name": "jujutsukaisenzone:quest/main_1_1/talk_11" }]
   }
 }

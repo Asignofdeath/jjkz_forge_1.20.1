@@ -88,6 +88,13 @@ public final class LimitlessTechniqueSkillSet extends AbstractInnateTechniqueSki
     public static final String SKILL_RED = "limitless_red";
     public static final String SKILL_PURPLE = "limitless_purple";
     public static final String SKILL_REMOTE_PURPLE = "limitless_remote_murasaki";
+    /** 领域「无量空处」在开发树上的 nodeId。 */
+    public static final String NODE_DOMAIN_MURYOKUSHO = "limitless_domain_muryokusho";
+    /**
+     * 领域「无量空处」的 skillId：机制型，随「习得领域展开」自动点亮，不消耗术式情报。
+     * 瞬发 / 开放式两个领域模式节点都以它为前置。
+     */
+    public static final String SKILL_DOMAIN = "limitless_domain";
     /** 机制型：解锁「领域模式 · 瞬发」（0.2 秒领域展开，叙事名）。 */
     public static final String SKILL_INSTANT_DOMAIN = "limitless_instant_domain";
     /** 机制型：解锁「领域模式 · 开放式」。 */
@@ -95,10 +102,22 @@ public final class LimitlessTechniqueSkillSet extends AbstractInnateTechniqueSki
     public static final String REF_CURSED_GRADE_SPECIAL = "ref_cursed_grade_special";
     public static final String REF_BARRIER_MASTERED = "ref_barrier_mastered";
 
+    private static final String TAG_DOMAIN_UNLOCK = "jujutsukaisenzone_limitless_domain_unlock";
     private static final String TAG_INSTANT_DOMAIN_UNLOCK = "jujutsukaisenzone_limitless_instant_domain_unlock";
     private static final String TAG_OPEN_DOMAIN_UNLOCK = "jujutsukaisenzone_limitless_open_domain_unlock";
+    private static final String ICON_DOMAIN = "textures/item/innate_technique_limitless.png";
     private static final String ICON_INSTANT_DOMAIN = "textures/item/innate_technique_limitless.png";
     private static final String ICON_OPEN_DOMAIN = "textures/item/innate_technique_limitless.png";
+
+    /**
+     * 机制型：领域「无量空处」在开发树上的落点。
+     * <p>
+     * 解锁与否<b>不写在存档里</b> —— 节点走 {@code autoUnlockWhenConditionsMet}，每次判定都实时看
+     * 「有没有习得领域展开」，所以领域状态变了节点跟着变，不需要额外维护一份开关。
+     */
+    private static final TechniqueSkill MECHANIC_DOMAIN = new TechniqueSkill(
+            SKILL_DOMAIN, 0, Component.literal("无量空处"), ICON_DOMAIN,
+            0, 0, 0, "", TAG_DOMAIN_UNLOCK, "");
 
     private static final TechniqueSkill MECHANIC_INSTANT_DOMAIN = new TechniqueSkill(
             SKILL_INSTANT_DOMAIN, 0, Component.literal("0.2秒的领域展开"), ICON_INSTANT_DOMAIN,
@@ -108,7 +127,8 @@ public final class LimitlessTechniqueSkillSet extends AbstractInnateTechniqueSki
             SKILL_OPEN_DOMAIN, 0, Component.literal("开放式无量空处"), ICON_OPEN_DOMAIN,
             0, 0, 0, "", TAG_OPEN_DOMAIN_UNLOCK, "");
 
-    private static final List<TechniqueSkill> MECHANICS = List.of(MECHANIC_INSTANT_DOMAIN, MECHANIC_OPEN_DOMAIN);
+    private static final List<TechniqueSkill> MECHANICS =
+            List.of(MECHANIC_DOMAIN, MECHANIC_INSTANT_DOMAIN, MECHANIC_OPEN_DOMAIN);
 
     private static final List<TechniqueSkill> SKILLS = Arrays.asList(
             new TechniqueSkill(SKILL_BLUE, 1, net.minecraft.network.chat.Component.literal("苍"),
@@ -154,12 +174,16 @@ public final class LimitlessTechniqueSkillSet extends AbstractInnateTechniqueSki
                     .requires("limitless_purple", REF_CURSED_GRADE_SPECIAL)
                     .intelCost(500)
                     .build())
-            .node(SkillTreeNodeDef.info("limitless_domain_muryokusho")
-                    .titleKey("skill_tree.jujutsukaisenzone.limitless_domain_muryokusho.title")
-                    .iconPath("textures/item/innate_technique_limitless.png")
-                    .descriptionKey("skill_tree.jujutsukaisenzone.limitless_domain_muryokusho.desc")
+            /*
+             * 领域「无量空处」：习得领域展开的<b>瞬间自动点亮</b>，不消耗术式情报、也不需要点选。
+             * 它是瞬发 / 开放式两个领域模式节点的共同前置，所以必须是真实的 skill 节点
+             * （说明节点不参与连线与解锁判定，挂不住任何东西）。
+             */
+            .node(SkillTreeNodeDef.skill(NODE_DOMAIN_MURYOKUSHO, SKILL_DOMAIN)
                     .requires("limitless_purple")
+                    .conditions(UnlockCondition.hasDomainExpansion())
                     .visibleWhen(UnlockCondition.hasDomainExpansion())
+                    .autoUnlockWhenConditionsMet()
                     .build())
             .node(SkillTreeNodeDef.reference(
                     REF_BARRIER_MASTERED,
@@ -169,9 +193,10 @@ public final class LimitlessTechniqueSkillSet extends AbstractInnateTechniqueSki
             /*
              * 机制型：「0.2秒的领域展开」——解锁通用圆盘「领域模式」的瞬发档。
              * 条件：已习得领域展开 + 结界术达到掌握（熟练）；前置节点用引用节点展示结界等级。
+             * 前置里的领域节点即「无量空处」本身 —— 没习得领域展开就没有这两个模式可谈。
              */
             .node(SkillTreeNodeDef.skill("limitless_instant_domain", SKILL_INSTANT_DOMAIN)
-                    .requires("limitless_purple", REF_BARRIER_MASTERED)
+                    .requires(NODE_DOMAIN_MURYOKUSHO, REF_BARRIER_MASTERED)
                     .conditions(
                             UnlockCondition.hasDomainExpansion(),
                             UnlockCondition.minBarrierTechniqueLevel(BarrierTechniqueLevel.MASTERED))
@@ -182,7 +207,7 @@ public final class LimitlessTechniqueSkillSet extends AbstractInnateTechniqueSki
              * 条件：已习得领域展开 + 结界术完全掌握；无壳、范围立方体贴图。
              */
             .node(SkillTreeNodeDef.skill("limitless_open_domain", SKILL_OPEN_DOMAIN)
-                    .requires("limitless_purple", REF_BARRIER_MASTERED)
+                    .requires(NODE_DOMAIN_MURYOKUSHO, REF_BARRIER_MASTERED)
                     .conditions(
                             UnlockCondition.hasDomainExpansion(),
                             UnlockCondition.minBarrierTechniqueLevel(BarrierTechniqueLevel.MASTERED))

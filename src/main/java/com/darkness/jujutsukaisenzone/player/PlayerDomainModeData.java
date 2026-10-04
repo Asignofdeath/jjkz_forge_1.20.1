@@ -3,6 +3,7 @@ package com.darkness.jujutsukaisenzone.player;
 import com.darkness.jujutsukaisenzone.network.CommandWheelNetwork;
 import com.darkness.jujutsukaisenzone.technique.development.SkillUnlockLogic;
 import com.darkness.jujutsukaisenzone.technique.skillset.LimitlessTechniqueSkillSet;
+import com.darkness.jujutsukaisenzone.technique.skillset.ShrineTechniqueSkillSet;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
 
@@ -15,8 +16,12 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * 领域展开模式：常规 / 瞬发 / 开放式。会话态，默认常规。
  * <p>
- * 瞬发：已解锁无下限「0.2秒的领域展开」。
- * 开放式：已解锁无下限「开放式无量空处」。
+ * 模式是<strong>通用</strong>的（不绑术式），但每一档都要对应术式自己的机制型技能解锁：
+ * <ul>
+ *   <li>瞬发：无下限「0.2秒的领域展开」/ 御厨子「真正的咒术」</li>
+ *   <li>开放式：无下限「开放式无量空处」</li>
+ * </ul>
+ * 因此{@link #availableModes(Player)}只列出该玩家当前术式真正解锁了的档位。
  */
 public final class PlayerDomainModeData
 {
@@ -63,14 +68,33 @@ public final class PlayerDomainModeData
         return get(player) == Mode.OPEN;
     }
 
+    /**
+     * 瞬发档是否可用：当前术式必须存在对应的瞬发机制型技能，且已解锁。
+     * <p>
+     * 无下限 =「0.2秒的领域展开」，御厨子 =「真正的咒术」；两者行为同口径（见
+     * {@code AbstractDomainExpansion} 的 skybox-only / auto-close 路径）。
+     */
     public static boolean canUseInstantMode(Player player)
     {
-        return player != null
-                && PlayerTechniqueData.isLimitless(player)
-                && SkillUnlockLogic.isSkillUnlockedById(
-                        player,
-                        PlayerTechniqueData.TECHNIQUE_LIMITLESS,
-                        LimitlessTechniqueSkillSet.SKILL_INSTANT_DOMAIN);
+        if (player == null)
+        {
+            return false;
+        }
+        if (PlayerTechniqueData.isLimitless(player))
+        {
+            return SkillUnlockLogic.isSkillUnlockedById(
+                    player,
+                    PlayerTechniqueData.TECHNIQUE_LIMITLESS,
+                    LimitlessTechniqueSkillSet.SKILL_INSTANT_DOMAIN);
+        }
+        if (PlayerTechniqueData.isShrine(player))
+        {
+            return SkillUnlockLogic.isSkillUnlockedById(
+                    player,
+                    PlayerTechniqueData.TECHNIQUE_SHRINE,
+                    ShrineTechniqueSkillSet.SKILL_INSTANT_DOMAIN);
+        }
+        return false;
     }
 
     public static boolean canUseOpenMode(Player player)
@@ -169,12 +193,21 @@ public final class PlayerDomainModeData
         }
     }
 
+    /**
+     * 切换术式后清理不再适用的领域模式。
+     * <p>
+     * 无下限与御厨子各自都有「瞬发」机制型技能，切到这两者时保留当前档位 —— 实际能不能用由
+     * {@link #sanitize(Player, Mode)} 在每次读取时按当前术式的解锁情况收正（未解锁按常规处理）。
+     * 切到其它术式则直接清掉。
+     */
     public static void clearIfTechniqueChanged(ServerPlayer player, String newTechniqueId)
     {
-        if (!PlayerTechniqueData.TECHNIQUE_LIMITLESS.equals(newTechniqueId))
+        if (PlayerTechniqueData.TECHNIQUE_LIMITLESS.equals(newTechniqueId)
+                || PlayerTechniqueData.TECHNIQUE_SHRINE.equals(newTechniqueId))
         {
-            clear(player);
+            return;
         }
+        clear(player);
     }
 
     public static void onLogout(ServerPlayer player)

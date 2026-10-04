@@ -6,7 +6,6 @@ import com.lowdragmc.lowdraglib.utils.Rect;
 import com.lowdragmc.lowdraglib.utils.Size;
 import com.darkness.jujutsukaisenzone.client.TechniqueSkillTooltipHelper;
 import com.darkness.jujutsukaisenzone.network.ModNetwork;
-import com.darkness.jujutsukaisenzone.technique.crit.CritSkillPolicy;
 import com.darkness.jujutsukaisenzone.technique.development.SkillLevelRules;
 import com.darkness.jujutsukaisenzone.technique.development.SkillUpgradeCost.CursedObjectIngredient;
 import com.darkness.jujutsukaisenzone.technique.development.SkillUpgradeCostRegistry;
@@ -193,22 +192,18 @@ public final class SkillTreeNodeWidget extends com.lowdragmc.lowdraglib.gui.widg
         {
             Component title = TechniqueSkillTreeViewHelper.getDisplayName(player, techniqueId, nodeDef);
             Component body = Component.translatable(nodeDef.infoDescriptionKey()).withStyle(ChatFormatting.GRAY);
-            if (nodeDef.isDomainInfoNode())
+            /*
+             * 只讲领域规则的说明节点（如审判的「上诉」）也同属领域系，标题下补同一行红色标注。
+             * 判据与下面 skill 分支共用 {@code isDomainNode()}——只认条件表里的「已习得领域展开」，
+             * 与节点种类无关，所以三种形态（本体 / 模式 / 规则说明）不会各自漏掉一种。
+             */
+            if (nodeDef.isDomainNode())
             {
-                List<Component> domainLines = new ArrayList<>(5);
-                domainLines.add(title.copy().withStyle(ChatFormatting.AQUA));
-                domainLines.add(Component.translatable(TechniqueSkillDescriptionKeys.DOMAIN_EXPANSION_TAG)
-                        .withStyle(ChatFormatting.RED));
-                // 领域斩击是每 10 tick 的持续伤害 ⇒ 该领域的说明节点要标明不参与暴击。
-                // 领域没有 skillId，只能按 nodeId 判定（名单见 CritSkillPolicy）。
-                if (CritSkillPolicy.isNoCritInfoNode(nodeDef.nodeId()))
-                {
-                    domainLines.add(Component.translatable(TechniqueSkillDescriptionKeys.NO_CRIT_TAG)
-                            .withStyle(ChatFormatting.LIGHT_PURPLE));
-                }
-                domainLines.add(Component.empty());
-                domainLines.add(body);
-                setHoverTooltips(domainLines);
+                setHoverTooltips(
+                        title.copy().withStyle(ChatFormatting.AQUA),
+                        Component.translatable(TechniqueSkillDescriptionKeys.DOMAIN_EXPANSION_TAG)
+                                .withStyle(ChatFormatting.RED),
+                        body);
                 return;
             }
             setHoverTooltips(
@@ -242,6 +237,20 @@ public final class SkillTreeNodeWidget extends com.lowdragmc.lowdraglib.gui.widg
                 skill -> {
                     List<Component> tooltip = new ArrayList<>(
                             TechniqueSkillTooltipHelper.build(player, techniqueId, skill));
+                    /*
+                     * 领域系节点在标题之下补一行红色「领域展开」。
+                     * <p>
+                     * 判据是 {@code nodeDef.isDomainNode()}（看条件表里有没有「已习得领域展开」），
+                     * 而不是节点 id 或一份术式名单 —— 领域本体 / 瞬发 / 开放式三种形态都自动带上，
+                     * 以后新增领域节点也不必回来登记。
+                     * 「不参与暴击」那行由 {@code TechniqueSkillTooltipHelper} 按 skillId 打，
+                     * 领域节点既然是 skill 节点，就与别的招式走同一条路径，这里不再特判。
+                     */
+                    if (nodeDef.isDomainNode() && !tooltip.isEmpty())
+                    {
+                        tooltip.add(1, Component.translatable(TechniqueSkillDescriptionKeys.DOMAIN_EXPANSION_TAG)
+                                .withStyle(ChatFormatting.RED));
+                    }
                     if (state == TechniqueSkillTreeViewHelper.NodeVisualState.SKILL_UNLOCKED)
                     {
                         appendUpgradeCostLines(tooltip, player, nodeDef.skillId());

@@ -30,7 +30,7 @@ public final class ModSounds
     public static final RegistryObject<SoundEvent> LIMITLESS_DOMAIN_CENTER_AMBIENT = register("domain.limitless_domain_sound");
     /** 无量空处「完美控制」反馈（{@code assets/.../sounds/sound_effects/iron_sound}）。 */
     public static final RegistryObject<SoundEvent> SOUND_EFFECTS_IRON_SOUND = register("sound_effects.iron_sound");
-    /** 「完美控制」时在领域球心播放的一次性环境音效（{@code assets/.../sounds/domain/limitless_domain_perfect}）。 */
+    /** 「完美控制」时在领域球心播放的一次性环境音效。音频不随模组分发，需资源包提供（{@code assets/.../sounds/domain/limitless_domain_perfect}）。 */
     public static final RegistryObject<SoundEvent> LIMITLESS_DOMAIN_PERFECT_AMBIENT = register("domain.limitless_domain_perfect");
     /** 伏魔神龛领域展开演出时在施法者处播放。 */
     public static final RegistryObject<SoundEvent> SHRINE_DOMAIN_EXPANSION = register("domain.shrine_domain_expension");
@@ -40,9 +40,9 @@ public final class ModSounds
     public static final RegistryObject<SoundEvent> SHRINE_SLASH_POWER = register("domain.shrine_slash_power");
     /** 伏魔神龛领域内击杀生物时播放。 */
     public static final RegistryObject<SoundEvent> SLASH_KILL = register("domain.slash_kill");
-    /** 伏魔神龛「完美压制」反馈（{@code assets/.../sounds/domain/shrine_perfect}）。 */
+    /** 伏魔神龛「完美压制」反馈。音频不随模组分发，需资源包提供（{@code assets/.../sounds/domain/shrine_perfect}）。 */
     public static final RegistryObject<SoundEvent> SHRINE_DOMAIN_PERFECT = register("domain.shrine_perfect");
-    /** 诛伏赐死「全员回来重审」反馈（{@code assets/.../sounds/domain/chubukushishi_perfect_new}）。 */
+    /** 诛伏赐死「全员回来重审」反馈。音频不随模组分发，需资源包提供（{@code assets/.../sounds/domain/chubukushishi_perfect_new}）。 */
     public static final RegistryObject<SoundEvent> JUDGMENT_DOMAIN_PERFECT = register("domain.chubukushishi_perfect");
     /** 诛伏赐死领域点击【开始审判】时于中心播放（{@code assets/.../sounds/domain/hold_a_court_session}）。 */
     public static final RegistryObject<SoundEvent> JUDGMENT_DOMAIN_HOLD_A_COURT_SESSION = register("domain.hold_a_court_session");
@@ -89,15 +89,27 @@ public final class ModSounds
             SOUND_EVENTS.register("jutsushiki.love_rendezvous.star_mark", () -> SoundEvent.createFixedRangeEvent(
                     ResourceLocation.fromNamespaceAndPath(JuJutsuKaisenZone.MODID, "jutsushiki.love_rendezvous.star_mark"),
                     32.0F));
-    /** 宿傩拟态语音「hmph」（{@code assets/.../sounds/character/sukuna/hmph}）。 */
+    /** 宿傩拟态语音「hmph」。音频不随模组分发，需资源包提供（{@code assets/.../sounds/character/sukuna/hmph}）。 */
     public static final RegistryObject<SoundEvent> SUKUNA_HMPH = register("character.sukuna.hmph");
-    /** 宿傩拟态语音「kai」（{@code assets/.../sounds/character/sukuna/kai}）。 */
+    /** 宿傩拟态语音「kai」。音频不随模组分发，需资源包提供（{@code assets/.../sounds/character/sukuna/kai}）。 */
     public static final RegistryObject<SoundEvent> SUKUNA_KAI = register("character.sukuna.kai");
-    /** 宿傩拟态语音「灶」（{@code assets/.../sounds/character/sukuna/fuga}）。 */
+    /** 宿傩拟态语音「灶」。音频不随模组分发，需资源包提供（{@code assets/.../sounds/character/sukuna/fuga}）。 */
     public static final RegistryObject<SoundEvent> SUKUNA_FUGA = register("character.sukuna.fuga");
-    /** 宿傩拟态语音「ぞんがい楽しめたぞ」（{@code assets/.../sounds/character/sukuna/zongai_tanoshimeta}）。 */
+    /** 宿傩拟态语音「ぞんがい楽しめたぞ」。音频不随模组分发，需资源包提供（{@code assets/.../sounds/character/sukuna/zongai_tanoshimeta}）。 */
     public static final RegistryObject<SoundEvent> SUKUNA_ZONGAI_TANOSHIMETA =
             register("character.sukuna.zongai_tanoshimeta");
+
+    /** 任务简报弹出音效（{@code assets/.../sounds/quest/task_brief}）。 */
+    public static final RegistryObject<SoundEvent> QUEST_TASK_BRIEF = register("quest.task_brief");
+    public static final RegistryObject<SoundEvent> QUEST_MAIN_1_1_TALK_1 = register("quest.main_1_1.talk.1");
+    public static final RegistryObject<SoundEvent> QUEST_MAIN_1_1_TALK_2 = register("quest.main_1_1.talk.2");
+    public static final RegistryObject<SoundEvent> QUEST_MAIN_1_1_TALK_3 = register("quest.main_1_1.talk.3");
+    public static final RegistryObject<SoundEvent> QUEST_MAIN_1_1_TALK_4 = register("quest.main_1_1.talk.4");
+    public static final RegistryObject<SoundEvent> QUEST_MAIN_1_1_TALK_5 = register("quest.main_1_1.talk.5");
+    public static final RegistryObject<SoundEvent> QUEST_MAIN_1_1_TALK_7 = register("quest.main_1_1.talk.7");
+    public static final RegistryObject<SoundEvent> QUEST_MAIN_1_1_TALK_8 = register("quest.main_1_1.talk.8");
+    public static final RegistryObject<SoundEvent> QUEST_MAIN_1_1_TALK_10 = register("quest.main_1_1.talk.10");
+    public static final RegistryObject<SoundEvent> QUEST_MAIN_1_1_TALK_11 = register("quest.main_1_1.talk.11");
 
     private ModSounds()
     {
