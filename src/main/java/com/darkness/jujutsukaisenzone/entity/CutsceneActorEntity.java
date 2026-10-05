@@ -43,12 +43,16 @@ public class CutsceneActorEntity extends Entity implements GeoEntity
             SynchedEntityData.defineId(CutsceneActorEntity.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Integer> DATA_CLIP_NONCE =
             SynchedEntityData.defineId(CutsceneActorEntity.class, EntityDataSerializers.INT);
+    private static final EntityDataAccessor<Float> DATA_TARGET_YAW =
+            SynchedEntityData.defineId(CutsceneActorEntity.class, EntityDataSerializers.FLOAT);
 
     private final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
     private int clientAppliedNonce = Integer.MIN_VALUE;
     private int restoreTicks = -1;
     private String restoreClip = "";
     private boolean restoreLoop;
+    /** 每 tick 逼近目标的比例；客户端也跑，避免追踪包把转身切成几帧。 */
+    private static final float TURN_LERP = 0.28F;
 
     public CutsceneActorEntity(EntityType<? extends CutsceneActorEntity> type, Level level)
     {
@@ -86,7 +90,14 @@ public class CutsceneActorEntity extends Entity implements GeoEntity
 
     public void lookYaw(float yaw)
     {
+        this.entityData.set(DATA_TARGET_YAW, Mth.wrapDegrees(yaw));
+    }
+
+    /** 出生/瞬切：不插值。 */
+    public void snapLookYaw(float yaw)
+    {
         float wrapped = Mth.wrapDegrees(yaw);
+        this.entityData.set(DATA_TARGET_YAW, wrapped);
         this.setYRot(wrapped);
         this.yRotO = wrapped;
     }
@@ -113,6 +124,26 @@ public class CutsceneActorEntity extends Entity implements GeoEntity
         return Boolean.TRUE.equals(this.entityData.get(DATA_LOOP));
     }
 
+    private void stepYawTowardTarget()
+    {
+        float target = this.entityData.get(DATA_TARGET_YAW);
+        float current = Mth.wrapDegrees(this.getYRot());
+        float delta = Mth.wrapDegrees(target - current);
+        if (Math.abs(delta) < 0.15F)
+        {
+            this.setYRot(target);
+            return;
+        }
+        this.setYRot(current + delta * TURN_LERP);
+    }
+
+    /** 朝向由本地插值，不要被位置包的 yaw 拽跳。 */
+    @Override
+    public void lerpTo(double x, double y, double z, float yRot, float xRot, int steps, boolean teleport)
+    {
+        super.lerpTo(x, y, z, this.getYRot(), this.getXRot(), steps, teleport);
+    }
+
     @Override
     public boolean shouldBeSaved()
     {
@@ -123,10 +154,11 @@ public class CutsceneActorEntity extends Entity implements GeoEntity
     public void tick()
     {
         super.tick();
+        this.setDeltaMovement(Vec3.ZERO);
+        this.move(MoverType.SELF, Vec3.ZERO);
+        stepYawTowardTarget();
         if (!this.level().isClientSide)
         {
-            this.setDeltaMovement(Vec3.ZERO);
-            this.move(MoverType.SELF, Vec3.ZERO);
             if (this.restoreTicks > 0)
             {
                 this.restoreTicks--;
@@ -173,6 +205,7 @@ public class CutsceneActorEntity extends Entity implements GeoEntity
         this.entityData.define(DATA_CLIP, "");
         this.entityData.define(DATA_LOOP, true);
         this.entityData.define(DATA_CLIP_NONCE, 0);
+        this.entityData.define(DATA_TARGET_YAW, 0.0F);
     }
 
     @Override

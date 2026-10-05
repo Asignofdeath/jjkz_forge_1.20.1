@@ -1,4 +1,4 @@
-package com.darkness.jujutsukaisenzone.quest;
+package com.darkness.jujutsukaisenzone.quest.mainline;
 
 import com.darkness.jujutsukaisenzone.locate.PlayerLocateGuidance;
 import com.darkness.jujutsukaisenzone.locate.StructureLocateTarget;
@@ -7,7 +7,12 @@ import com.darkness.jujutsukaisenzone.network.packet.SyncQuestMissionBriefingS2C
 import com.darkness.jujutsukaisenzone.network.packet.SyncQuestProgressS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncQuestTrackS2CPacket;
 import com.darkness.jujutsukaisenzone.player.PlayerQuestData;
+import com.darkness.jujutsukaisenzone.quest.mainline.main_1_1.MainQuest11Intro;
+import com.darkness.jujutsukaisenzone.quest.mainline.main_1_1.MainQuest11VillageClear;
+import com.darkness.jujutsukaisenzone.quest.mainline.main_1_1.MainQuest11VillageNightApproach;
+import com.darkness.jujutsukaisenzone.quest.mainline.main_1_2.MainQuest12Anomaly;
 import java.util.ArrayList;
+import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 
@@ -35,9 +40,14 @@ public final class MainQuestLogic
         syncProgress(player);
         // 先强制清客户端引导 HUD，再按进度决定要不要重新开导航（防换世界残留）
         PlayerLocateGuidance.clearSilent(player);
-        if (MainQuestDefs.MAIN_1_1_ID.equals(PlayerQuestData.getTrackedId(player)))
+        String tracked = PlayerQuestData.getTrackedId(player);
+        if (MainQuestDefs.MAIN_1_1_ID.equals(tracked))
         {
             MainQuest11Intro.startIfNeeded(player);
+        }
+        if (MainQuestDefs.MAIN_1_2_ID.equals(tracked))
+        {
+            MainQuest12Anomaly.startIfNeeded(player);
         }
         ensureLocateForTracked(player, false);
     }
@@ -86,6 +96,10 @@ public final class MainQuestLogic
         {
             MainQuest11Intro.startIfNeeded(player);
         }
+        if (MainQuestDefs.MAIN_1_2_ID.equals(def.id()))
+        {
+            MainQuest12Anomaly.startIfNeeded(player);
+        }
         ensureLocateForTracked(player, announce);
         // 常规追踪立刻播简报；main_1_1 尚未揭幕巡镜时延后到 finishBlackout
         if (announce && !shouldDeferMissionBriefing(player, def))
@@ -131,6 +145,8 @@ public final class MainQuestLogic
         }
         clearLocateIfOwnedByQuest(player, tracked);
         MainQuest11Intro.abort(player);
+        MainQuest12Anomaly.abort(player);
+        MainQuest11VillageNightApproach.clear(player);
         PlayerQuestData.setTrackedId(player, null);
         syncProgress(player);
         if (announce)
@@ -160,6 +176,10 @@ public final class MainQuestLogic
         if (target == null || !target.id().equals(locateTargetId))
         {
             return false;
+        }
+        if (MainQuestDefs.MAIN_1_1_ID.equals(def.id()))
+        {
+            MainQuest11VillageNightApproach.onArrived(player);
         }
         complete(player, def.id(), true);
         return true;
@@ -191,6 +211,10 @@ public final class MainQuestLogic
             return;
         }
         PlayerQuestData.markCompleted(player, questId);
+        if (MainQuestDefs.MAIN_1_2_ID.equals(questId))
+        {
+            MainQuest12Anomaly.onCompleted(player);
+        }
         if (questId.equals(PlayerQuestData.getTrackedId(player)))
         {
             clearLocateIfOwnedByQuest(player, questId);
@@ -201,6 +225,12 @@ public final class MainQuestLogic
         {
             player.sendSystemMessage(Component.translatable("message.jujutsukaisenzone.quest.completed",
                     Component.translatable(def.titleKey())));
+        }
+        // 标准交接：完成 → 解锁下一环 → 自动追踪
+        MainQuestDef next = MainQuestDefs.nextAfter(questId);
+        if (next != null && !PlayerQuestData.isCompleted(player, next.id()))
+        {
+            track(player, next.id(), announce);
         }
     }
 
@@ -213,6 +243,8 @@ public final class MainQuestLogic
             clearLocateIfOwnedByQuest(player, tracked);
         }
         MainQuest11Intro.abort(player);
+        MainQuest12Anomaly.abort(player);
+        MainQuest11VillageNightApproach.clear(player);
         PlayerQuestData.clearAllProgress(player);
         syncProgress(player);
         bootstrapIfNeeded(player);
@@ -243,11 +275,61 @@ public final class MainQuestLogic
         {
             return;
         }
-        // 始终用最新校正坐标刷新会话（原版 locate 常把 Y=0，需 refinement）
-        if (PlayerLocateGuidance.start(player, def.locateTarget(), announce)
+        StructureLocateTarget target = def.locateTarget();
+        boolean villageNav = StructureLocateTarget.NEAREST_VILLAGE.id().equals(target.id());
+        if (villageNav)
+        {
+            ensurePinnedVillageNavigate(player, target, announce, tracked);
+            return;
+        }
+        if (PlayerLocateGuidance.start(player, target, announce)
                 && MainQuestDefs.MAIN_1_1_ID.equals(tracked))
         {
             MainQuest11VillageClear.clearNearestVillage(player);
+        }
+    }
+
+    /**
+     * 叙事村：首次 findNearest 后锁定坐标；之后只 startFixed，禁止随玩家位置改村。
+     */
+    private static void ensurePinnedVillageNavigate(
+            ServerPlayer player, StructureLocateTarget target, boolean announce, String tracked)
+    {
+        BlockPos pinned = NarrativeVillage.pinnedPos(player);
+        PlayerLocateGuidance.Session existing = PlayerLocateGuidance.get(player);
+        if (pinned == null
+                && existing != null
+                && StructureLocateTarget.NEAREST_VILLAGE.id().equals(existing.targetId()))
+        {
+            pinned = existing.targetPos();
+            NarrativeVillage.pin(player, pinned);
+        }
+        if (pinned != null)
+        {
+            if (existing != null
+                    && StructureLocateTarget.NEAREST_VILLAGE.id().equals(existing.targetId())
+                    && pinned.equals(existing.targetPos()))
+            {
+                return;
+            }
+            if (PlayerLocateGuidance.startFixed(player, target, pinned, announce)
+                    && MainQuestDefs.MAIN_1_1_ID.equals(tracked))
+            {
+                MainQuest11VillageClear.clearNarrativeVillage(player);
+            }
+            return;
+        }
+        if (PlayerLocateGuidance.start(player, target, announce))
+        {
+            PlayerLocateGuidance.Session session = PlayerLocateGuidance.get(player);
+            if (session != null)
+            {
+                NarrativeVillage.pin(player, session.targetPos());
+            }
+            if (MainQuestDefs.MAIN_1_1_ID.equals(tracked))
+            {
+                MainQuest11VillageClear.clearNarrativeVillage(player);
+            }
         }
     }
 
@@ -274,11 +356,17 @@ public final class MainQuestLogic
             NetworkSenders.toPlayer(player, SyncQuestTrackS2CPacket.clear());
             return;
         }
+        String objectiveKey = def.objectiveKey();
+        String phaseObjective = MainQuest12Anomaly.objectiveKeyOverride(player);
+        if (phaseObjective != null)
+        {
+            objectiveKey = phaseObjective;
+        }
         NetworkSenders.toPlayer(player, new SyncQuestTrackS2CPacket(
                 true,
                 def.id(),
                 Component.translatable(def.titleKey()).getString(),
-                Component.translatable(def.objectiveKey()).getString()));
+                Component.translatable(objectiveKey).getString()));
     }
 
     private static void dropStaleQuestProgress(ServerPlayer player)

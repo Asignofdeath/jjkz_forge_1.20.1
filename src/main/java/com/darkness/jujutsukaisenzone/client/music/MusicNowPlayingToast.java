@@ -1,22 +1,28 @@
 package com.darkness.jujutsukaisenzone.client.music;
 
 import com.darkness.jujutsukaisenzone.JuJutsuKaisenZone;
+import com.darkness.jujutsukaisenzone.client.QuestBlackoutOverlay;
 import com.darkness.jujutsukaisenzone.music.ModMusicTrack;
 import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.VertexSorting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.client.event.RenderGuiEvent;
-import net.minecraftforge.client.event.ScreenEvent;
-import net.minecraftforge.eventbus.api.EventPriority;
+import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import org.joml.Matrix4f;
 
 /**
  * 开播时右上角划入小框：曲名 + 来源，停留后收回。
+ * <p>
+ * 绘制对齐 {@link com.darkness.jujutsukaisenzone.client.QuestMissionBriefingOverlay}：
+ * {@link TickEvent.RenderTickEvent} {@code END} + 自建 {@link GuiGraphics}。
+ * CMDCam 运镜时 {@code hideGui=true} 会跳过 {@code Gui.render}，{@code RenderGuiEvent} 不会触发。
  */
 @Mod.EventBusSubscriber(modid = JuJutsuKaisenZone.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE, value = Dist.CLIENT)
 public final class MusicNowPlayingToast
@@ -48,33 +54,29 @@ public final class MusicNowPlayingToast
         active = new ActiveToast(track.title(), track.source(), System.currentTimeMillis());
     }
 
-    @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onScreenRenderPost(ScreenEvent.Render.Post event)
+    @SubscribeEvent
+    public static void onRenderTick(TickEvent.RenderTickEvent event)
     {
-        render(event.getGuiGraphics(), event.getScreen().width, event.getScreen().height);
-    }
-
-    @SubscribeEvent(priority = EventPriority.LOW)
-    public static void onRenderGui(RenderGuiEvent.Post event)
-    {
-        Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.screen != null)
+        if (event.phase != TickEvent.Phase.END)
         {
             return;
         }
-        render(
-                event.getGuiGraphics(),
-                event.getWindow().getGuiScaledWidth(),
-                event.getWindow().getGuiScaledHeight());
-    }
-
-    private static void render(GuiGraphics graphics, int screenW, int screenH)
-    {
         ActiveToast toast = active;
         if (toast == null)
         {
             return;
         }
+        if (QuestBlackoutOverlay.isActive())
+        {
+            return;
+        }
+
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.level == null)
+        {
+            return;
+        }
+
         long elapsed = System.currentTimeMillis() - toast.startedAtMs;
         if (elapsed >= TOTAL_MS)
         {
@@ -82,8 +84,37 @@ public final class MusicNowPlayingToast
             return;
         }
 
-        Minecraft minecraft = Minecraft.getInstance();
-        Font font = minecraft.font;
+        float alpha = resolveAlpha(elapsed);
+        if (alpha <= 0.01F)
+        {
+            return;
+        }
+
+        int screenW = minecraft.getWindow().getGuiScaledWidth();
+        int screenH = minecraft.getWindow().getGuiScaledHeight();
+
+        RenderSystem.backupProjectionMatrix();
+        Matrix4f ortho = new Matrix4f().setOrtho(0.0F, (float) screenW, (float) screenH, 0.0F, 1000.0F, 3000.0F);
+        RenderSystem.setProjectionMatrix(ortho, VertexSorting.ORTHOGRAPHIC_Z);
+
+        PoseStack modelView = RenderSystem.getModelViewStack();
+        modelView.pushPose();
+        modelView.setIdentity();
+        modelView.translate(0.0D, 0.0D, 1000.0D - 3000.0D);
+        RenderSystem.applyModelViewMatrix();
+
+        GuiGraphics graphics = new GuiGraphics(minecraft, minecraft.renderBuffers().bufferSource());
+        render(graphics, minecraft.font, screenW, toast, elapsed, alpha);
+        graphics.flush();
+
+        modelView.popPose();
+        RenderSystem.applyModelViewMatrix();
+        RenderSystem.restoreProjectionMatrix();
+    }
+
+    private static void render(
+            GuiGraphics graphics, Font font, int screenW, ActiveToast toast, long elapsed, float alpha)
+    {
         int paddingX = 12;
         int paddingY = 8;
         int gap = 3;
@@ -92,12 +123,6 @@ public final class MusicNowPlayingToast
         int panelH = paddingY * 2 + font.lineHeight + gap + font.lineHeight;
 
         float slide = resolveSlide(elapsed);
-        float alpha = resolveAlpha(elapsed);
-        if (alpha <= 0.01F)
-        {
-            return;
-        }
-
         int right = screenW - MARGIN;
         int left = right - panelW;
         int top = MARGIN;
@@ -108,7 +133,6 @@ public final class MusicNowPlayingToast
         graphics.pose().pushPose();
         RenderSystem.disableDepthTest();
         RenderSystem.depthMask(false);
-        graphics.pose().translate(0.0F, 0.0F, 1000.0F);
 
         int panelAlpha = Math.round(210 * alpha);
         int borderAlpha = Math.round(230 * alpha);

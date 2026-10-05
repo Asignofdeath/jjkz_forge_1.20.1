@@ -32,11 +32,38 @@ public final class ModMusic
             boolean loop,
             int fadeMs)
     {
+        play(player, trackId, priority, loop, fadeMs, 1.0F, 0);
+    }
+
+    public static void play(
+            ServerPlayer player,
+            String trackId,
+            MusicPriority priority,
+            boolean loop,
+            int fadeMs,
+            float volume,
+            int durationMs)
+    {
+        play(player, trackId, priority, loop, fadeMs, volume, durationMs, 0);
+    }
+
+    public static void play(
+            ServerPlayer player,
+            String trackId,
+            MusicPriority priority,
+            boolean loop,
+            int fadeMs,
+            float volume,
+            int durationMs,
+            int fadeOutMs)
+    {
         if (player == null || trackId == null || trackId.isEmpty() || priority == null)
         {
             return;
         }
-        NetworkSenders.toPlayer(player, new SyncMusicPlayS2CPacket(trackId, priority, loop, fadeMs));
+        NetworkSenders.toPlayer(
+                player,
+                new SyncMusicPlayS2CPacket(trackId, priority, loop, fadeMs, volume, durationMs, fadeOutMs));
     }
 
     public static void stop(ServerPlayer player)

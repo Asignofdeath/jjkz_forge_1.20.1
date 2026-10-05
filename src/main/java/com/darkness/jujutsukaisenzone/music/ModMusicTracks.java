@@ -33,7 +33,12 @@ public final class ModMusicTracks
 
     static
     {
-        /* 曲目在有 ogg 后于此 register；无音频时勿注册，以免点播放报缺失。 */
+        register(
+                "leisurely_and_carefree",
+                "music/leisurely_and_carefree",
+                "music.jujutsukaisenzone.leisurely_and_carefree.title",
+                "music.jujutsukaisenzone.leisurely_and_carefree.source",
+                false);
     }
 
     private ModMusicTracks()

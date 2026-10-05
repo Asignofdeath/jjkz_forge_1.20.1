@@ -9,9 +9,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.network.chat.Style;
-import net.minecraft.network.chat.TextColor;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.util.Mth;
 import net.minecraftforge.api.distmarker.Dist;
@@ -21,9 +18,9 @@ import net.minecraftforge.fml.common.Mod;
 import org.joml.Matrix4f;
 
 /**
- * 任务<strong>对话</strong>的表现层：电影上下黑幕（letterbox），台词画在下黑条里。
+ * CG / 电影巡镜用对白：上下黑幕（letterbox），台词画在下黑条里。
  * <p>
- * 「角色名：」按对主角态度染色（友好淡蓝 / 中立淡灰 / 敌对红），正文白色。
+ * 普通对白 COD 字幕见 {@link QuestCodCaptionOverlay}。角色名染色见 {@link QuestDialogCaptionStyle}。
  * <p>
  * 激活期间强制 {@code hideGui=true}。黑幕/字幕走 {@link TickEvent.RenderTickEvent} {@code END} 自建 {@link GuiGraphics}。
  */
@@ -31,7 +28,6 @@ import org.joml.Matrix4f;
 public final class QuestCinematicLetterboxOverlay
 {
     private static final int BAR_COLOR = 0xFF000000;
-    private static final int BODY_RGB = 0xFFFFFF;
     private static final float BAR_FRACTION = 0.12F;
     private static final long FADE_IN_MILLIS = 10L * 50L;
     private static final long FADE_OUT_MILLIS = 20L * 50L;
@@ -170,9 +166,9 @@ public final class QuestCinematicLetterboxOverlay
         Font font = minecraft.font;
         int wrapWidth = Math.max(16, width - 40);
         String full = captionKey.isBlank() ? "" : Component.translatable(captionKey).getString();
-        Component fullStyled = styleCaption(full, full);
+        Component fullStyled = QuestDialogCaptionStyle.style(full, full);
         String visiblePlain = full.isEmpty() ? "" : full.substring(0, Math.min(revealedChars, full.length()));
-        Component visibleStyled = styleCaption(full, visiblePlain);
+        Component visibleStyled = QuestDialogCaptionStyle.style(full, visiblePlain);
 
         List<FormattedCharSequence> layoutLines = full.isEmpty()
                 ? List.of()
@@ -222,61 +218,6 @@ public final class QuestCinematicLetterboxOverlay
         modelView.popPose();
         RenderSystem.applyModelViewMatrix();
         RenderSystem.restoreProjectionMatrix();
-    }
-
-    /**
-     * 用完整句解析「角色名：」，再对 {@code visible} 前缀染色（打字机未揭完时名字也不闪白）。
-     */
-    private static Component styleCaption(String full, String visible)
-    {
-        if (visible == null || visible.isEmpty())
-        {
-            return Component.empty();
-        }
-        if (full == null || full.isEmpty())
-        {
-            return Component.literal(visible).withStyle(bodyStyle());
-        }
-        int colonIndex = indexOfSpeakerColon(full);
-        if (colonIndex < 0)
-        {
-            return Component.literal(visible).withStyle(bodyStyle());
-        }
-        String speaker = full.substring(0, colonIndex);
-        QuestDialogStance stance = QuestDialogSpeakerPalette.stanceOf(speaker);
-        int nameLen = colonIndex + 1;
-        if (visible.length() <= nameLen)
-        {
-            return Component.literal(visible).withStyle(nameStyle(stance));
-        }
-        MutableComponent result = Component.literal(visible.substring(0, nameLen)).withStyle(nameStyle(stance));
-        result.append(Component.literal(visible.substring(nameLen)).withStyle(bodyStyle()));
-        return result;
-    }
-
-    private static int indexOfSpeakerColon(String plain)
-    {
-        int fullWidth = plain.indexOf('：');
-        int halfWidth = plain.indexOf(':');
-        if (fullWidth < 0)
-        {
-            return halfWidth;
-        }
-        if (halfWidth < 0)
-        {
-            return fullWidth;
-        }
-        return Math.min(fullWidth, halfWidth);
-    }
-
-    private static Style nameStyle(QuestDialogStance stance)
-    {
-        return Style.EMPTY.withColor(TextColor.fromRgb(stance.rgb()));
-    }
-
-    private static Style bodyStyle()
-    {
-        return Style.EMPTY.withColor(TextColor.fromRgb(BODY_RGB));
     }
 
     private static void beginForceHideGui()

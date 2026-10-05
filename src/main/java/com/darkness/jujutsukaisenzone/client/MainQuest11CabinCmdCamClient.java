@@ -1,6 +1,6 @@
 package com.darkness.jujutsukaisenzone.client;
 
-import com.darkness.jujutsukaisenzone.quest.MainQuestDefs;
+import com.darkness.jujutsukaisenzone.quest.mainline.MainQuestDefs;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;

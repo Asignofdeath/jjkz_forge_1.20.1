@@ -23,9 +23,9 @@ import net.minecraftforge.fml.common.Mod;
 import org.joml.Matrix4f;
 
 /**
- * COD 风格任务简报：左下角短暂开场。
+ * COD 风格任务简报：右下角短暂开场（避开左下角聊天栏）。
  * <p>
- * 动画：标题左滑入 + 放大回弹；元数据逐行错开滑入；最后整体淡出。
+ * 动画：标题右滑入 + 放大回弹；元数据逐行错开滑入；最后整体淡出。
  * <p>
  * 绘制路径对齐 {@code cg_director} 的 Media 字幕：{@link TickEvent.RenderTickEvent} {@code END}
  * + 自建 {@link GuiGraphics}。CMDCam 运镜时 {@code hideGui=true} 会跳过 {@code Gui.render}，
@@ -37,7 +37,7 @@ public final class QuestMissionBriefingOverlay
     private static final int COLOR_WHITE = 0xFFFFFF;
     private static final float TITLE_SCALE = 1.65F;
     private static final float TITLE_SCALE_START = 1.20F;
-    private static final int MARGIN_LEFT = 16;
+    private static final int MARGIN_RIGHT = 16;
     private static final int MARGIN_BOTTOM = 28;
     private static final float SLIDE_PX = 28.0F;
 
@@ -175,14 +175,14 @@ public final class QuestMissionBriefingOverlay
         int titleH = Math.round(font.lineHeight * TITLE_SCALE) + 4;
         int blockH = titleH + lineH * metaLines.length;
         int baseY = height - MARGIN_BOTTOM - blockH;
-        int baseX = MARGIN_LEFT;
+        int rightEdge = width - MARGIN_RIGHT;
 
-        drawTitle(graphics, font, title, baseX, baseY, elapsed, exitAlpha);
+        drawTitle(graphics, font, title, rightEdge, baseY, elapsed, exitAlpha);
 
         int metaY = baseY + titleH;
         for (int i = 0; i < metaLines.length; i++)
         {
-            drawMetaLine(graphics, font, metaLines[i], baseX, metaY, elapsed, META_DELAYS_MILLIS[i], exitAlpha);
+            drawMetaLine(graphics, font, metaLines[i], rightEdge, metaY, elapsed, META_DELAYS_MILLIS[i], exitAlpha);
             metaY += lineH;
         }
 
@@ -193,8 +193,9 @@ public final class QuestMissionBriefingOverlay
         RenderSystem.restoreProjectionMatrix();
     }
 
+    /** {@code rightEdge} 为右对齐锚点（文本右缘）。 */
     private static void drawTitle(
-            GuiGraphics graphics, Font font, String text, int x, int y, long elapsed, float exitAlpha)
+            GuiGraphics graphics, Font font, String text, int rightEdge, int y, long elapsed, float exitAlpha)
     {
         float t = progress(elapsed, 0L, TITLE_IN_MILLIS);
         if (t <= 0.0F)
@@ -204,23 +205,26 @@ public final class QuestMissionBriefingOverlay
         float ease = easeOutCubic(t);
         float back = easeOutBack(t);
         float alpha = ease * exitAlpha;
-        float slide = (1.0F - ease) * -SLIDE_PX;
+        float slide = (1.0F - ease) * SLIDE_PX;
         float scale = TITLE_SCALE_START + (TITLE_SCALE - TITLE_SCALE_START) * back;
-        float exitSlide = (1.0F - exitAlpha) * -10.0F;
+        float exitSlide = (1.0F - exitAlpha) * 10.0F;
+        float textW = font.width(text) * scale;
+        float x = rightEdge - textW + slide + exitSlide;
 
         PoseStack pose = graphics.pose();
         pose.pushPose();
-        pose.translate(x + slide, y + exitSlide, 0.0F);
+        pose.translate(x, y, 0.0F);
         pose.scale(scale, scale, 1.0F);
         graphics.drawString(font, text, 0, 0, withAlpha(COLOR_WHITE, alpha), true);
         pose.popPose();
     }
 
+    /** {@code rightEdge} 为右对齐锚点（文本右缘）。 */
     private static void drawMetaLine(
             GuiGraphics graphics,
             Font font,
             String text,
-            int x,
+            int rightEdge,
             int y,
             long elapsed,
             long delayMillis,
@@ -237,14 +241,15 @@ public final class QuestMissionBriefingOverlay
         }
         float ease = easeOutCubic(t);
         float alpha = ease * exitAlpha;
-        float slide = (1.0F - ease) * -SLIDE_PX;
-        float exitSlide = (1.0F - exitAlpha) * -8.0F;
+        float slide = (1.0F - ease) * SLIDE_PX;
+        float exitSlide = (1.0F - exitAlpha) * 8.0F;
+        int x = rightEdge - font.width(text) + Math.round(slide + exitSlide);
 
         graphics.drawString(
                 font,
                 text,
-                Math.round(x + slide),
-                Math.round(y + exitSlide),
+                x,
+                Math.round(y),
                 withAlpha(COLOR_WHITE, alpha),
                 true);
     }

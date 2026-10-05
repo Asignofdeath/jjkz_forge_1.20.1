@@ -1,4 +1,4 @@
-package com.darkness.jujutsukaisenzone.quest;
+package com.darkness.jujutsukaisenzone.quest.mainline.main_1_1;
 
 import com.darkness.jujutsukaisenzone.cg.PlayerCgLock;
 import com.darkness.jujutsukaisenzone.entity.CutsceneActorEntity;

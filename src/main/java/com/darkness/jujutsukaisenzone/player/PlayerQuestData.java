@@ -1,8 +1,8 @@
 package com.darkness.jujutsukaisenzone.player;
 
-import com.darkness.jujutsukaisenzone.quest.MainQuestDef;
-import com.darkness.jujutsukaisenzone.quest.MainQuestDefs;
-import com.darkness.jujutsukaisenzone.quest.MainQuestStatus;
+import com.darkness.jujutsukaisenzone.quest.mainline.MainQuestDef;
+import com.darkness.jujutsukaisenzone.quest.mainline.MainQuestDefs;
+import com.darkness.jujutsukaisenzone.quest.mainline.MainQuestStatus;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashSet;
@@ -84,6 +84,11 @@ public final class PlayerQuestData
         entry.main11TalkDone = false;
         entry.main11Kitted = false;
         entry.main11CabinPos = null;
+        entry.narrativeVillagePos = null;
+        entry.main12AmbushStarted = false;
+        entry.main12AmbushOrigin = null;
+        entry.main12DecorPlaced = false;
+        entry.main12HealthLocked = false;
         dirty(player);
     }
 
@@ -147,6 +152,73 @@ public final class PlayerQuestData
     public static void setMain11CabinPos(ServerPlayer player, @Nullable BlockPos pos)
     {
         data(player).main11CabinPos = pos == null ? null : pos.immutable();
+        dirty(player);
+    }
+
+    /** 主线叙事村庄锁定坐标（首次 locate 后写入，不再随「最近村」漂移）。 */
+    @Nullable
+    public static BlockPos getNarrativeVillagePos(ServerPlayer player)
+    {
+        return data(player).narrativeVillagePos;
+    }
+
+    public static void setNarrativeVillagePos(ServerPlayer player, @Nullable BlockPos pos)
+    {
+        data(player).narrativeVillagePos = pos == null ? null : pos.immutable();
+        dirty(player);
+    }
+
+    public static boolean isMain12AmbushStarted(ServerPlayer player)
+    {
+        return data(player).main12AmbushStarted;
+    }
+
+    public static void setMain12AmbushStarted(ServerPlayer player, boolean value)
+    {
+        data(player).main12AmbushStarted = value;
+        dirty(player);
+    }
+
+    @Nullable
+    public static BlockPos getMain12AmbushOrigin(ServerPlayer player)
+    {
+        return data(player).main12AmbushOrigin;
+    }
+
+    public static void setMain12AmbushOrigin(ServerPlayer player, @Nullable BlockPos pos)
+    {
+        data(player).main12AmbushOrigin = pos == null ? null : pos.immutable();
+        dirty(player);
+    }
+
+    public static void clearMain12Ambush(ServerPlayer player)
+    {
+        JjkzPlayerDataStorage.PlayerDataEntry entry = data(player);
+        entry.main12AmbushStarted = false;
+        entry.main12AmbushOrigin = null;
+        dirty(player);
+    }
+
+    public static boolean isMain12DecorPlaced(ServerPlayer player)
+    {
+        return data(player).main12DecorPlaced;
+    }
+
+    public static void setMain12DecorPlaced(ServerPlayer player, boolean value)
+    {
+        data(player).main12DecorPlaced = value;
+        dirty(player);
+    }
+
+    /** 1.2 伏击残血锁血：完成后仍保持，留给 1.3（重置进度时清掉）。 */
+    public static boolean isMain12HealthLocked(ServerPlayer player)
+    {
+        return data(player).main12HealthLocked;
+    }
+
+    public static void setMain12HealthLocked(ServerPlayer player, boolean value)
+    {
+        data(player).main12HealthLocked = value;
         dirty(player);
     }
 

@@ -332,5 +332,13 @@
   },
   "quest.main_1_1.talk.11": {
     "sounds": [{ "name": "jujutsukaisenzone:quest/main_1_1/talk_11" }]
+  },
+  "music.leisurely_and_carefree": {
+    "sounds": [
+      {
+        "name": "jujutsukaisenzone:music/leisurely_and_carefree",
+        "stream": true
+      }
+    ]
   }
 }

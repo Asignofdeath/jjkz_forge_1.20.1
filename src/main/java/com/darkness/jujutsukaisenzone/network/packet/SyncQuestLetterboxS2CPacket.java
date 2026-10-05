@@ -7,7 +7,10 @@ import net.minecraftforge.network.NetworkEvent;
 
 import java.util.function.Supplier;
 
-/** 服务端 → 客户端：任务<strong>对话</strong>（电影黑幕下条字幕）。不是聊天栏，也不是开场全黑。 */
+/**
+ * 服务端 → 客户端：CG 电影黑幕对白。
+ * 普通对白 COD 字幕走 {@link SyncQuestCodCaptionsS2CPacket}；开场全黑走 {@link SyncQuestBlackoutS2CPacket}。
+ */
 public class SyncQuestLetterboxS2CPacket
 {
     private final boolean active;

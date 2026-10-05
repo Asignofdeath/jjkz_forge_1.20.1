@@ -3,9 +3,9 @@ package com.darkness.jujutsukaisenzone.client.gui.quest;
 import com.darkness.jujutsukaisenzone.network.NetworkSenders;
 import com.darkness.jujutsukaisenzone.network.packet.TrackQuestC2SPacket;
 import com.darkness.jujutsukaisenzone.player.PlayerQuestData;
-import com.darkness.jujutsukaisenzone.quest.MainQuestDef;
-import com.darkness.jujutsukaisenzone.quest.MainQuestDefs;
-import com.darkness.jujutsukaisenzone.quest.MainQuestStatus;
+import com.darkness.jujutsukaisenzone.quest.mainline.MainQuestDef;
+import com.darkness.jujutsukaisenzone.quest.mainline.MainQuestDefs;
+import com.darkness.jujutsukaisenzone.quest.mainline.MainQuestStatus;
 import com.lowdragmc.lowdraglib.gui.widget.Widget;
 import com.lowdragmc.lowdraglib.utils.Position;
 import com.lowdragmc.lowdraglib.utils.Size;
@@ -78,9 +78,14 @@ public final class QuestJournalPanelWidget extends Widget
 
         int y = 44;
         int rowWidth = width - MARGIN * 2;
+        // 主线只显示当前环（可追踪 / 追踪中）：未解锁不剧透，已完成让位给下一环
         for (MainQuestDef def : MainQuestDefs.all())
         {
             MainQuestStatus status = PlayerQuestData.status(player, def);
+            if (status == MainQuestStatus.LOCKED || status == MainQuestStatus.COMPLETED)
+            {
+                continue;
+            }
             boolean hover = mouseX >= MARGIN && mouseX <= MARGIN + rowWidth
                     && mouseY >= y && mouseY <= y + ROW_HEIGHT;
             int rowColor = hover && isClickable(status) ? 0xFF243044 : 0xFF1A1F28;

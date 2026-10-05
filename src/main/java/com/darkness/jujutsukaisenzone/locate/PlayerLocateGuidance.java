@@ -2,7 +2,7 @@ package com.darkness.jujutsukaisenzone.locate;
 
 import com.darkness.jujutsukaisenzone.network.NetworkSenders;
 import com.darkness.jujutsukaisenzone.network.packet.SyncLocateGuidanceS2CPacket;
-import com.darkness.jujutsukaisenzone.quest.MainQuestLogic;
+import com.darkness.jujutsukaisenzone.quest.mainline.MainQuestLogic;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -63,9 +63,22 @@ public final class PlayerLocateGuidance
             }
             return false;
         }
-        BlockPos pos = found.get();
+        return startFixed(player, target, found.get(), announce);
+    }
+
+    /**
+     * 用已锁定的坐标开导航，不再 {@code findNearest}（叙事村选定后不可漂移）。
+     */
+    public static boolean startFixed(
+            ServerPlayer player, StructureLocateTarget target, BlockPos fixedPos, boolean announce)
+    {
+        if (fixedPos == null)
+        {
+            return false;
+        }
+        BlockPos pos = fixedPos.immutable();
         Session session = new Session(
-                target.id(), target.displayName(), pos.immutable(), target.arriveDistance());
+                target.id(), target.displayName(), pos, target.arriveDistance());
         SESSIONS.put(player.getUUID(), session);
         sync(player, session);
         if (announce)

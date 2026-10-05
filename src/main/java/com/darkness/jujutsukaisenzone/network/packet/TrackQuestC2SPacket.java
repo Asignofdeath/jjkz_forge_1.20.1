@@ -1,6 +1,6 @@
 package com.darkness.jujutsukaisenzone.network.packet;
 
-import com.darkness.jujutsukaisenzone.quest.MainQuestLogic;
+import com.darkness.jujutsukaisenzone.quest.mainline.MainQuestLogic;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.network.NetworkEvent;

@@ -1,4 +1,4 @@
-package com.darkness.jujutsukaisenzone.quest;
+package com.darkness.jujutsukaisenzone.quest.mainline;
 
 /**
  * 主线任务对玩家可见的状态。

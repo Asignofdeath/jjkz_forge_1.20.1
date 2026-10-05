@@ -17,6 +17,7 @@ import com.darkness.jujutsukaisenzone.network.packet.SyncQuestTrackS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.TrackQuestC2SPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncQuestBlackoutS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncQuestLetterboxS2CPacket;
+import com.darkness.jujutsukaisenzone.network.packet.SyncQuestCodCaptionsS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncCgLookClampS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.MainQuest11CabinCmdCamS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncMusicPlayS2CPacket;
@@ -136,6 +137,11 @@ public final class PlayerPacketRegistrar
                 .encoder(SyncQuestMissionBriefingS2CPacket::encode)
                 .decoder(SyncQuestMissionBriefingS2CPacket::decode)
                 .consumerMainThread(SyncQuestMissionBriefingS2CPacket::handle)
+                .add();
+        channel.messageBuilder(SyncQuestCodCaptionsS2CPacket.class, 116, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(SyncQuestCodCaptionsS2CPacket::encode)
+                .decoder(SyncQuestCodCaptionsS2CPacket::decode)
+                .consumerMainThread(SyncQuestCodCaptionsS2CPacket::handle)
                 .add();
     }
 }

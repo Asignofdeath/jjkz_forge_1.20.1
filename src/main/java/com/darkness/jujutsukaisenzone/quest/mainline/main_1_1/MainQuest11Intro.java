@@ -1,14 +1,18 @@
-package com.darkness.jujutsukaisenzone.quest;
+package com.darkness.jujutsukaisenzone.quest.mainline.main_1_1;
 
 import com.darkness.jujutsukaisenzone.cg.PlayerCgLock;
 import com.darkness.jujutsukaisenzone.locate.PlayerLocateGuidance;
 import com.darkness.jujutsukaisenzone.network.ModNetwork;
 import com.darkness.jujutsukaisenzone.network.NetworkSenders;
+import com.darkness.jujutsukaisenzone.music.ModMusic;
+import com.darkness.jujutsukaisenzone.music.MusicPriority;
 import com.darkness.jujutsukaisenzone.network.packet.MainQuest11CabinCmdCamS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncQuestBlackoutS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncQuestLetterboxS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncQuestMissionBriefingS2CPacket;
 import com.darkness.jujutsukaisenzone.player.PlayerQuestData;
+import com.darkness.jujutsukaisenzone.quest.mainline.MainQuestDefs;
+import com.darkness.jujutsukaisenzone.quest.mainline.MainQuestLogic;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -45,6 +49,14 @@ public final class MainQuest11Intro
             BLACKOUT_KEYS.length * LINE_TICKS + (BLACKOUT_KEYS.length - 1) * GAP_TICKS;
     /** 组1 6s + 组2/3 各 3s（组间 load 吃进上一组时长，不另加空档）。 */
     private static final int CAM_LOCK_TICKS = 120 + 60 + 60;
+    private static final String CAM_START_MUSIC_ID = "leisurely_and_carefree";
+    /** 第一组镜头起播时的剧情曲音量（相对音乐滑条）。 */
+    private static final float CAM_START_MUSIC_VOLUME = 0.3F;
+    private static final int CAM_START_MUSIC_DURATION_MS = 90_000;
+    /** 揭幕起播淡入；400ms 听不出。 */
+    private static final int CAM_START_MUSIC_FADE_IN_MS = 2_000;
+    /** 一分半到点后的淡出。 */
+    private static final int CAM_START_MUSIC_FADE_OUT_MS = 2_000;
     private static final Map<UUID, Session> SESSIONS = new ConcurrentHashMap<>();
     private static final Map<UUID, Integer> CAM_UNLOCK_TICKS = new ConcurrentHashMap<>();
 
@@ -96,6 +108,7 @@ public final class MainQuest11Intro
         NetworkSenders.toPlayer(player, SyncQuestBlackoutS2CPacket.clear());
         NetworkSenders.toPlayer(player, SyncQuestLetterboxS2CPacket.clear());
         NetworkSenders.toPlayer(player, SyncQuestMissionBriefingS2CPacket.clear());
+        ModMusic.stopIf(player, MusicPriority.STORY, 0);
         ModNetwork.sendPlayerInputLockSync(player, false);
     }
 
@@ -222,6 +235,15 @@ public final class MainQuest11Intro
         // 第一组巡镜起播前：小屋演员已进世界；同时播 COD 风格任务简报
         MainQuest11CabinActors.spawnForCamStart(player, session.cabinBounds, session.teleportPos);
         NetworkSenders.toPlayer(player, MainQuest11CabinCmdCamS2CPacket.startPlayback());
+        ModMusic.play(
+                player,
+                CAM_START_MUSIC_ID,
+                MusicPriority.STORY,
+                false,
+                CAM_START_MUSIC_FADE_IN_MS,
+                CAM_START_MUSIC_VOLUME,
+                CAM_START_MUSIC_DURATION_MS,
+                CAM_START_MUSIC_FADE_OUT_MS);
         NetworkSenders.toPlayer(player, SyncQuestBlackoutS2CPacket.clear());
         MainQuestLogic.sendMissionBriefing(player, MainQuestDefs.MAIN_1_1);
         PlayerCgLock.pinOnly(player, player.position());

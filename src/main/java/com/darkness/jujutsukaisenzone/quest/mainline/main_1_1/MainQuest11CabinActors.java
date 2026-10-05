@@ -1,4 +1,4 @@
-package com.darkness.jujutsukaisenzone.quest;
+package com.darkness.jujutsukaisenzone.quest.mainline.main_1_1;
 
 import com.darkness.jujutsukaisenzone.entity.CutsceneActorEntity;
 import com.darkness.jujutsukaisenzone.registry.ModEntities;
@@ -98,7 +98,7 @@ public final class MainQuest11CabinActors
         }
         actor.prepare(appearance, clip);
         actor.moveTo(x, y, z, yaw, 0.0F);
-        actor.yRotO = yaw;
+        actor.snapLookYaw(yaw);
         level.addFreshEntity(actor);
         UUID playerId = player.getUUID();
         ACTORS_BY_PLAYER.computeIfAbsent(playerId, id -> new ArrayList<>()).add(actor.getUUID());

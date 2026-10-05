@@ -156,6 +156,11 @@ public final class JjkzPlayerDataStorage extends SavedData
         private static final String TAG_MAIN_11_TALK_DONE = "main11TalkDone";
         private static final String TAG_MAIN_11_KITTED = "main11Kitted";
         private static final String TAG_MAIN_11_CABIN = "main11Cabin";
+        private static final String TAG_NARRATIVE_VILLAGE = "narrativeVillage";
+        private static final String TAG_MAIN_12_AMBUSH_STARTED = "main12AmbushStarted";
+        private static final String TAG_MAIN_12_AMBUSH_ORIGIN = "main12AmbushOrigin";
+        private static final String TAG_MAIN_12_DECOR_PLACED = "main12DecorPlaced";
+        private static final String TAG_MAIN_12_HEALTH_LOCKED = "main12HealthLocked";
 
         boolean cursedEnergyInitialized;
         int cursedEnergyBaseMax;
@@ -212,6 +217,11 @@ public final class JjkzPlayerDataStorage extends SavedData
         boolean main11TalkDone;
         boolean main11Kitted;
         @javax.annotation.Nullable BlockPos main11CabinPos;
+        @javax.annotation.Nullable BlockPos narrativeVillagePos;
+        boolean main12AmbushStarted;
+        @javax.annotation.Nullable BlockPos main12AmbushOrigin;
+        boolean main12DecorPlaced;
+        boolean main12HealthLocked;
 
         private static PlayerDataEntry load(CompoundTag tag)
         {
@@ -330,6 +340,20 @@ public final class JjkzPlayerDataStorage extends SavedData
                 CompoundTag cabin = tag.getCompound(TAG_MAIN_11_CABIN);
                 entry.main11CabinPos = new BlockPos(cabin.getInt("x"), cabin.getInt("y"), cabin.getInt("z"));
             }
+            if (tag.contains(TAG_NARRATIVE_VILLAGE, Tag.TAG_COMPOUND))
+            {
+                CompoundTag village = tag.getCompound(TAG_NARRATIVE_VILLAGE);
+                entry.narrativeVillagePos = new BlockPos(
+                        village.getInt("x"), village.getInt("y"), village.getInt("z"));
+            }
+            entry.main12AmbushStarted = tag.getBoolean(TAG_MAIN_12_AMBUSH_STARTED);
+            if (tag.contains(TAG_MAIN_12_AMBUSH_ORIGIN, Tag.TAG_COMPOUND))
+            {
+                CompoundTag ambush = tag.getCompound(TAG_MAIN_12_AMBUSH_ORIGIN);
+                entry.main12AmbushOrigin = new BlockPos(ambush.getInt("x"), ambush.getInt("y"), ambush.getInt("z"));
+            }
+            entry.main12DecorPlaced = tag.getBoolean(TAG_MAIN_12_DECOR_PLACED);
+            entry.main12HealthLocked = tag.getBoolean(TAG_MAIN_12_HEALTH_LOCKED);
             return entry;
         }
 
@@ -420,6 +444,25 @@ public final class JjkzPlayerDataStorage extends SavedData
                 cabin.putInt("z", main11CabinPos.getZ());
                 tag.put(TAG_MAIN_11_CABIN, cabin);
             }
+            if (narrativeVillagePos != null)
+            {
+                CompoundTag village = new CompoundTag();
+                village.putInt("x", narrativeVillagePos.getX());
+                village.putInt("y", narrativeVillagePos.getY());
+                village.putInt("z", narrativeVillagePos.getZ());
+                tag.put(TAG_NARRATIVE_VILLAGE, village);
+            }
+            tag.putBoolean(TAG_MAIN_12_AMBUSH_STARTED, main12AmbushStarted);
+            if (main12AmbushOrigin != null)
+            {
+                CompoundTag ambush = new CompoundTag();
+                ambush.putInt("x", main12AmbushOrigin.getX());
+                ambush.putInt("y", main12AmbushOrigin.getY());
+                ambush.putInt("z", main12AmbushOrigin.getZ());
+                tag.put(TAG_MAIN_12_AMBUSH_ORIGIN, ambush);
+            }
+            tag.putBoolean(TAG_MAIN_12_DECOR_PLACED, main12DecorPlaced);
+            tag.putBoolean(TAG_MAIN_12_HEALTH_LOCKED, main12HealthLocked);
             return tag;
         }
 

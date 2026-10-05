@@ -1,12 +1,12 @@
-package com.darkness.jujutsukaisenzone.quest;
+package com.darkness.jujutsukaisenzone.quest.mainline.main_1_1;
 
 import com.darkness.jujutsukaisenzone.locate.PlayerLocateGuidance;
 import com.darkness.jujutsukaisenzone.locate.StructureLocateTarget;
-import com.darkness.jujutsukaisenzone.locate.StructureLocator;
 import com.darkness.jujutsukaisenzone.player.PlayerQuestData;
+import com.darkness.jujutsukaisenzone.quest.mainline.MainQuestDefs;
+import com.darkness.jujutsukaisenzone.quest.mainline.NarrativeVillage;
 import java.util.List;
 import java.util.Optional;
-import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
@@ -16,7 +16,7 @@ import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.phys.AABB;
 
 /**
- * 主线 1.1：定位到目标村后清空村内生物（叙事空村）。
+ * 主线 1.1：清空<strong>已锁定叙事村</strong>内生物（叙事空村）。
  * 导航期间定期再清，避免区块加载后又刷出村民/动物。
  */
 public final class MainQuest11VillageClear
@@ -44,31 +44,25 @@ public final class MainQuest11VillageClear
         {
             return;
         }
-        clearNearestVillage(player);
+        clearNarrativeVillage(player);
     }
 
-    public static void clearNearestVillage(ServerPlayer player)
+    public static void clearNarrativeVillage(ServerPlayer player)
     {
         ServerLevel level = player.serverLevel();
-        Optional<BoundingBox> bounds = StructureLocator.findNearestBounds(
-                level,
-                player.blockPosition(),
-                StructureLocateTarget.NEAREST_VILLAGE,
-                StructureLocator.DEFAULT_RADIUS_CHUNKS);
+        Optional<BoundingBox> bounds = NarrativeVillage.resolveBounds(player);
         if (bounds.isEmpty())
         {
-            PlayerLocateGuidance.Session session = PlayerLocateGuidance.get(player);
-            if (session == null)
-            {
-                return;
-            }
-            BlockPos center = session.targetPos();
-            clearLivingInBox(level, new BoundingBox(
-                    center.getX() - 64, center.getY() - 16, center.getZ() - 64,
-                    center.getX() + 64, center.getY() + 48, center.getZ() + 64));
             return;
         }
         clearLivingInBox(level, bounds.get());
+    }
+
+    /** @deprecated 用 {@link #clearNarrativeVillage} */
+    @Deprecated
+    public static void clearNearestVillage(ServerPlayer player)
+    {
+        clearNarrativeVillage(player);
     }
 
     private static void clearLivingInBox(ServerLevel level, BoundingBox box)

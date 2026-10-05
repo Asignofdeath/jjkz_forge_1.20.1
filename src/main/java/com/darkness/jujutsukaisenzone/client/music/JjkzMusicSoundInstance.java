@@ -8,7 +8,8 @@ import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 
 /**
- * 本地非立体 BGM：{@code relative + NONE}，走 {@link SoundSource#MUSIC}。
+ * 本地非立体 BGM：{@code relative + NONE}。
+ * 走 {@link SoundSource#MASTER}，与任务简报语音同一通道——CMDCam 运镜时原版会停 {@code MUSIC}。
  */
 public final class JjkzMusicSoundInstance extends AbstractTickableSoundInstance
 {
@@ -18,15 +19,38 @@ public final class JjkzMusicSoundInstance extends AbstractTickableSoundInstance
     private int fadeOutRemaining;
     private int fadeOutTotal;
     private boolean fadeOutRequested;
+    /** 峰值播完后自动淡出；0 表示不限时。 */
+    private int durationRemaining;
+    private final int autoFadeOutMs;
 
     public JjkzMusicSoundInstance(SoundEvent soundEvent, boolean loop, int fadeInMs)
     {
-        super(soundEvent, SoundSource.MUSIC, RandomSource.create());
+        this(soundEvent, loop, fadeInMs, 1.0F, 0, 0);
+    }
+
+    public JjkzMusicSoundInstance(
+            SoundEvent soundEvent, boolean loop, int fadeInMs, float volume, int durationMs)
+    {
+        this(soundEvent, loop, fadeInMs, volume, durationMs, 0);
+    }
+
+    public JjkzMusicSoundInstance(
+            SoundEvent soundEvent,
+            boolean loop,
+            int fadeInMs,
+            float volume,
+            int durationMs,
+            int fadeOutMs)
+    {
+        super(soundEvent, SoundSource.MASTER, RandomSource.create());
         this.looping = loop;
         this.relative = true;
         this.attenuation = SoundInstance.Attenuation.NONE;
         this.pitch = 1.0F;
-        this.peakVolume = 1.0F;
+        this.peakVolume = Mth.clamp(volume, 0.0F, 1.0F);
+        this.durationRemaining = durationMs <= 0 ? 0 : msToTicks(durationMs);
+        int resolvedFadeOut = fadeOutMs > 0 ? fadeOutMs : (fadeInMs > 0 ? fadeInMs : 400);
+        this.autoFadeOutMs = resolvedFadeOut;
         int fadeInTicks = msToTicks(fadeInMs);
         if (fadeInTicks <= 0)
         {
@@ -40,6 +64,13 @@ public final class JjkzMusicSoundInstance extends AbstractTickableSoundInstance
             this.fadeInTotal = fadeInTicks;
             this.fadeInRemaining = fadeInTicks;
         }
+    }
+
+    /** 淡入从 0 起；不覆盖的话原版会直接 skip 整条音。 */
+    @Override
+    public boolean canStartSilent()
+    {
+        return true;
     }
 
     public void requestFadeOut(int fadeOutMs)
@@ -89,6 +120,14 @@ public final class JjkzMusicSoundInstance extends AbstractTickableSoundInstance
             this.fadeInRemaining--;
             float t = 1.0F - (this.fadeInRemaining / (float) this.fadeInTotal);
             this.volume = this.peakVolume * Mth.clamp(t, 0.0F, 1.0F);
+        }
+        if (this.durationRemaining > 0)
+        {
+            this.durationRemaining--;
+            if (this.durationRemaining <= 0)
+            {
+                this.requestFadeOut(this.autoFadeOutMs);
+            }
         }
     }
 

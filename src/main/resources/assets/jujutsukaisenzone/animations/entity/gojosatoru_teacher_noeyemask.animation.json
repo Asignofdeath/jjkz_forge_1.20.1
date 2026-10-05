@@ -1,0 +1,109 @@
+{
+	"format_version": "1.8.0",
+	"animations": {
+		"muryoukuusho_gesture_noeyemask": {
+			"loop": "hold_on_last_frame",
+			"animation_length": 1.2917,
+			"bones": {
+				"Waist": {
+					"rotation": {
+						"0.0": {
+							"vector": [
+								0,
+								0,
+								0
+							]
+						},
+						"0.5": {
+							"vector": [
+								0,
+								-10,
+								0
+							]
+						}
+					},
+					"position": {
+						"vector": [
+							0,
+							0,
+							0
+						]
+					}
+				},
+				"Head": {
+					"rotation": {
+						"0.0": {
+							"vector": [
+								0,
+								0,
+								0
+							]
+						},
+						"0.5": {
+							"vector": [
+								0,
+								12.5,
+								0
+							]
+						}
+					}
+				},
+				"Right Arm": {
+					"rotation": {
+						"0.0": {
+							"vector": [
+								0,
+								0,
+								0
+							]
+						},
+						"1.25": {
+							"vector": [
+								-145,
+								0,
+								0
+							]
+						}
+					},
+					"position": {
+						"0.0": {
+							"vector": [
+								0,
+								0,
+								0
+							]
+						},
+						"0.2917": {
+							"vector": [
+								0,
+								-2,
+								-2
+							]
+						},
+						"0.7083": {
+							"vector": [
+								0,
+								-3,
+								-1
+							]
+						},
+						"1.0833": {
+							"vector": [
+								0,
+								-4,
+								-2
+							]
+						},
+						"1.2917": {
+							"vector": [
+								0,
+								-3,
+								-3
+							]
+						}
+					}
+				}
+			}
+		}
+	}
+}

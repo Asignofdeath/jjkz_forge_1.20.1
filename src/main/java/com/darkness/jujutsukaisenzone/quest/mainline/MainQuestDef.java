@@ -1,4 +1,4 @@
-package com.darkness.jujutsukaisenzone.quest;
+package com.darkness.jujutsukaisenzone.quest.mainline;
 
 import com.darkness.jujutsukaisenzone.locate.StructureLocateTarget;
 

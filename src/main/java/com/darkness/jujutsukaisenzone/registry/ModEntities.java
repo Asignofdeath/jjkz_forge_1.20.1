@@ -124,7 +124,7 @@ public final class ModEntities
                                     CutsceneActorEntity::new, MobCategory.MISC)
                             .sized(0.6F, 1.8F)
                             .clientTrackingRange(16)
-                            .updateInterval(5)
+                            .updateInterval(1)
                             .fireImmune()
                             .build("cutscene_actor"));
 

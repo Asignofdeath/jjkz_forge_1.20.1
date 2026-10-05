@@ -33,6 +33,29 @@ public final class JjkzMusicDirector
      */
     public static boolean play(String trackId, MusicPriority priority, boolean loop, int fadeMs)
     {
+        return play(trackId, priority, loop, fadeMs, 1.0F, 0, 0);
+    }
+
+    public static boolean play(
+            String trackId,
+            MusicPriority priority,
+            boolean loop,
+            int fadeMs,
+            float volume,
+            int durationMs)
+    {
+        return play(trackId, priority, loop, fadeMs, volume, durationMs, 0);
+    }
+
+    public static boolean play(
+            String trackId,
+            MusicPriority priority,
+            boolean loop,
+            int fadeMs,
+            float volume,
+            int durationMs,
+            int fadeOutMs)
+    {
         ModMusicTrack track = ModMusicTracks.byId(trackId);
         if (track == null || priority == null)
         {
@@ -47,7 +70,8 @@ public final class JjkzMusicDirector
         releasingSound = null;
         stopInternal(0);
         boolean useLoop = loop || track.loop();
-        JjkzMusicSoundInstance instance = new JjkzMusicSoundInstance(track.sound().get(), useLoop, fadeMs);
+        JjkzMusicSoundInstance instance = new JjkzMusicSoundInstance(
+                track.sound().get(), useLoop, fadeMs, volume, durationMs, fadeOutMs);
         Minecraft.getInstance().getSoundManager().play(instance);
         currentSound = instance;
         currentPriority = priority;

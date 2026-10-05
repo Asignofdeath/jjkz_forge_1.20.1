@@ -7,7 +7,7 @@ import net.minecraftforge.network.NetworkEvent;
 
 import java.util.function.Supplier;
 
-/** 服务端 → 客户端：开场全黑 + 旁白。对话走 {@link SyncQuestLetterboxS2CPacket}。 */
+/** 服务端 → 客户端：开场全黑 + 旁白。CG 对话走 {@link SyncQuestLetterboxS2CPacket}；普通对白走 {@link SyncQuestCodCaptionsS2CPacket}。 */
 public class SyncQuestBlackoutS2CPacket
 {
     private final boolean active;

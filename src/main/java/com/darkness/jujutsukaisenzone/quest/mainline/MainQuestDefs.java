@@ -1,4 +1,4 @@
-package com.darkness.jujutsukaisenzone.quest;
+package com.darkness.jujutsukaisenzone.quest.mainline;
 
 import com.darkness.jujutsukaisenzone.locate.StructureLocateTarget;
 import java.util.Collection;
@@ -13,6 +13,7 @@ import javax.annotation.Nullable;
 public final class MainQuestDefs
 {
     public static final String MAIN_1_1_ID = "main_1_1";
+    public static final String MAIN_1_2_ID = "main_1_2";
 
     public static final MainQuestDef MAIN_1_1 = new MainQuestDef(
             MAIN_1_1_ID,
@@ -24,11 +25,22 @@ public final class MainQuestDefs
             null,
             StructureLocateTarget.NEAREST_VILLAGE);
 
+    public static final MainQuestDef MAIN_1_2 = new MainQuestDef(
+            MAIN_1_2_ID,
+            "quest.jujutsukaisenzone.main_1_2.title",
+            "quest.jujutsukaisenzone.main_1_2.objective.explore",
+            "quest.jujutsukaisenzone.main_1_2.description",
+            "quest.jujutsukaisenzone.main_1_2.briefing.org",
+            "quest.jujutsukaisenzone.main_1_2.briefing.location",
+            MAIN_1_1_ID,
+            null);
+
     private static final Map<String, MainQuestDef> BY_ID = new LinkedHashMap<>();
 
     static
     {
         register(MAIN_1_1);
+        register(MAIN_1_2);
     }
 
     private MainQuestDefs()
@@ -48,6 +60,26 @@ public final class MainQuestDefs
             return null;
         }
         return BY_ID.get(id);
+    }
+
+    /**
+     * 完成 {@code completedId} 后应解锁并自动追踪的下一环（表内第一条以前序匹配者）。
+     */
+    @Nullable
+    public static MainQuestDef nextAfter(@Nullable String completedId)
+    {
+        if (completedId == null || completedId.isEmpty())
+        {
+            return null;
+        }
+        for (MainQuestDef def : BY_ID.values())
+        {
+            if (completedId.equals(def.prerequisiteId()))
+            {
+                return def;
+            }
+        }
+        return null;
     }
 
     public static Collection<MainQuestDef> all()

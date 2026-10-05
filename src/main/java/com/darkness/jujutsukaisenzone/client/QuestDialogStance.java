@@ -1,7 +1,7 @@
 package com.darkness.jujutsukaisenzone.client;
 
 /**
- * 任务电影黑幕对白：角色名相对主角的态度染色。
+ * 对白角色名相对主角的态度染色（电影黑幕 / COD 字幕共用）。
  */
 public enum QuestDialogStance
 {

@@ -20,6 +20,9 @@ public final class QuestDialogSpeakerPalette
         register("XiaoShiZi", QuestDialogStance.FRIENDLY);
         register("你", QuestDialogStance.FRIENDLY);
         register("You", QuestDialogStance.FRIENDLY);
+        // main_1_2 伏击
+        register("三级咒灵甲", QuestDialogStance.HOSTILE);
+        register("Grade 3 Spirit A", QuestDialogStance.HOSTILE);
     }
 
     private QuestDialogSpeakerPalette()
