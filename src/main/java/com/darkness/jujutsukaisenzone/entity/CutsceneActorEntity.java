@@ -19,6 +19,8 @@ import software.bernie.geckolib.core.animation.RawAnimation;
 import software.bernie.geckolib.core.object.PlayState;
 import software.bernie.geckolib.util.GeckoLibUtil;
 
+import javax.annotation.Nullable;
+
 /**
  * CG / 任务演出用 Geo 演员：无 AI、无重力、无碰撞、不进存档。
  * 物理（朝向）与动画 clip 分开设。
@@ -34,10 +36,26 @@ public class CutsceneActorEntity extends Entity implements GeoEntity
     public static final String CLIP_KIRO_STAND_IDLE = "geo_human_entity_stand_idle";
     public static final String CLIP_KIRO_CRAFT_AT_THE_WORKBENCH = "craft_at_the_workbench";
     public static final String CLIP_KIRO_REACH_OUT = "reach_out_your_hand";
+    /** 常规人形：倒地仰躺。geo 骨骼与所有 humanoid 一致，可跨模型共用。 */
+    public static final String CLIP_HUMANOID_FALL_DOWN_AND_BACK = "fall_down_and_back";
+    /** 五条悟（戴眼罩）外观 id，对应 {@code gojosatoru_teacher.*} 资源。 */
+    public static final String APPEARANCE_GOJO = "gojosatoru_teacher";
+    public static final String CLIP_GOJO_STAND_UP_AND_PROTECT = "stand_up_and_protect";
+    /** 起身保护后转头看一眼玩家、再复原（一次性，定格末帧）。 */
+    public static final String CLIP_GOJO_STAND_UP_AND_PROTECT_AND_LOOK_BACK = "stand_up_and_protect_and_look_back";
+    public static final String CLIP_GOJO_TAKE_OFF_THE_BLINDFOLD = "take_off_the_blindfold";
+    /** 五条悟（摘眼罩）外观 id，对应 {@code gojosatoru_teacher_noeyemask.*} 资源。 */
+    public static final String APPEARANCE_GOJO_NO_EYE_MASK = "gojosatoru_teacher_noeyemask";
+    public static final String CLIP_GOJO_MURYOUKUUSHO_GESTURE = "muryoukuusho_gesture_noeyemask";
+    /** 贴图覆盖哨兵：客户端解析为「本地玩家自己的皮肤」。 */
+    public static final String TEXTURE_LOCAL_PLAYER_SKIN = "@local_player_skin";
 
     private static final EntityDataAccessor<String> DATA_APPEARANCE =
             SynchedEntityData.defineId(CutsceneActorEntity.class, EntityDataSerializers.STRING);
     private static final EntityDataAccessor<String> DATA_CLIP =
+            SynchedEntityData.defineId(CutsceneActorEntity.class, EntityDataSerializers.STRING);
+    /** 贴图覆盖：空 = 用 appearance 同名贴图；非空 = 完整资源路径（玩家皮肤等）。 */
+    private static final EntityDataAccessor<String> DATA_TEXTURE_OVERRIDE =
             SynchedEntityData.defineId(CutsceneActorEntity.class, EntityDataSerializers.STRING);
     private static final EntityDataAccessor<Boolean> DATA_LOOP =
             SynchedEntityData.defineId(CutsceneActorEntity.class, EntityDataSerializers.BOOLEAN);
@@ -68,6 +86,25 @@ public class CutsceneActorEntity extends Entity implements GeoEntity
     {
         this.entityData.set(DATA_APPEARANCE, appearance == null ? "" : appearance);
         setClip(clip, true);
+    }
+
+    /** 运行期换外观（如五条悟摘眼罩换模型）。 */
+    public void setAppearance(String appearance)
+    {
+        this.entityData.set(DATA_APPEARANCE, appearance == null ? "" : appearance);
+    }
+
+    /** 贴图覆盖：完整资源路径（如玩家皮肤）；传 null / 空 = 回退 appearance 同名贴图。 */
+    public void setTextureOverride(@Nullable String texturePath)
+    {
+        this.entityData.set(DATA_TEXTURE_OVERRIDE, texturePath == null ? "" : texturePath);
+    }
+
+    @Nullable
+    public String getTextureOverride()
+    {
+        String value = this.entityData.get(DATA_TEXTURE_OVERRIDE);
+        return value == null || value.isEmpty() ? null : value;
     }
 
     public void setClip(String clip, boolean loop)
@@ -206,6 +243,7 @@ public class CutsceneActorEntity extends Entity implements GeoEntity
         this.entityData.define(DATA_LOOP, true);
         this.entityData.define(DATA_CLIP_NONCE, 0);
         this.entityData.define(DATA_TARGET_YAW, 0.0F);
+        this.entityData.define(DATA_TEXTURE_OVERRIDE, "");
     }
 
     @Override
@@ -236,6 +274,15 @@ public class CutsceneActorEntity extends Entity implements GeoEntity
         if (clip == null || clip.isEmpty())
         {
             return PlayState.STOP;
+        }
+        // 主线 1.3：摘眼罩按 0.5 倍速播，墙钟约 3.5s，末帧仍由 JSON hold_on_last_frame 定格。
+        if (CLIP_GOJO_TAKE_OFF_THE_BLINDFOLD.equals(clip))
+        {
+            state.getController().setAnimationSpeed(0.5D);
+        }
+        else
+        {
+            state.getController().setAnimationSpeed(1.0D);
         }
         if (this.isClipLoop())
         {

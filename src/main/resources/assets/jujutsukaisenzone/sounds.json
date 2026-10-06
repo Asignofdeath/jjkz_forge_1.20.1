@@ -333,6 +333,33 @@
   "quest.main_1_1.talk.11": {
     "sounds": [{ "name": "jujutsukaisenzone:quest/main_1_1/talk_11" }]
   },
+  "quest.main_1_3.talk.1": {
+    "sounds": [{ "name": "jujutsukaisenzone:quest/main_1_3/talk_1" }]
+  },
+  "quest.main_1_3.talk.3": {
+    "sounds": [{ "name": "jujutsukaisenzone:quest/main_1_3/talk_3" }]
+  },
+  "quest.main_1_3.talk.4": {
+    "sounds": [{ "name": "jujutsukaisenzone:quest/main_1_3/talk_4" }]
+  },
+  "quest.main_1_3.talk.5": {
+    "sounds": [{ "name": "jujutsukaisenzone:quest/main_1_3/talk_5" }]
+  },
+  "quest.main_1_3.talk.6": {
+    "sounds": [{ "name": "jujutsukaisenzone:quest/main_1_3/talk_6" }]
+  },
+  "quest.fall_down": {
+    "sounds": [{ "name": "jujutsukaisenzone:quest/fall_down" }]
+  },
+  "quest.squeeze_and_pop": {
+    "sounds": [{ "name": "jujutsukaisenzone:quest/squeeze_and_pop" }]
+  },
+  "quest.tinnitus": {
+    "sounds": [{ "name": "jujutsukaisenzone:quest/tinnitus" }]
+  },
+  "quest.notinvade_open": {
+    "sounds": [{ "name": "jujutsukaisenzone:quest/notinvade_open" }]
+  },
   "music.leisurely_and_carefree": {
     "sounds": [
       {

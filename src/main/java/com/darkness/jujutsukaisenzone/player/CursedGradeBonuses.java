@@ -141,6 +141,7 @@ public final class CursedGradeBonuses
         }
 
         StrengthenTechniqueBonuses.applyActiveModifiers(player);
+        com.darkness.jujutsukaisenzone.talent.InnateTalentData.refreshModifiers(player);
         PlayerHealthData.scaleHealthAfterMaxChange(player, oldMax, oldHealth);
         // 等级 / 天与咒缚状态变化会改变强度面板，立刻下发给客户端（tooltip 与 /jjkz data 用）。
         PlayerCombatPowerData.syncToClient(player);

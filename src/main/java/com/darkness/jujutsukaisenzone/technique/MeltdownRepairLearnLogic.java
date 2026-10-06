@@ -35,7 +35,8 @@ public final class MeltdownRepairLearnLogic
         {
             return;
         }
-        if (player.getRandom().nextDouble() >= BASE_LEARN_CHANCE)
+        if (player.getRandom().nextDouble() >= com.darkness.jujutsukaisenzone.talent.InnateTalentData.geniusLearnChance(
+                player, BASE_LEARN_CHANCE))
         {
             return;
         }

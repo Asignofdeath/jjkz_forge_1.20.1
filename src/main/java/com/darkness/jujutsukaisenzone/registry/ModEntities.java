@@ -8,6 +8,7 @@ import com.darkness.jujutsukaisenzone.entity.DemonSubduingShrineEntity;
 import com.darkness.jujutsukaisenzone.entity.Grade3CurseSpiritAEntity;
 import com.darkness.jujutsukaisenzone.entity.JudgeEntity;
 import com.darkness.jujutsukaisenzone.entity.GavelProjectileEntity;
+import com.darkness.jujutsukaisenzone.entity.GojoSatoruEntity;
 import com.darkness.jujutsukaisenzone.entity.JadeDogEntity;
 import com.darkness.jujutsukaisenzone.entity.JujutsuCouncilStaffEntity;
 import com.darkness.jujutsukaisenzone.entity.MahoragaEntity;
@@ -127,6 +128,16 @@ public final class ModEntities
                             .updateInterval(1)
                             .fireImmune()
                             .build("cutscene_actor"));
+
+    /** 五条悟（AI 术师实体）：有 AI、能开真实领域放技能，特级面板。 */
+    public static final RegistryObject<EntityType<GojoSatoruEntity>> GOJO_SATORU =
+            ENTITY_TYPES.register("gojo_satoru",
+                    () -> EntityType.Builder.<GojoSatoruEntity>of(GojoSatoruEntity::new, MobCategory.CREATURE)
+                            .sized(0.6F, 1.9F)
+                            .clientTrackingRange(16)
+                            .updateInterval(2)
+                            .fireImmune()
+                            .build("gojo_satoru"));
 
     /** 三级咒灵甲（暂用尸壳模型占位） */
     public static final RegistryObject<EntityType<Grade3CurseSpiritAEntity>> GRADE_3_CURSE_SPIRIT_A =

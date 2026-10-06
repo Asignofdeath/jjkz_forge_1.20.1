@@ -46,7 +46,9 @@ public final class DomainExpansionLearnLogic
 
     public static double getEntryChance(ServerPlayer player)
     {
-        return BASE_ENTRY_CHANCE + PlayerDomainExpansionData.getStudybookBoostUses(player) * STUDYBOOK_BONUS_PER_USE;
+        return com.darkness.jujutsukaisenzone.talent.InnateTalentData.geniusLearnChance(
+                player,
+                BASE_ENTRY_CHANCE + PlayerDomainExpansionData.getStudybookBoostUses(player) * STUDYBOOK_BONUS_PER_USE);
     }
 
     public static boolean canRollEntry(ServerPlayer player)

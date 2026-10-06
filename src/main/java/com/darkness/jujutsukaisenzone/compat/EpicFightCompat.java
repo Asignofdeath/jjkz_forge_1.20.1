@@ -2,9 +2,13 @@ package com.darkness.jujutsukaisenzone.compat;
 
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import yesman.epicfight.api.animation.AnimationManager.AnimationAccessor;
+import yesman.epicfight.api.animation.types.StaticAnimation;
 import yesman.epicfight.world.capabilities.EpicFightCapabilities;
+import yesman.epicfight.world.capabilities.entitypatch.LivingEntityPatch;
 import yesman.epicfight.world.capabilities.entitypatch.player.PlayerPatch;
 import yesman.epicfight.world.capabilities.entitypatch.player.ServerPlayerPatch;
 import yesman.epicfight.world.capabilities.item.CapabilityItem;
@@ -65,6 +69,28 @@ public final class EpicFightCompat
     public static void stopLimitlessDomainChargeAnimation(ServerPlayer player)
     {
         ServerPlayerPatch patch = EpicFightCapabilities.getEntityPatch(player, ServerPlayerPatch.class);
+        if (patch != null && JjkzEpicFightAnimations.LIMITLESS_DOMAIN_CHARGE != null)
+        {
+            patch.stopPlaying(JjkzEpicFightAnimations.LIMITLESS_DOMAIN_CHARGE);
+        }
+    }
+
+    /**
+     * 无量空处蓄力开始（AI 实体施法者版）：播放非循环 Blender 导出动画。
+     * <p>
+     * 与玩家版差别仅取 patch 的方式 —— 实体走 {@link LivingEntityPatch}。
+     * {@link com.darkness.jujutsukaisenzone.entity.GojoSatoruEntity} 已挂 patch，会实际播放；
+     * 其它未接管实体仍静默跳过。
+     */
+    public static void playLimitlessDomainChargeAnimation(LivingEntity entity)
+    {
+        playTechniqueAnimationSynced(entity, JjkzEpicFightAnimations.LIMITLESS_DOMAIN_CHARGE);
+    }
+
+    /** 无量空处蓄力中断（AI 实体施法者版）：停止蓄力动画。 */
+    public static void stopLimitlessDomainChargeAnimation(LivingEntity entity)
+    {
+        LivingEntityPatch<?> patch = EpicFightCapabilities.getEntityPatch(entity, LivingEntityPatch.class);
         if (patch != null && JjkzEpicFightAnimations.LIMITLESS_DOMAIN_CHARGE != null)
         {
             patch.stopPlaying(JjkzEpicFightAnimations.LIMITLESS_DOMAIN_CHARGE);
@@ -173,11 +199,13 @@ public final class EpicFightCompat
      */
     public static void playLimitlessAkaShortAnimation(ServerPlayer player)
     {
-        ServerPlayerPatch patch = EpicFightCapabilities.getEntityPatch(player, ServerPlayerPatch.class);
-        if (patch != null && JjkzEpicFightAnimations.AKA_SHORT != null)
-        {
-            patch.playAnimationInstantly(JjkzEpicFightAnimations.AKA_SHORT);
-        }
+        playLimitlessAkaShortAnimation((LivingEntity) player);
+    }
+
+    /** 「赫」发射前摇（AI 实体施法者版）。 */
+    public static void playLimitlessAkaShortAnimation(LivingEntity entity)
+    {
+        playTechniqueAnimationSynced(entity, JjkzEpicFightAnimations.AKA_SHORT);
     }
 
     /**
@@ -185,11 +213,13 @@ public final class EpicFightCompat
      */
     public static void playRemoteMurasakiStartAnimation(ServerPlayer player)
     {
-        ServerPlayerPatch patch = EpicFightCapabilities.getEntityPatch(player, ServerPlayerPatch.class);
-        if (patch != null && JjkzEpicFightAnimations.REMOTE_MURASAKI_START != null)
-        {
-            patch.playAnimationInstantly(JjkzEpicFightAnimations.REMOTE_MURASAKI_START);
-        }
+        playRemoteMurasakiStartAnimation((LivingEntity) player);
+    }
+
+    /** 超远程虚式茈起手（AI 实体施法者版）。 */
+    public static void playRemoteMurasakiStartAnimation(LivingEntity entity)
+    {
+        playTechniqueAnimationSynced(entity, JjkzEpicFightAnimations.REMOTE_MURASAKI_START);
     }
 
     /**
@@ -197,7 +227,13 @@ public final class EpicFightCompat
      */
     public static void stopRemoteMurasakiStartAnimation(ServerPlayer player)
     {
-        ServerPlayerPatch patch = EpicFightCapabilities.getEntityPatch(player, ServerPlayerPatch.class);
+        stopRemoteMurasakiStartAnimation((LivingEntity) player);
+    }
+
+    /** 超远程虚式茈起手停止（AI 实体施法者版）。 */
+    public static void stopRemoteMurasakiStartAnimation(LivingEntity entity)
+    {
+        LivingEntityPatch<?> patch = EpicFightCapabilities.getEntityPatch(entity, LivingEntityPatch.class);
         if (patch != null && JjkzEpicFightAnimations.REMOTE_MURASAKI_START != null)
         {
             patch.stopPlaying(JjkzEpicFightAnimations.REMOTE_MURASAKI_START);
@@ -209,11 +245,13 @@ public final class EpicFightCompat
      */
     public static void playRemoteMurasakiFireAnimation(ServerPlayer player)
     {
-        ServerPlayerPatch patch = EpicFightCapabilities.getEntityPatch(player, ServerPlayerPatch.class);
-        if (patch != null && JjkzEpicFightAnimations.REMOTE_MURASAKI_FIRE != null)
-        {
-            patch.playAnimationInstantly(JjkzEpicFightAnimations.REMOTE_MURASAKI_FIRE);
-        }
+        playRemoteMurasakiFireAnimation((LivingEntity) player);
+    }
+
+    /** 超远程虚式茈发射（AI 实体施法者版）。 */
+    public static void playRemoteMurasakiFireAnimation(LivingEntity entity)
+    {
+        playTechniqueAnimationSynced(entity, JjkzEpicFightAnimations.REMOTE_MURASAKI_FIRE);
     }
 
     /**
@@ -272,6 +310,48 @@ public final class EpicFightCompat
         if (patch != null && JjkzEpicFightAnimations.FLYING_TURN_KICK != null)
         {
             patch.playAnimationInstantly(JjkzEpicFightAnimations.FLYING_TURN_KICK);
+        }
+    }
+
+    /**
+     * 主线 1.3 开场：播放倒地动画并定格末帧
+     * （需已注册 {@link JjkzEpicFightAnimations#THE_PLAYER_FELL_TO_THE_GROUND}）。
+     */
+    public static void playPlayerFellToTheGroundAnimation(ServerPlayer player)
+    {
+        ServerPlayerPatch patch = EpicFightCapabilities.getEntityPatch(player, ServerPlayerPatch.class);
+        if (patch != null && JjkzEpicFightAnimations.THE_PLAYER_FELL_TO_THE_GROUND != null)
+        {
+            patch.playAnimationInstantly(JjkzEpicFightAnimations.THE_PLAYER_FELL_TO_THE_GROUND);
+        }
+    }
+
+    /** 主线 1.3：停止倒地定格动画。 */
+    public static void stopPlayerFellToTheGroundAnimation(ServerPlayer player)
+    {
+        ServerPlayerPatch patch = EpicFightCapabilities.getEntityPatch(player, ServerPlayerPatch.class);
+        if (patch != null && JjkzEpicFightAnimations.THE_PLAYER_FELL_TO_THE_GROUND != null)
+        {
+            patch.stopPlaying(JjkzEpicFightAnimations.THE_PLAYER_FELL_TO_THE_GROUND);
+        }
+    }
+
+    /**
+     * 生物施法者：服务端 {@code PLAY} 并同步给追踪玩家。
+     * {@code playAnimationInstantly} 对玩家本地可见，但会被人形生物的近战 Goal 立刻盖掉。
+     */
+    private static void playTechniqueAnimationSynced(
+            LivingEntity entity,
+            AnimationAccessor<? extends StaticAnimation> animation)
+    {
+        if (entity == null || entity.level().isClientSide || animation == null)
+        {
+            return;
+        }
+        LivingEntityPatch<?> patch = EpicFightCapabilities.getEntityPatch(entity, LivingEntityPatch.class);
+        if (patch != null)
+        {
+            patch.playAnimationSynchronized(animation, 0.0F);
         }
     }
 

@@ -31,6 +31,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 
 import javax.annotation.Nullable;
 import java.util.ArrayDeque;
@@ -251,14 +252,42 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
     // ==================== 子类必须实现的抽象方法 ====================
 
     /**
-     * 应用领域专属效果。
+     * 应用领域专属效果（玩家版）。
      * <p>
      * 基础领域无特殊效果，术式领域有专属效果（如必中、伤害加成等）。
      *
-     * @param player   施术者
+     * @param player   施术者（玩家）
      * @param instance 领域实例
      */
     protected abstract void applyDomainSpecificEffect(ServerPlayer player, BarrierInstance instance);
+
+    /**
+     * 应用领域专属效果（施法者无关版）：玩家与 AI 实体共用。
+     * <p>
+     * 默认实现：有玩家 → 转调 {@link #applyDomainSpecificEffect(ServerPlayer, BarrierInstance)}；
+     * AI 实体（无玩家）→ 什么也不做。术式领域若要支持 AI 实体施法，覆写本方法并在
+     * {@code caster.player() == null} 分支里做实体版演出 / 必中判定。
+     */
+    protected void applyDomainSpecificEffect(DomainCaster caster, BarrierInstance instance)
+    {
+        ServerPlayer player = caster.player();
+        if (player != null)
+        {
+            applyDomainSpecificEffect(player, instance);
+        }
+    }
+
+    /**
+     * 关闭回调（施法者无关版）。默认实现转调玩家版（若有玩家），否则什么也不做。
+     */
+    protected void onBarrierClosed(DomainCaster caster, BarrierInstance instance)
+    {
+        ServerPlayer player = caster.player();
+        if (player != null)
+        {
+            onBarrierClosed(player, instance);
+        }
+    }
 
     @Override
     protected void onBarrierClosed(ServerPlayer player, BarrierInstance instance)
@@ -304,14 +333,26 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
     }
 
     /**
-     * 领域实例入队后的钩子：子类可标记瞬发共展天空盒 / 构建完即关等。
+     * 领域实例入队后的钩子（玩家版）：子类可标记瞬发共展天空盒 / 构建完即关等。
      */
     protected void configureDomainInstance(ServerPlayer player, BarrierInstance instance)
     {
     }
 
     /**
-     * 瞬发领域（天空盒-only / 构建完即关）展开进度<strong>首次过半</strong>时的钩子：
+     * 领域实例入队后的钩子（施法者无关版）。默认：有玩家 → 转调玩家版；AI 实体 → 无操作。
+     */
+    protected void configureDomainInstance(DomainCaster caster, BarrierInstance instance)
+    {
+        ServerPlayer player = caster.player();
+        if (player != null)
+        {
+            configureDomainInstance(player, instance);
+        }
+    }
+
+    /**
+     * 瞬发领域（天空盒-only / 构建完即关）展开进度<strong>首次过半</strong>时的钩子（玩家版）：
      * 子类可在此挂演出（如球心 Photon）。比等到 100% 构建完成更早，给短命瞬发领域留出展示时间。
      * <p>
      * 瞬发路径不经过 {@link #applyDomainSpecificEffect(ServerPlayer, BarrierInstance)}，故演出需挂此处。
@@ -319,6 +360,18 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
      */
     protected void onInstantDomainHalfProgress(ServerPlayer player, ServerLevel level, BarrierInstance instance)
     {
+    }
+
+    /**
+     * 瞬发过半钩子（施法者无关版）。默认：有玩家 → 转调玩家版；AI 实体 → 无操作。
+     */
+    protected void onInstantDomainHalfProgress(DomainCaster caster, ServerLevel level, BarrierInstance instance)
+    {
+        ServerPlayer player = caster.player();
+        if (player != null)
+        {
+            onInstantDomainHalfProgress(player, level, instance);
+        }
     }
 
     // ==================== 领域方块 ====================
@@ -339,62 +392,91 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
     @Override
     public void cast(ServerPlayer player)
     {
-        if (!player.isAlive() || !isInBattleMode(player))
+        cast(DomainCaster.of(player));
+    }
+
+    /**
+     * 领域展开（施法者无关版）：玩家与 AI 实体共用同一条真实展开路径。
+     * <p>
+     * 与旧 {@code cast(ServerPlayer)} 的唯一差别是「数值来源」与「玩家专属演出」都走
+     * {@link DomainCaster}：咒力 / 战斗模式 / 模式选择由实现决定，输入锁、脑损、
+     * 领域量表、提示文案等只在 {@code caster.player() != null} 时执行。
+     */
+    public void cast(DomainCaster caster)
+    {
+        ServerPlayer player = caster.player();
+        if (!caster.alive() || !caster.inBattleMode())
         {
             return;
         }
 
         // 如果玩家已在自己的领域内，解除领域（Alt+结界术键 = 解除领域）
-        if (closeDomainIfPlayerInside(player))
+        if (closeDomainIfCasterInside(caster))
         {
             return;
         }
 
-        if (TechniqueMeltdownEffect.blockDomainExpansion(player))
+        if (player != null)
         {
+            if (TechniqueMeltdownEffect.blockDomainExpansion(player))
+            {
+                return;
+            }
+
+            if (ConfiscationEffect.blockDomainExpansion(player))
+            {
+                return;
+            }
+        }
+
+        // 检查施法者是否在任何领域内（包括别人的领域），领域内无法展开领域
+        if (isPositionInAnyDomain(caster.level(), caster.blockPosition()))
+        {
+            if (player != null)
+            {
+                player.displayClientMessage(Component.literal("无法展开领域，因为领域对抗还没做").withStyle(ChatFormatting.RED), true);
+            }
             return;
         }
 
-        if (ConfiscationEffect.blockDomainExpansion(player))
+        // 检查施法者是否在普通结界内，结界内无法展开领域
+        if (caster.level() != null
+                && BarrierTechniqueServerLogic.getInstance().isPositionInBarrier(caster.level(), caster.blockPosition()))
         {
-            return;
-        }
-
-        // 检查玩家是否在任何领域内（包括别人的领域），领域内无法展开领域
-        if (isPlayerInsideAnyDomain(player))
-        {
-            player.displayClientMessage(Component.literal("无法展开领域，因为领域对抗还没做").withStyle(ChatFormatting.RED), true);
-            return;
-        }
-
-        // 检查玩家是否在普通结界内，结界内无法展开领域
-        if (BarrierTechniqueServerLogic.getInstance().isPositionInBarrier(player.serverLevel(), player.blockPosition()))
-        {
-            player.displayClientMessage(Component.literal("结界内无法展开领域").withStyle(ChatFormatting.RED), true);
+            if (player != null)
+            {
+                player.displayClientMessage(Component.literal("结界内无法展开领域").withStyle(ChatFormatting.RED), true);
+            }
             return;
         }
 
         // 检查是否习得领域展开
-        if (!hasLearnedDomainExpansion(player))
+        if (!hasLearnedDomainExpansion(caster))
         {
-            player.displayClientMessage(Component.literal("尚未习得领域展开").withStyle(ChatFormatting.RED), true);
+            if (player != null)
+            {
+                player.displayClientMessage(Component.literal("尚未习得领域展开").withStyle(ChatFormatting.RED), true);
+            }
             return;
         }
 
         // 检查是否习得结界术（前置条件）
-        if (!PlayerBarrierTechniqueData.hasLearned(player))
+        if (!hasLearnedBarrierTechnique(caster))
         {
-            player.displayClientMessage(Component.literal("需要先习得结界术").withStyle(ChatFormatting.RED), true);
+            if (player != null)
+            {
+                player.displayClientMessage(Component.literal("需要先习得结界术").withStyle(ChatFormatting.RED), true);
+            }
             return;
         }
 
         // 领域展开半径：开放式 64 / 瞬发 32 / 常规 DOMAIN_RADIUS
         int radius;
-        if (PlayerDomainModeData.isOpen(player))
+        if (isOpenDomainMode(caster))
         {
             radius = OPEN_DOMAIN_RADIUS;
         }
-        else if (PlayerDomainModeData.isInstant(player))
+        else if (isInstantDomainMode(caster))
         {
             radius = INSTANT_DOMAIN_RADIUS;
         }
@@ -403,13 +485,13 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
             radius = DOMAIN_RADIUS;
         }
 
-        // 脑损满则禁止展开（强开受伤）
-        if (!PlayerBrainDamageData.tryAllowDomainExpansion(player))
+        // 脑损满则禁止展开（强开受伤）；仅玩家
+        if (player != null && !PlayerBrainDamageData.tryAllowDomainExpansion(player))
         {
             return;
         }
-        // 领域量表未满则禁止展开
-        if (!PlayerDomainGaugeData.tryAllowDomainExpansion(player))
+        // 领域量表未满则禁止展开；仅玩家
+        if (player != null && !PlayerDomainGaugeData.tryAllowDomainExpansion(player))
         {
             return;
         }
@@ -417,20 +499,27 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
 
         // 检查并消耗展开领域所需的咒力
         int expansionCost = calculateExpansionCost(0);
-        if (!PlayerCursedEnergyData.tryConsume(player, expansionCost))
+        if (!caster.consumeCursedEnergy(expansionCost))
         {
-            player.displayClientMessage(
-                    Component.literal("咒力不足，无法展开领域（需要 " + expansionCost + "）")
-                            .withStyle(ChatFormatting.RED), true);
+            if (player != null)
+            {
+                player.displayClientMessage(
+                        Component.literal("咒力不足，无法展开领域（需要 " + expansionCost + "）")
+                                .withStyle(ChatFormatting.RED), true);
+            }
             return;
         }
 
-        ServerLevel level = player.serverLevel();
-        BlockPos center = player.blockPosition();
-        int playerFootY = player.getBlockY() - 1;
+        ServerLevel level = caster.level();
+        if (level == null)
+        {
+            return;
+        }
+        BlockPos center = caster.blockPosition();
+        int playerFootY = caster.footBlockY();
         Map<BlockPos, BlockState> removedBlocks = new HashMap<>();
 
-        boolean openDomain = PlayerDomainModeData.isOpen(player);
+        boolean openDomain = isOpenDomainMode(caster);
         List<BlockPos> shellBlocks = openDomain
                 ? List.of()
                 : buildHollowSpherePositions(center, radius);
@@ -445,13 +534,15 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
         // 排序（从背后向前方包围）
         if (!openDomain)
         {
-            shellBlocks = sortShellBlocksForExpansion(shellBlocks, center, player);
+            shellBlocks = sortShellBlocksForExpansion(shellBlocks, center, caster);
         }
 
-        // 读取玩家的规则设置
-        boolean blockMobSpawn = BarrierRulesData.isBlockMobSpawn(player.getUUID());
+        // 读取施法者的规则设置
+        boolean blockMobSpawn = player != null
+                ? BarrierRulesData.isBlockMobSpawn(player.getUUID())
+                : false;
 
-        Deque<BarrierInstance> queue = ACTIVE_DOMAINS.computeIfAbsent(player.getUUID(), key -> new ArrayDeque<>());
+        Deque<BarrierInstance> queue = ACTIVE_DOMAINS.computeIfAbsent(caster.uid(), key -> new ArrayDeque<>());
 
         BarrierInstance instance = new BarrierInstance(
                 level.dimension(),
@@ -470,19 +561,25 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
 
         queue.addLast(instance);
 
-        // 今日次数 / 超额脑损（关域不算，仅成功展开）
-        PlayerBrainDamageData.onDomainExpanded(player);
-        PlayerDomainGaugeData.consumeOnExpand(player);
+        // 今日次数 / 超额脑损（关域不算，仅成功展开）；仅玩家
+        if (player != null)
+        {
+            PlayerBrainDamageData.onDomainExpanded(player);
+            PlayerDomainGaugeData.consumeOnExpand(player);
+        }
 
-        configureDomainInstance(player, instance);
+        configureDomainInstance(caster, instance);
         if (instance.isOpenDomain())
         {
             instance.setExpanding(false);
-            applyDomainSpecificEffect(player, instance);
-            String nameDisplay = domainName.isEmpty() ? "" : "「" + domainName + "」";
-            player.displayClientMessage(
-                    Component.literal(nameDisplay + "开放式领域展开（半径 " + radius + "）")
-                            .withStyle(ChatFormatting.GOLD), true);
+            applyDomainSpecificEffect(caster, instance);
+            if (player != null)
+            {
+                String nameDisplay = domainName.isEmpty() ? "" : "「" + domainName + "」";
+                player.displayClientMessage(
+                        Component.literal(nameDisplay + "开放式领域展开（半径 " + radius + "）")
+                                .withStyle(ChatFormatting.GOLD), true);
+            }
         }
         else if (instance.isAutoCloseOnComplete())
         {
@@ -495,13 +592,13 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
             BarrierInstance oldest = queue.pollFirst();
             if (oldest != null)
             {
-                clearBarrierInstance(player, oldest);
+                clearBarrierInstance(caster, oldest);
             }
         }
 
         if (queue.isEmpty())
         {
-            ACTIVE_DOMAINS.remove(player.getUUID());
+            ACTIVE_DOMAINS.remove(caster.uid());
         }
 
         if (instance.isOpenDomain())
@@ -514,23 +611,77 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
         {
             // 即时展开：放置所有方块、生成地板、填充地板以下、清空地板以上
             placeAllDomainBlocks(level, shellBlocks, removedBlocks, center, radius, playerFootY);
-            completeDomainShellExpansion(player, level, instance, shellBlocks, center, radius, playerFootY, removedBlocks);
+            completeDomainShellExpansion(caster, level, instance, shellBlocks, center, radius, playerFootY, removedBlocks);
             if (instance.isDiscardAfterTick())
             {
                 return;
             }
-            String nameDisplay = domainName.isEmpty() ? "" : "「" + domainName + "」";
-            player.displayClientMessage(
-                    Component.literal(nameDisplay + "领域展开完成（半径 " + radius + "）")
-                            .withStyle(ChatFormatting.GOLD), true);
+            if (player != null)
+            {
+                String nameDisplay = domainName.isEmpty() ? "" : "「" + domainName + "」";
+                player.displayClientMessage(
+                        Component.literal(nameDisplay + "领域展开完成（半径 " + radius + "）")
+                                .withStyle(ChatFormatting.GOLD), true);
+            }
         }
-        else
+        else if (player != null)
         {
             String nameDisplay = domainName.isEmpty() ? "" : "「" + domainName + "」";
             player.displayClientMessage(
                     Component.literal(nameDisplay + "领域展开中（半径 " + radius + "）")
                             .withStyle(ChatFormatting.LIGHT_PURPLE), true);
         }
+    }
+
+    // ==================== 施法者抽象适配（玩家 / AI 实体通用） ====================
+
+    /**
+     * 该施法者是否已习得「领域展开」。默认走玩家存档；{@link com.darkness.jujutsukaisenzone.technique.domain.DomainCaster.EntityCaster}
+     * 由术式子类覆盖（AI 术师默认视为已习得，前提是它已被赋予该术式）。
+     */
+    protected boolean hasLearnedDomainExpansion(DomainCaster caster)
+    {
+        ServerPlayer player = caster.player();
+        return player != null && hasLearnedDomainExpansion(player);
+    }
+
+    /**
+     * 该施法者是否已习得「结界术」前置。默认走玩家存档；AI 实体默认 true。
+     */
+    protected boolean hasLearnedBarrierTechnique(DomainCaster caster)
+    {
+        ServerPlayer player = caster.player();
+        if (player != null)
+        {
+            return PlayerBarrierTechniqueData.hasLearned(player);
+        }
+        return false;
+    }
+
+    /**
+     * 是否「开放式」模式。玩家读圆盘；AI 术师读 {@link AiDomainModeData}。
+     */
+    protected boolean isOpenDomainMode(DomainCaster caster)
+    {
+        ServerPlayer player = caster.player();
+        if (player != null)
+        {
+            return PlayerDomainModeData.isOpen(player);
+        }
+        return AiDomainModeData.isOpen(caster.entity());
+    }
+
+    /**
+     * 是否「瞬发」模式。玩家读圆盘；AI 术师读 {@link AiDomainModeData}。
+     */
+    protected boolean isInstantDomainMode(DomainCaster caster)
+    {
+        ServerPlayer player = caster.player();
+        if (player != null)
+        {
+            return PlayerDomainModeData.isInstant(player);
+        }
+        return AiDomainModeData.isInstant(caster.entity());
     }
 
     /**
@@ -619,15 +770,54 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
         }
 
         placeAllDomainBlocks(level, shellBlocks, removedBlocks, center, radius, playerFootY);
-        completeDomainShellExpansion(player, level, instance, shellBlocks, center, radius, playerFootY, removedBlocks);
+        completeDomainShellExpansion(DomainCaster.of(player), level, instance, shellBlocks, center, radius, playerFootY, removedBlocks);
         return true;
     }
 
+    /**
+     * 领域维持（施法者入口，{@link IBarrierTechnique} 契约）。
+     * <p>
+     * 默认实现<b>转发</b>到 {@link #tickMaintain(DomainCaster)}，使玩家与 AI 实体走同一套维持逻辑。
+     * <p>
+     * ⛔⛔ <b>子类覆写本方法时必须注意「虚调用环」</b>：本方法与 {@link #tickMaintain(DomainCaster)}
+     * 互相可达（本方法 → DC 版；而子类若覆写了 DC 版、其玩家分支又回调本方法，则 DC 版 → 本方法）。
+     * 一旦两侧同时被覆写且互相转发，就会形成「SP 版 → DC 版 → SP 版」的无限递归（{@code StackOverflowError}），
+     * 且<b>编译期完全无法发现</b>。
+     * <p>
+     * <b>正确做法</b>：共用逻辑抽成<b>私有非虚</b>方法（如 {@code LimitlessDomainExpansion#tickMaintainPlayerSide}），
+     * 两条入口都直达该私有方法；子类覆写 DC 版的玩家分支<b>严禁</b>写
+     * {@code tickMaintain(player)} / {@code super.tickMaintain(player)}。
+     * <p>
+     * 参考实现：{@code LimitlessDomainExpansion}（唯一覆写 DC 版的领域，已按此规矩处理）。
+     * 其余领域（{@code ShrineDomainExpansion} / {@code LoveRendezvousDomainExpansion}/
+     * {@code JudgmentDomainExpansion}）只覆写 SP 版，故不涉及此陷阱。
+     */
     @Override
     public void tickMaintain(ServerPlayer player)
     {
-        tickDeferredDomainSkyboxPlacement(player);
-        Deque<BarrierInstance> queue = ACTIVE_DOMAINS.get(player.getUUID());
+        tickMaintain(DomainCaster.of(player));
+    }
+
+    /**
+     * 领域维持（施法者无关版）：玩家与 AI 实体共用。
+     * <p>
+     * 所有玩家专属副作用（提示文案、瞬发慢镜头标记、延迟天空盒）在 {@code caster.player() == null}
+     * 时自动跳过；咒力消耗走 {@link DomainCaster#consumeCursedEnergy(int)}。
+     * <p>
+     * ⛔ <b>覆写本方法的子类请先阅读 {@link #tickMaintain(ServerPlayer)} 的「虚调用环」警告</b>：
+     * 本方法与 SP 版互相可达，双方同时覆写并互相转发会导致无限递归。
+     * <p>
+     * 基类本实现是<b>纯实现</b>（不回调 SP 版），因此「只覆写 SP 版」的子类（Shrine / Love / Judgment）
+     * 由基类转发进入本方法后即终止，不会成环；只有「同时覆写 DC 版」的子类才有风险。
+     */
+    public void tickMaintain(DomainCaster caster)
+    {
+        ServerPlayer player = caster.player();
+        if (player != null)
+        {
+            tickDeferredDomainSkyboxPlacement(player);
+        }
+        Deque<BarrierInstance> queue = ACTIVE_DOMAINS.get(caster.uid());
         if (queue == null || queue.isEmpty())
         {
             return;
@@ -638,16 +828,23 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
 
         for (BarrierInstance instance : queue)
         {
-            ServerLevel level = player.server.getLevel(instance.getDimension());
-            if (level == null)
+            ServerLevel level = caster.level();
+            if (level == null || !level.dimension().equals(instance.getDimension()))
             {
-                continue;
+                ServerLevel byKey = level != null && level.getServer() != null
+                        ? level.getServer().getLevel(instance.getDimension())
+                        : null;
+                if (byKey == null)
+                {
+                    continue;
+                }
+                level = byKey;
             }
 
             // 处理延迟展开动画
             if (instance.isExpanding())
             {
-                tickDomainExpand(player, level, instance);
+                tickDomainExpand(caster, level, instance);
                 if (instance.isAutoCloseOnComplete() && !instance.isDiscardAfterTick())
                 {
                     InstantDomainSlowMo.refresh(level, instance.getCenter(), instance.getInstantSlowMoTargets());
@@ -668,34 +865,37 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
                 instance.setAutoCloseHoldTicksRemaining(remaining);
                 if (remaining <= 0)
                 {
-                    finishInstantAutoClose(player, instance);
+                    finishInstantAutoClose(caster, instance);
                     continue;
                 }
                 kept.addLast(instance);
                 continue;
             }
 
-            // 玩家离开领域 → 领域立刻崩解
-            if (!isPlayerInsideBarrier(player, instance))
+            // 施法者离开领域 → 领域立刻崩解
+            if (!isCasterInsideBarrier(caster, instance))
             {
-                String nameDisplay = domainName.isEmpty() ? "" : "「" + domainName + "」";
-                player.displayClientMessage(
-                        Component.literal(nameDisplay + "离开领域范围，领域崩解")
-                                .withStyle(ChatFormatting.RED), true);
-                clearBarrierInstance(player, instance);
+                if (player != null)
+                {
+                    String nameDisplay = domainName.isEmpty() ? "" : "「" + domainName + "」";
+                    player.displayClientMessage(
+                            Component.literal(nameDisplay + "离开领域范围，领域崩解")
+                                    .withStyle(ChatFormatting.RED), true);
+                }
+                clearBarrierInstance(caster, instance);
                 continue;
             }
 
             // 消耗维持领域所需的咒力
             double costPerTick = (MAINTAIN_COST_BASE_PER_SECOND + instance.getRadius() * MAINTAIN_COST_PER_RADIUS_PER_SECOND) / TICKS_PER_SECOND;
-            double reduction = getMaintainCostReduction(player);
+            double reduction = caster.maintainCostReduction();
             costPerTick = costPerTick * (1.0 - reduction);
             int costThisTick = (int) Math.ceil(costPerTick);
             if (costThisTick > 0)
             {
-                if (!PlayerCursedEnergyData.tryConsume(player, costThisTick))
+                if (!caster.consumeCursedEnergy(costThisTick))
                 {
-                    if (!collapsedNotified)
+                    if (player != null && !collapsedNotified)
                     {
                         String nameDisplay = domainName.isEmpty() ? "" : "「" + domainName + "」";
                         player.displayClientMessage(
@@ -703,7 +903,7 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
                                         .withStyle(ChatFormatting.RED), true);
                         collapsedNotified = true;
                     }
-                    clearBarrierInstance(player, instance);
+                    clearBarrierInstance(caster, instance);
                     continue;
                 }
             }
@@ -714,7 +914,7 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
                 double remainingPercent = calculateRemainingPercent(level, instance);
                 if (remainingPercent < MIN_MAINTAIN_PERCENT)
                 {
-                    if (!collapsedNotified && isPlayerInsideBarrier(player, instance))
+                    if (player != null && !collapsedNotified && isCasterInsideBarrier(caster, instance))
                     {
                         String nameDisplay = domainName.isEmpty() ? "" : "「" + domainName + "」";
                         player.displayClientMessage(
@@ -722,25 +922,53 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
                                         .withStyle(ChatFormatting.RED), true);
                         collapsedNotified = true;
                     }
-                    clearBarrierInstance(player, instance);
+                    clearBarrierInstance(caster, instance);
                     continue;
                 }
 
-                notifyDomainHealthIfNeeded(player, instance, remainingPercent);
+                if (player != null)
+                {
+                    notifyDomainHealthIfNeeded(player, instance, remainingPercent);
+                }
             }
             else
             {
-                tickOpenDomainMaintenance(player, instance);
+                tickOpenDomainMaintenance(caster, instance);
             }
             kept.addLast(instance);
         }
 
         if (kept.isEmpty())
         {
-            ACTIVE_DOMAINS.remove(player.getUUID());
+            ACTIVE_DOMAINS.remove(caster.uid());
             return;
         }
-        ACTIVE_DOMAINS.put(player.getUUID(), kept);
+        ACTIVE_DOMAINS.put(caster.uid(), kept);
+    }
+
+    /**
+     * 施法者是否位于领域球内（玩家 / AI 实体通用）。
+     */
+    protected final boolean isCasterInsideBarrier(DomainCaster caster, BarrierInstance instance)
+    {
+        ServerPlayer player = caster.player();
+        if (player != null)
+        {
+            return isPlayerInsideBarrier(player, instance);
+        }
+        if (!instance.getDimension().equals(caster.dimension()))
+        {
+            return false;
+        }
+        Vec3 pos = caster.position();
+        double cx = instance.getCenter().getX() + 0.5D;
+        double cy = instance.getCenter().getY() + 0.5D;
+        double cz = instance.getCenter().getZ() + 0.5D;
+        double dx = pos.x - cx;
+        double dy = pos.y - cy;
+        double dz = pos.z - cz;
+        double radiusSquared = instance.getRadius() * instance.getRadius();
+        return dx * dx + dy * dy + dz * dz < radiusSquared;
     }
 
     /**
@@ -751,6 +979,18 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
     }
 
     /**
+     * 开放式领域每 tick 钩子（施法者无关版）。默认转调玩家版（若有玩家）。
+     */
+    protected void tickOpenDomainMaintenance(DomainCaster caster, BarrierInstance instance)
+    {
+        ServerPlayer player = caster.player();
+        if (player != null)
+        {
+            tickOpenDomainMaintenance(player, instance);
+        }
+    }
+
+    /**
      * 该玩家是否仍持有本实现下的活跃领域（含展开动画中）。
      * <p>
      * 领域主人在维持领域期间应停掉领域量表灌充；展开动画尚未完成时同样算「在领域中」。
@@ -758,6 +998,15 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
     public boolean hasActiveDomain(ServerPlayer owner)
     {
         Deque<BarrierInstance> queue = ACTIVE_DOMAINS.get(owner.getUUID());
+        return queue != null && !queue.isEmpty();
+    }
+
+    /**
+     * 该 UUID 是否仍持有本实现下的活跃领域（玩家 / AI 实体通用）。
+     */
+    public boolean hasActiveDomain(UUID ownerUuid)
+    {
+        Deque<BarrierInstance> queue = ACTIVE_DOMAINS.get(ownerUuid);
         return queue != null && !queue.isEmpty();
     }
 
@@ -791,6 +1040,25 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
         for (BarrierInstance instance : queue)
         {
             clearBarrierInstance(player, instance);
+        }
+    }
+
+    /**
+     * 关闭该施法者当前持有的全部领域（施法者无关版）：玩家与 AI 实体共用。
+     * <p>
+     * 与 {@link #closeAllForPlayer(ServerPlayer)} 的唯一差别是关域回调与方块还原都走 {@code caster}，
+     * 使 AI 实体的领域也能正常撤除并<b>实时复原地形</b>（含天空盒、球壳、被替换方块）。
+     */
+    public void closeAllForCaster(DomainCaster caster)
+    {
+        Deque<BarrierInstance> queue = ACTIVE_DOMAINS.remove(caster.uid());
+        if (queue == null)
+        {
+            return;
+        }
+        for (BarrierInstance instance : queue)
+        {
+            clearBarrierInstance(caster, instance);
         }
     }
 
@@ -1265,7 +1533,7 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
      * 同步处理该列的地板铺设、地板以下填充和地板以上清空，
      * 实现地板和清空跟随球壳一同展开的动画效果。
      */
-    private void tickDomainExpand(ServerPlayer player, ServerLevel level, BarrierInstance instance)
+    private void tickDomainExpand(DomainCaster caster, ServerLevel level, BarrierInstance instance)
     {
         List<BlockPos> allBlocks = instance.getShellBlocks();
         int currentProgress = instance.getExpansionProgress();
@@ -1296,7 +1564,7 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
 
         if (instance.isSkyboxOnlyExpand())
         {
-            tickSkyboxOnlyExpand(player, level, instance, allBlocks, processedColumns,
+            tickSkyboxOnlyExpand(caster, level, instance, allBlocks, processedColumns,
                     center, radius, playerFootY, batchLimit, currentProgress);
             return;
         }
@@ -1325,18 +1593,22 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
 
         // 显示展开进度
         int totalBlocks = allBlocks.size();
-        int percent = (int) Math.round(100.0 * newProgress / totalBlocks);
-        String nameDisplay = domainName.isEmpty() ? "" : "「" + domainName + "」";
-        player.displayClientMessage(
-                Component.literal(nameDisplay + "构建中: " + percent + "%")
-                        .withStyle(ChatFormatting.LIGHT_PURPLE), true);
+        ServerPlayer player = caster.player();
+        if (player != null)
+        {
+            int percent = (int) Math.round(100.0 * newProgress / totalBlocks);
+            String nameDisplay = domainName.isEmpty() ? "" : "「" + domainName + "」";
+            player.displayClientMessage(
+                    Component.literal(nameDisplay + "构建中: " + percent + "%")
+                            .withStyle(ChatFormatting.LIGHT_PURPLE), true);
+        }
 
         // 检查展开是否完成
         if (newProgress >= allBlocks.size())
         {
             instance.setExpanding(false);
             completeDomainShellExpansion(
-                    player,
+                    caster,
                     level,
                     instance,
                     allBlocks,
@@ -1344,9 +1616,9 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
                     radius,
                     instance.getPlayerFootY(),
                     instance.getRemovedBlocks());
-            if (!instance.isDiscardAfterTick())
+            if (player != null && !instance.isDiscardAfterTick())
             {
-                nameDisplay = domainName.isEmpty() ? "" : "「" + domainName + "」";
+                String nameDisplay = domainName.isEmpty() ? "" : "「" + domainName + "」";
                 player.displayClientMessage(
                         Component.literal(nameDisplay + "领域构建完成")
                                 .withStyle(ChatFormatting.GOLD), true);
@@ -1358,7 +1630,7 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
      * 瞬发：按球壳顺序只放天空盒（内侧 + 地板），不放结界/领域壳与填充。
      */
     private void tickSkyboxOnlyExpand(
-            ServerPlayer player,
+            DomainCaster caster,
             ServerLevel level,
             BarrierInstance instance,
             List<BlockPos> allBlocks,
@@ -1388,18 +1660,22 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
         instance.setExpansionProgress(newProgress);
 
         int totalBlocks = allBlocks.size();
-        maybeNotifyInstantHalfProgress(player, level, instance, newProgress, totalBlocks);
-        int percent = (int) Math.round(100.0 * newProgress / totalBlocks);
-        String nameDisplay = domainName.isEmpty() ? "" : "「" + domainName + "」";
-        player.displayClientMessage(
-                Component.literal(nameDisplay + "构建中: " + percent + "%")
-                        .withStyle(ChatFormatting.LIGHT_PURPLE), true);
+        maybeNotifyInstantHalfProgress(caster, level, instance, newProgress, totalBlocks);
+        ServerPlayer player = caster.player();
+        if (player != null)
+        {
+            int percent = (int) Math.round(100.0 * newProgress / totalBlocks);
+            String nameDisplay = domainName.isEmpty() ? "" : "「" + domainName + "」";
+            player.displayClientMessage(
+                    Component.literal(nameDisplay + "构建中: " + percent + "%")
+                            .withStyle(ChatFormatting.LIGHT_PURPLE), true);
+        }
 
         if (newProgress >= allBlocks.size())
         {
             instance.setExpanding(false);
             completeDomainShellExpansion(
-                    player,
+                    caster,
                     level,
                     instance,
                     allBlocks,
@@ -1413,7 +1689,7 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
     /**
      * 瞬发展开进度首次过半时触发一次 {@link #onInstantDomainHalfProgress}。
      */
-    private void maybeNotifyInstantHalfProgress(ServerPlayer player, ServerLevel level, BarrierInstance instance,
+    private void maybeNotifyInstantHalfProgress(DomainCaster caster, ServerLevel level, BarrierInstance instance,
                                                 int progress, int totalBlocks)
     {
         if (instance.isInstantHalfProgressNotified() || totalBlocks <= 0 || progress * 2 < totalBlocks)
@@ -1421,7 +1697,7 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
             return;
         }
         instance.setInstantHalfProgressNotified(true);
-        onInstantDomainHalfProgress(player, level, instance);
+        onInstantDomainHalfProgress(caster, level, instance);
     }
 
     /**
@@ -1442,7 +1718,7 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
      * 瞬发模式进入完成态保持，倒计时结束后自动关闭。
      */
     private void completeDomainShellExpansion(
-            ServerPlayer player,
+            DomainCaster caster,
             ServerLevel level,
             BarrierInstance instance,
             List<BlockPos> shellBlocks,
@@ -1451,9 +1727,10 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
             int playerFootY,
             Map<BlockPos, BlockState> removedBlocks)
     {
+        ServerPlayer player = caster.player();
         if (!instance.isSkyboxOnlyExpand())
         {
-            if (deferDomainSkyboxPlacement())
+            if (deferDomainSkyboxPlacement() && player != null)
             {
                 scheduleDeferredDomainSkyboxPlacement(player);
             }
@@ -1475,30 +1752,37 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
         {
             /* 进入完成态保持，慢镜头继续；倒计时结束后再关。 */
             instance.setAutoCloseHoldTicksRemaining(INSTANT_AUTO_CLOSE_HOLD_TICKS);
-            String nameDisplay = domainName.isEmpty() ? "" : "「" + domainName + "」";
-            player.displayClientMessage(
-                    Component.literal(nameDisplay + "领域构建完成")
-                            .withStyle(ChatFormatting.GOLD), true);
+            if (player != null)
+            {
+                String nameDisplay = domainName.isEmpty() ? "" : "「" + domainName + "」";
+                player.displayClientMessage(
+                        Component.literal(nameDisplay + "领域构建完成")
+                                .withStyle(ChatFormatting.GOLD), true);
+            }
             return;
         }
 
-        applyDomainSpecificEffect(player, instance);
+        applyDomainSpecificEffect(caster, instance);
     }
 
     /** 瞬发完成态倒计时结束：关域、熔断路径走 {@link #clearBarrierInstance}。 */
-    private void finishInstantAutoClose(ServerPlayer player, BarrierInstance instance)
+    private void finishInstantAutoClose(DomainCaster caster, BarrierInstance instance)
     {
         String nameDisplay = domainName.isEmpty() ? "" : "「" + domainName + "」";
         ResourceLocation residualTexture = instance.getCustomSkyboxTexture() != null
                 ? instance.getCustomSkyboxTexture()
                 : DEFAULT_SKYBOX_TEXTURE;
-        clearBarrierInstance(player, instance);
+        clearBarrierInstance(caster, instance);
         instance.setDiscardAfterTick(true);
-        broadcastInstantCloseScreenShake(player);
-        broadcastInstantDomainCrossResidual(player, residualTexture);
-        player.displayClientMessage(
-                Component.literal(nameDisplay + "瞬发领域已关闭")
-                        .withStyle(ChatFormatting.AQUA), true);
+        ServerPlayer player = caster.player();
+        if (player != null)
+        {
+            broadcastInstantCloseScreenShake(player);
+            broadcastInstantDomainCrossResidual(player, residualTexture);
+            player.displayClientMessage(
+                    Component.literal(nameDisplay + "瞬发领域已关闭")
+                            .withStyle(ChatFormatting.AQUA), true);
+        }
     }
 
     /**
@@ -1725,11 +2009,11 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
     }
 
     /**
-     * 玩家位于自己领域内部时再次触发领域展开，视为解除领域。
+     * 施法者位于自己领域内部时再次触发领域展开，视为解除领域。
      */
-    private boolean closeDomainIfPlayerInside(ServerPlayer player)
+    private boolean closeDomainIfCasterInside(DomainCaster caster)
     {
-        Deque<BarrierInstance> queue = ACTIVE_DOMAINS.get(player.getUUID());
+        Deque<BarrierInstance> queue = ACTIVE_DOMAINS.get(caster.uid());
         if (queue == null || queue.isEmpty())
         {
             return false;
@@ -1737,17 +2021,21 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
 
         Deque<BarrierInstance> kept = new ArrayDeque<>();
         boolean closed = false;
+        ServerPlayer player = caster.player();
 
         for (BarrierInstance instance : queue)
         {
-            if (!closed && isPlayerInsideBarrier(player, instance))
+            if (!closed && isCasterInsideBarrier(caster, instance))
             {
-                clearBarrierInstance(player, instance);
+                clearBarrierInstance(caster, instance);
                 closed = true;
-                String nameDisplay = domainName.isEmpty() ? "" : "「" + domainName + "」";
-                player.displayClientMessage(
-                        Component.literal(nameDisplay + "已解除")
-                                .withStyle(ChatFormatting.YELLOW), true);
+                if (player != null)
+                {
+                    String nameDisplay = domainName.isEmpty() ? "" : "「" + domainName + "」";
+                    player.displayClientMessage(
+                            Component.literal(nameDisplay + "已解除")
+                                    .withStyle(ChatFormatting.YELLOW), true);
+                }
                 continue;
             }
             kept.addLast(instance);
@@ -1755,13 +2043,21 @@ public abstract class AbstractDomainExpansion extends AbstractBarrierTechnique
 
         if (kept.isEmpty())
         {
-            ACTIVE_DOMAINS.remove(player.getUUID());
+            ACTIVE_DOMAINS.remove(caster.uid());
         }
         else
         {
-            ACTIVE_DOMAINS.put(player.getUUID(), kept);
+            ACTIVE_DOMAINS.put(caster.uid(), kept);
         }
         return closed;
+    }
+
+    /**
+     * 玩家位于自己领域内部时再次触发领域展开，视为解除领域。
+     */
+    private boolean closeDomainIfPlayerInside(ServerPlayer player)
+    {
+        return closeDomainIfCasterInside(DomainCaster.of(player));
     }
 
     /**

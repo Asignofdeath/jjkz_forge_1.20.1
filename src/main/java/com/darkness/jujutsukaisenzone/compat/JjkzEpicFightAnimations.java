@@ -42,6 +42,11 @@ public final class JjkzEpicFightAnimations
     public static AnimationAccessor<JjkzTechniqueCastAnimation> FLYING_TURN;
     /** {@code assets/jujutsukaisenzone/animmodels/animations/flying_turn_kick.json}，「飞行，穿越」踢击 */
     public static AnimationAccessor<JjkzTechniqueCastAnimation> FLYING_TURN_KICK;
+    /**
+     * {@code assets/jujutsukaisenzone/animmodels/animations/the_player_fell_to_the_ground.json}，
+     * 主线 1.3 开场倒地（定格末帧）。
+     */
+    public static AnimationAccessor<JjkzHoldLastFrameAnimation> THE_PLAYER_FELL_TO_THE_GROUND;
 
     private JjkzEpicFightAnimations()
     {
@@ -94,5 +99,8 @@ public final class JjkzEpicFightAnimations
         FLYING_TURN_KICK = builder.nextAccessor(
                 "flying_turn_kick",
                 accessor -> new JjkzTechniqueCastAnimation(accessor, Armatures.BIPED));
+        THE_PLAYER_FELL_TO_THE_GROUND = builder.nextAccessor(
+                "the_player_fell_to_the_ground",
+                accessor -> new JjkzHoldLastFrameAnimation(accessor, Armatures.BIPED));
     }
 }

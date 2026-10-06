@@ -5,6 +5,7 @@ import com.darkness.jujutsukaisenzone.network.packet.AerialMultiJumpC2SPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SelectStarMarkC2SPacket;
 import com.darkness.jujutsukaisenzone.network.packet.StarMarkClearC2SPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncCombatPowerS2CPacket;
+import com.darkness.jujutsukaisenzone.network.packet.SyncInnateTalentS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncCursedEnergyS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncCursedEnergyTraitS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncCursedGradeS2CPacket;
@@ -38,6 +39,11 @@ public final class PlayerSyncNetwork
     public static void sendCursedEnergySync(ServerPlayer player, int current, int max)
     {
         NetworkSenders.toPlayer(player, new SyncCursedEnergyS2CPacket(current, max));
+    }
+
+    public static void sendInnateTalentSync(ServerPlayer player, String talentId, String source)
+    {
+        NetworkSenders.toPlayer(player, new SyncInnateTalentS2CPacket(talentId, source));
     }
 
     public static void sendFactionSync(ServerPlayer player, String factionId)

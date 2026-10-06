@@ -11,6 +11,7 @@ import com.darkness.jujutsukaisenzone.quest.mainline.MainQuestDefs;
 import com.darkness.jujutsukaisenzone.quest.mainline.MainQuestLogic;
 import com.darkness.jujutsukaisenzone.quest.mainline.NarrativeVillage;
 import com.darkness.jujutsukaisenzone.registry.ModEntities;
+import com.darkness.jujutsukaisenzone.registry.ModSounds;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -18,8 +19,11 @@ import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.TickTask;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Mth;
 import net.minecraft.world.DifficultyInstance;
 import net.minecraft.world.entity.MobSpawnType;
@@ -38,6 +42,8 @@ public final class MainQuest12Anomaly
     /** 探索时长：120 秒。 */
     public static final int EXPLORE_TICKS = 2400;
     public static final int MAX_SPAWN = 30;
+    /** {@code fall_down.ogg} 约 1.35s，之后接 squeeze_and_pop。 */
+    private static final int FALL_DOWN_TICKS = 27;
     public static final double SPAWN_MIN_DIST = 12.0D;
     public static final double SPAWN_MAX_DIST = 18.0D;
     public static final double FLEE_DISTANCE = 40.0D;
@@ -57,8 +63,7 @@ public final class MainQuest12Anomaly
             "quest.jujutsukaisenzone.main_1_2.monologue.2",
             "quest.jujutsukaisenzone.main_1_2.monologue.3",
             "quest.jujutsukaisenzone.main_1_2.monologue.4",
-            "quest.jujutsukaisenzone.main_1_2.monologue.5",
-            "quest.jujutsukaisenzone.main_1_2.monologue.6"
+            "quest.jujutsukaisenzone.main_1_2.monologue.5"
     };
     /**
      * 伏击编排：玩家句与三级咒灵甲战吼交错；
@@ -72,6 +77,11 @@ public final class MainQuest12Anomaly
     };
     private static final int LINE_TICKS = 70;
     private static final int GAP_TICKS = 10;
+    /**
+     * 末句（monologue.5「地上还有没收干净的东西……」）相对前句出现的间隔：10 秒。
+     * 其余句维持 {@code LINE_TICKS + GAP_TICKS} 的默认节奏。
+     */
+    private static final int TAIL_LINE_DELAY_TICKS = 200;
     /** 多人抢话间隔（小于客户端同时出现阈值 12）。 */
     private static final int MULTI_SPEAKER_GAP_TICKS = 8;
     private static final int SPAWN_ATTEMPTS = 96;
@@ -180,6 +190,26 @@ public final class MainQuest12Anomaly
         }
         PlayerQuestData.clearMain12Ambush(player);
         PlayerQuestData.setMain12DecorPlaced(player, false);
+        playCompleteSounds(player);
+    }
+
+    private static void playCompleteSounds(ServerPlayer player)
+    {
+        player.playNotifySound(ModSounds.QUEST_FALL_DOWN.get(), SoundSource.MASTER, 1.0F, 1.0F);
+        MinecraftServer server = player.getServer();
+        if (server == null)
+        {
+            return;
+        }
+        UUID playerId = player.getUUID();
+        server.tell(new TickTask(server.getTickCount() + FALL_DOWN_TICKS, () ->
+        {
+            ServerPlayer still = server.getPlayerList().getPlayer(playerId);
+            if (still != null)
+            {
+                still.playNotifySound(ModSounds.QUEST_SQUEEZE_AND_POP.get(), SoundSource.MASTER, 1.0F, 1.0F);
+            }
+        }));
     }
 
     public static void tick(ServerPlayer player)
@@ -418,11 +448,13 @@ public final class MainQuest12Anomaly
     {
         session.monologueFinished = true;
         int gap = LINE_TICKS + GAP_TICKS;
+        int tail = MONOLOGUE_KEYS.length - 1;
         int[] delays = new int[MONOLOGUE_KEYS.length];
         int[] holds = new int[MONOLOGUE_KEYS.length];
         for (int i = 0; i < MONOLOGUE_KEYS.length; i++)
         {
-            delays[i] = i == 0 ? 0 : gap;
+            // 末句（「地上还有没收干净的东西……」）与前句相隔 10 秒，其余维持默认节奏。
+            delays[i] = i == 0 ? 0 : (i == tail ? TAIL_LINE_DELAY_TICKS : gap);
             holds[i] = gap;
         }
         NetworkSenders.toPlayer(player, SyncQuestCodCaptionsS2CPacket.play(MONOLOGUE_KEYS, delays, holds));

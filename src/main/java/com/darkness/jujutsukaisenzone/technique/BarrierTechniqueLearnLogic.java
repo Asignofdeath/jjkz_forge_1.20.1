@@ -27,7 +27,9 @@ public final class BarrierTechniqueLearnLogic
             return false;
         }
         int reads = PlayerBarrierTechniqueData.getStudybookReadCount(player);
-        if (reads >= MAX_STUDYBOOK_READS)
+        int required = com.darkness.jujutsukaisenzone.talent.InnateTalentData.geniusRequiredReads(
+                player, MAX_STUDYBOOK_READS);
+        if (reads >= required)
         {
             player.sendSystemMessage(Component.translatable("message.jujutsukaisenzone.barrier_studybook.pending_wake"));
             return false;
@@ -36,7 +38,7 @@ public final class BarrierTechniqueLearnLogic
         PlayerBarrierTechniqueData.setStudybookReadCount(player, newReads);
         player.sendSystemMessage(Component.translatable(
                 "message.jujutsukaisenzone.barrier_studybook.read_" + newReads));
-        if (newReads >= MAX_STUDYBOOK_READS)
+        if (newReads >= required)
         {
             PlayerBarrierTechniqueData.setPendingWakeUnlock(player, true);
         }

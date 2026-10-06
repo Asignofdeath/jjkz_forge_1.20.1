@@ -463,6 +463,11 @@ public final class TechniqueDamageSources
             float amount,
             SkillDamageType damageType)
     {
+        if (TechniqueAtkObjShackle.shouldSkipHit(
+                owner, target, damageType, currentNarrativeMemberId()))
+        {
+            return false;
+        }
         float resolvedAmount = resolvePowerScaled(owner, amount, damageType);
         boolean previousScaledFlag = POWER_ALREADY_SCALED.get();
         POWER_ALREADY_SCALED.set(true);

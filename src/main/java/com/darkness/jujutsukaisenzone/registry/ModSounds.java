@@ -110,6 +110,19 @@ public final class ModSounds
     public static final RegistryObject<SoundEvent> QUEST_MAIN_1_1_TALK_8 = register("quest.main_1_1.talk.8");
     public static final RegistryObject<SoundEvent> QUEST_MAIN_1_1_TALK_10 = register("quest.main_1_1.talk.10");
     public static final RegistryObject<SoundEvent> QUEST_MAIN_1_1_TALK_11 = register("quest.main_1_1.talk.11");
+    public static final RegistryObject<SoundEvent> QUEST_MAIN_1_3_TALK_1 = register("quest.main_1_3.talk.1");
+    public static final RegistryObject<SoundEvent> QUEST_MAIN_1_3_TALK_3 = register("quest.main_1_3.talk.3");
+    public static final RegistryObject<SoundEvent> QUEST_MAIN_1_3_TALK_4 = register("quest.main_1_3.talk.4");
+    public static final RegistryObject<SoundEvent> QUEST_MAIN_1_3_TALK_5 = register("quest.main_1_3.talk.5");
+    public static final RegistryObject<SoundEvent> QUEST_MAIN_1_3_TALK_6 = register("quest.main_1_3.talk.6");
+    /** 1.2 完成：摔倒（{@code assets/.../sounds/quest/fall_down}）。 */
+    public static final RegistryObject<SoundEvent> QUEST_FALL_DOWN = register("quest.fall_down");
+    /** 1.2 完成：fall_down 结束后播放（{@code assets/.../sounds/quest/squeeze_and_pop}）。 */
+    public static final RegistryObject<SoundEvent> QUEST_SQUEEZE_AND_POP = register("quest.squeeze_and_pop");
+    /** 1.3 醒来眨眼开始（{@code assets/.../sounds/quest/tinnitus}）。 */
+    public static final RegistryObject<SoundEvent> QUEST_TINNITUS = register("quest.tinnitus");
+    /** 1.3 醒来眨眼开始（{@code assets/.../sounds/quest/notinvade_open}）。 */
+    public static final RegistryObject<SoundEvent> QUEST_NOTINVADE_OPEN = register("quest.notinvade_open");
 
     private ModSounds()
     {

@@ -13,7 +13,9 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.client.event.RenderGuiEvent;
 import net.minecraftforge.event.TickEvent;
+import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import org.joml.Matrix4f;
@@ -137,7 +139,29 @@ public final class QuestCodCaptionOverlay
         {
             return;
         }
+        renderCaptions();
+    }
 
+    /**
+     * 眨眼遮罩画在 {@link RenderGuiEvent.Post} 上，会盖住 {@link TickEvent.RenderTickEvent} 里的字幕。
+     * 眨眼进行时在 GUI 最上层再画一遍 COD，保证对白不被眼皮挡住。
+     */
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public static void onRenderGui(RenderGuiEvent.Post event)
+    {
+        if (!QuestWakeBlinkOverlay.isActive())
+        {
+            return;
+        }
+        if (QuestBlackoutOverlay.isActive() || QuestCinematicLetterboxOverlay.isActive())
+        {
+            return;
+        }
+        renderCaptions();
+    }
+
+    private static void renderCaptions()
+    {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.level == null || minecraft.player == null)
         {

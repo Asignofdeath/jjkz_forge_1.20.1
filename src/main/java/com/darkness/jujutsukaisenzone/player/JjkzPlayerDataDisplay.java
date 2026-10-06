@@ -28,9 +28,8 @@ public final class JjkzPlayerDataDisplay
         String factionDisplay = factionId.isEmpty()
                 ? "未选择"
                 : PlayerFactionData.getDisplayName(factionId) + " (" + factionId + ")";
-        boolean reverseTechniqueLearned = PlayerReverseTechniqueData.hasReverseTechnique(subject);
         String innateTechnique = PlayerTechniqueData.getInnateTechnique(subject);
-        boolean heavenlyRestricted = PlayerCursedEnergyData.isHeavenlyRestricted(subject);
+        boolean reverseTechniqueLearned = PlayerReverseTechniqueData.hasReverseTechnique(subject);
         BarrierTechniqueLevel barrierLevel = PlayerBarrierTechniqueData.getLevel(subject);
         SeanceTechniqueLevel seanceLevel = PlayerSeanceTechniqueData.getLevel(subject);
         StrengthenTechniqueLevel strengthenLevel = PlayerStrengthenTechniqueData.getLevel(subject);
@@ -63,7 +62,15 @@ public final class JjkzPlayerDataDisplay
                 healthMax,
                 CursedGradeBonuses.BASE_MAX_HEALTH,
                 healthBonus)));
-        viewer.sendSystemMessage(Component.literal("天与咒缚: " + (heavenlyRestricted ? "是" : "否")));
+        var talent = com.darkness.jujutsukaisenzone.talent.InnateTalentData.get(subject);
+        if (talent != null)
+        {
+            var source = com.darkness.jujutsukaisenzone.talent.InnateTalentData.getSource(subject);
+            String prefix = source == com.darkness.jujutsukaisenzone.talent.InnateTalentSource.ACQUIRED
+                    ? "后天天赋"
+                    : "生得天赋";
+            viewer.sendSystemMessage(Component.literal(prefix + ": " + talent.displayName()));
+        }
         CombatPowerStats power = PlayerCombatPowerData.resolve(subject);
         viewer.sendSystemMessage(Component.literal("体术强度: " + power.physicalPower()
                 + "　术式强度: " + power.techniquePower()));

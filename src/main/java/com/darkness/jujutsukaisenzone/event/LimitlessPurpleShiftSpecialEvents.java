@@ -3,6 +3,7 @@ package com.darkness.jujutsukaisenzone.event;
 import com.darkness.jujutsukaisenzone.JuJutsuKaisenZone;
 import com.darkness.jujutsukaisenzone.compat.EpicFightCompat;
 import com.darkness.jujutsukaisenzone.entity.SpecialEffectEntity;
+import com.darkness.jujutsukaisenzone.entity.combat.AiTechniqueStats;
 import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
 import com.darkness.jujutsukaisenzone.technique.skillset.LimitlessTechniqueSkillSet;
 import net.minecraft.nbt.CompoundTag;
@@ -10,15 +11,17 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
-import net.minecraft.world.entity.player.Player;
-import net.minecraftforge.event.TickEvent;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
+import net.minecraftforge.event.entity.living.LivingEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
 /**
  * Shift+3 茈特别招式：无重力上升约 10 格（仅抬升 Y，不锁 X/Z）→ 与槽位 3 相同的茈蓄力/发射流程 → 结束缓降。
+ * <p>
+ * 流程对玩家与持有 {@link AiTechniqueStats} 的 AI 术师共用同一套 tag / 时序；玩家额外要求战斗模式与无下限术式。
  */
 @Mod.EventBusSubscriber(modid = JuJutsuKaisenZone.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public final class LimitlessPurpleShiftSpecialEvents
@@ -43,84 +46,94 @@ public final class LimitlessPurpleShiftSpecialEvents
     {
     }
 
-    /** 由 {@link LimitlessTechniqueSkillSet#castSpecialMove} 在扣费/冷却成功后调用。 */
-    public static void begin(ServerPlayer player)
+    /** 由扣费/冷却成功后调用（玩家槽位或 AI 选招）。 */
+    public static void begin(LivingEntity caster)
     {
-        if (getState(player) != STATE_NONE)
+        if (getState(caster) != STATE_NONE)
         {
-            abort(player);
+            abort(caster);
         }
-        CompoundTag tag = player.getPersistentData();
+        CompoundTag tag = caster.getPersistentData();
         tag.putInt(TAG_STATE, STATE_RISING);
-        tag.putDouble(TAG_TARGET_Y, player.getY() + RISE_TARGET_BLOCKS);
-        player.setNoGravity(true);
+        tag.putDouble(TAG_TARGET_Y, caster.getY() + RISE_TARGET_BLOCKS);
+        caster.setNoGravity(true);
     }
 
-    public static boolean isActive(ServerPlayer player)
+    public static boolean isActive(LivingEntity caster)
     {
-        return getState(player) != STATE_NONE;
+        return caster != null && getState(caster) != STATE_NONE;
     }
 
-    private static int getState(ServerPlayer player)
+    private static int getState(LivingEntity caster)
     {
-        return player.getPersistentData().getInt(TAG_STATE);
+        return caster == null ? STATE_NONE : caster.getPersistentData().getInt(TAG_STATE);
     }
 
     @SubscribeEvent
-    public static void onPlayerTick(TickEvent.PlayerTickEvent event)
+    public static void onLivingTick(LivingEvent.LivingTickEvent event)
     {
-        if (event.phase != TickEvent.Phase.END || !(event.player instanceof ServerPlayer sp))
+        LivingEntity living = event.getEntity();
+        if (living.level().isClientSide || getState(living) == STATE_NONE)
         {
             return;
         }
-        int st = getState(sp);
-        if (st == STATE_NONE)
+        if (!canContinue(living))
+        {
+            abort(living);
+            return;
+        }
+        if (!(living.level() instanceof ServerLevel level))
         {
             return;
         }
-        if (!EpicFightCompat.isBattleMode(sp) || !PlayerTechniqueData.isLimitless(sp))
-        {
-            abort(sp);
-            return;
-        }
-
-        ServerLevel level = sp.serverLevel();
-        CompoundTag t = sp.getPersistentData();
+        CompoundTag t = living.getPersistentData();
         double targetY = t.getDouble(TAG_TARGET_Y);
+        int st = getState(living);
 
         if (st == STATE_RISING)
         {
-            // 只沿当前位置抬升 Y，X/Z 完全由玩家移动决定；已达/超过目标高度则进入蓄力（不向下拉回）。
-            if (sp.getY() >= targetY - Y_EPSILON)
+            if (living.getY() >= targetY - Y_EPSILON)
             {
-                LimitlessTechniqueSkillSet.INSTANCE.castPurpleMiniNormal(sp);
+                LimitlessTechniqueSkillSet.INSTANCE.castPurpleMiniNormal(living);
                 t.putInt(TAG_STATE, STATE_HOVER);
-                // +1：与实体首刻扣减蓄力 tick 对齐，避免悬停提前结束导致茈未发射。
                 long releaseAt = level.getGameTime() + (long) SpecialEffectEntity.limitlessPurpleMiniChargeTicks() + 1L;
                 t.putLong(TAG_RELEASE_AT, releaseAt);
             }
             else
             {
-                double ny = Math.min(sp.getY() + RISE_PER_TICK, targetY);
-                sp.teleportTo(level, sp.getX(), ny, sp.getZ(), sp.getYRot(), sp.getXRot());
+                double ny = Math.min(living.getY() + RISE_PER_TICK, targetY);
+                if (living instanceof ServerPlayer sp)
+                {
+                    sp.teleportTo(level, sp.getX(), ny, sp.getZ(), sp.getYRot(), sp.getXRot());
+                }
+                else
+                {
+                    living.teleportTo(living.getX(), ny, living.getZ());
+                }
             }
         }
         else if (st == STATE_HOVER)
         {
             if (level.getGameTime() >= t.getLong(TAG_RELEASE_AT))
             {
-                complete(sp);
+                complete(living);
             }
         }
+    }
+
+    private static boolean canContinue(LivingEntity living)
+    {
+        if (living instanceof ServerPlayer sp)
+        {
+            return EpicFightCompat.isBattleMode(sp) && PlayerTechniqueData.isLimitless(sp);
+        }
+        return AiTechniqueStats.has(living);
     }
 
     @SubscribeEvent
     public static void onLivingDeath(LivingDeathEvent event)
     {
-        if (event.getEntity() instanceof ServerPlayer sp)
-        {
-            abort(sp);
-        }
+        abort(event.getEntity());
     }
 
     @SubscribeEvent
@@ -142,28 +155,28 @@ public final class LimitlessPurpleShiftSpecialEvents
     }
 
     /** 中断：清状态、恢复重力；不给予缓降。 */
-    public static void abort(ServerPlayer player)
+    public static void abort(LivingEntity caster)
     {
-        if (getState(player) == STATE_NONE)
+        if (getState(caster) == STATE_NONE)
         {
             return;
         }
-        clearTags(player);
-        player.setNoGravity(false);
-        player.resetFallDistance();
+        clearTags(caster);
+        caster.setNoGravity(false);
+        caster.resetFallDistance();
     }
 
-    private static void complete(ServerPlayer player)
+    private static void complete(LivingEntity caster)
     {
-        clearTags(player);
-        player.setNoGravity(false);
-        player.resetFallDistance();
-        player.addEffect(new MobEffectInstance(MobEffects.SLOW_FALLING, SLOW_FALLING_DURATION_TICKS, 0, false, false, true));
+        clearTags(caster);
+        caster.setNoGravity(false);
+        caster.resetFallDistance();
+        caster.addEffect(new MobEffectInstance(MobEffects.SLOW_FALLING, SLOW_FALLING_DURATION_TICKS, 0, false, false, true));
     }
 
-    private static void clearTags(Player player)
+    private static void clearTags(LivingEntity caster)
     {
-        CompoundTag tag = player.getPersistentData();
+        CompoundTag tag = caster.getPersistentData();
         tag.remove(TAG_STATE);
         tag.remove(TAG_TARGET_Y);
         tag.remove(TAG_RELEASE_AT);

@@ -42,7 +42,8 @@ public final class ReverseTechniqueLearnLogic
 
     public static double getLearnChance(Player player)
     {
-        return BASE_LEARN_CHANCE + getStudybookBoostUses(player) * STUDYBOOK_BONUS_PER_USE;
+        return com.darkness.jujutsukaisenzone.talent.InnateTalentData.geniusLearnChance(
+                player, BASE_LEARN_CHANCE + getStudybookBoostUses(player) * STUDYBOOK_BONUS_PER_USE);
     }
 
     public static void tryLearnFromDamage(ServerPlayer player, float damageAmount)

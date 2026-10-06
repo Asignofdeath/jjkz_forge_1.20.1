@@ -11,6 +11,7 @@ import com.darkness.jujutsukaisenzone.player.PlayerDomainGaugeData;
 import com.darkness.jujutsukaisenzone.technique.JjkzDamageTypeTags;
 import com.darkness.jujutsukaisenzone.technique.SkillDamageResolver;
 import com.darkness.jujutsukaisenzone.technique.SkillDefenseResolver;
+import com.darkness.jujutsukaisenzone.technique.TechniqueAtkObjShackle;
 import com.darkness.jujutsukaisenzone.technique.TechniqueDamageBoosts;
 import com.darkness.jujutsukaisenzone.technique.TechniqueDamageSources;
 import com.darkness.jujutsukaisenzone.technique.crit.CritRules;
@@ -103,6 +104,15 @@ public final class TechniqueDamageZoneEvents
 
         LivingEntity target = event.getEntity();
         DamageSource source = event.getSource();
+
+        LivingEntity shackleAttacker = source.getEntity() instanceof LivingEntity living ? living : null;
+        SkillDamageType shackleType = resolveDamageType(target, source);
+        if (TechniqueAtkObjShackle.shouldSkipHit(
+                shackleAttacker, target, shackleType, TechniqueDamageSources.currentNarrativeMemberId()))
+        {
+            event.setCanceled(true);
+            return;
+        }
 
         // 本击暴击状态：整次 LivingHurt（含黑闪 NORMAL / SE）共用，入口清空防脏读。
         HitCritState.begin();
@@ -333,6 +343,25 @@ public final class TechniqueDamageZoneEvents
         if (appliedReduction > 0.0D)
         {
             event.setAmount((float) (amount * (1.0D - appliedReduction)));
+        }
+    }
+
+    /** 限定对象的术式技能：乘区全部算完后 ×0.8。 */
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public static void onLivingDamageShackle(LivingDamageEvent event)
+    {
+        LivingEntity target = event.getEntity();
+        if (target.level().isClientSide || event.getAmount() <= 0.0F)
+        {
+            return;
+        }
+        DamageSource source = event.getSource();
+        LivingEntity attacker = source.getEntity() instanceof LivingEntity living ? living : null;
+        SkillDamageType type = resolveDamageType(target, source);
+        if (TechniqueAtkObjShackle.shouldReduceDamage(
+                attacker, type, TechniqueDamageSources.currentNarrativeMemberId()))
+        {
+            event.setAmount(event.getAmount() * TechniqueAtkObjShackle.DAMAGE_FACTOR);
         }
     }
 

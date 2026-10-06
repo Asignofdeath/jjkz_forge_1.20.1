@@ -13,21 +13,18 @@ import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.Vec3;
 
 /**
- * 主线 1.2 探索期「鬼打墙」：足迹折返，概率触发，附带一句自述。
+ * 主线 1.2 探索期「鬼打墙」：足迹折返，固定编排触发 1～2 次，附带一句自述。
  */
 public final class MainQuest12LoopTrap
 {
     private static final int SAMPLE_INTERVAL = 10;
     private static final int TRAIL_CAPACITY = 12;
-    /** 探索满 8 秒后才可触发。 */
-    private static final int WARMUP_TICKS = 160;
-    /** 两次触发间隔 ≥25 秒。 */
-    private static final int COOLDOWN_TICKS = 500;
-    /** 每秒抽检概率。 */
-    private static final float CHANCE_PER_SECOND = 0.04F;
+    /** 一场探索最多触发次数。 */
     private static final int MAX_TRIGGERS = 2;
-    /** 相对上次取样至少走出这么多格才抽检。 */
-    private static final double MIN_MOVE = 6.0D;
+    /** 第 1 次固定触发刻（探索 30 秒）。 */
+    private static final int FIRST_TRIGGER_TICK = 600;
+    /** 第 2 次固定触发刻（探索 75 秒）。 */
+    private static final int SECOND_TRIGGER_TICK = 1500;
     /** 折返到约 4～8 秒前的足迹（取样间隔 10 tick）。 */
     private static final int REWIND_MIN = 4;
     private static final int REWIND_MAX = 8;
@@ -68,32 +65,17 @@ public final class MainQuest12LoopTrap
     {
         TrapState state = STATES.computeIfAbsent(player.getUUID(), id -> new TrapState());
         sampleTrail(player, state);
+        planTriggers(player, state);
 
-        if (state.triggers >= MAX_TRIGGERS)
+        if (state.triggers >= state.plannedTriggers)
         {
             return;
         }
-        if (exploreTicks < WARMUP_TICKS)
-        {
-            return;
-        }
-        if (exploreTicks - state.lastTriggerExploreTick < COOLDOWN_TICKS)
-        {
-            return;
-        }
-        if (exploreTicks % 20 != 0)
+        if (exploreTicks < state.plannedTriggerTicks[state.triggers])
         {
             return;
         }
         if (state.trailCount < REWIND_MIN + 1)
-        {
-            return;
-        }
-        if (horizontalMoveSinceLastSample(player, state) < MIN_MOVE)
-        {
-            return;
-        }
-        if (player.getRandom().nextFloat() >= CHANCE_PER_SECOND)
         {
             return;
         }
@@ -102,8 +84,25 @@ public final class MainQuest12LoopTrap
             return;
         }
         state.triggers++;
-        state.lastTriggerExploreTick = exploreTicks;
         playLoopLine(player);
+    }
+
+    /**
+     * 每场探索开排一次：随机 1 或 2 次，落点固定在第 30 / 75 秒。
+     * <p>
+     * 不再掷概率——旧实现里「相对上次取样（10 tick）至少走 6 格」的闸门在 0.5 秒内
+     * 根本走不满，导致整段探索几乎永不触发。
+     */
+    private static void planTriggers(ServerPlayer player, TrapState state)
+    {
+        if (state.planned)
+        {
+            return;
+        }
+        state.planned = true;
+        state.plannedTriggers = player.getRandom().nextBoolean() ? 1 : 2;
+        state.plannedTriggerTicks[0] = FIRST_TRIGGER_TICK;
+        state.plannedTriggerTicks[1] = state.plannedTriggers >= 2 ? SECOND_TRIGGER_TICK : Integer.MAX_VALUE;
     }
 
     private static void sampleTrail(ServerPlayer player, TrapState state)
@@ -121,20 +120,6 @@ public final class MainQuest12LoopTrap
         {
             state.trailCount++;
         }
-        state.lastSampleX = pos.x;
-        state.lastSampleZ = pos.z;
-        state.hasLastSample = true;
-    }
-
-    private static double horizontalMoveSinceLastSample(ServerPlayer player, TrapState state)
-    {
-        if (!state.hasLastSample)
-        {
-            return 0.0D;
-        }
-        double dx = player.getX() - state.lastSampleX;
-        double dz = player.getZ() - state.lastSampleZ;
-        return Math.sqrt(dx * dx + dz * dz);
     }
 
     private static boolean tryRewind(
@@ -194,9 +179,8 @@ public final class MainQuest12LoopTrap
         int trailWrite;
         int trailCount;
         int triggers;
-        int lastTriggerExploreTick = -COOLDOWN_TICKS;
-        double lastSampleX;
-        double lastSampleZ;
-        boolean hasLastSample;
+        boolean planned;
+        int plannedTriggers;
+        final int[] plannedTriggerTicks = new int[MAX_TRIGGERS];
     }
 }

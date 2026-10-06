@@ -40,6 +40,10 @@ public final class PlayerTechniqueData
             PlayerMimicryData.onTechniqueChanged(serverPlayer, normalized);
             PlayerTenShadowsModeData.clearIfTechniqueChanged(serverPlayer, normalized);
             PlayerDomainModeData.clearIfTechniqueChanged(serverPlayer, normalized);
+            if (!TECHNIQUE_NONE.equals(normalized))
+            {
+                com.darkness.jujutsukaisenzone.talent.InnateTalentLottery.grantGeniusCommonsIfNeeded(serverPlayer);
+            }
             return;
         }
         player.getPersistentData().putString(TAG_INNATE_TECHNIQUE, normalized);

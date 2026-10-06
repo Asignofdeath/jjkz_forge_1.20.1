@@ -40,7 +40,9 @@ public final class SeanceTechniqueLearnLogic
             return false;
         }
         int reads = PlayerSeanceTechniqueData.getStudybookReadCount(player);
-        if (reads >= MAX_STUDYBOOK_READS)
+        int required = com.darkness.jujutsukaisenzone.talent.InnateTalentData.geniusRequiredReads(
+                player, MAX_STUDYBOOK_READS);
+        if (reads >= required)
         {
             player.sendSystemMessage(Component.translatable(
                     "message.jujutsukaisenzone.soul_studybook.max_uses"));
@@ -50,7 +52,7 @@ public final class SeanceTechniqueLearnLogic
         PlayerSeanceTechniqueData.setStudybookReadCount(player, newReads);
         player.sendSystemMessage(Component.translatable(
                 "message.jujutsukaisenzone.soul_studybook.read_" + newReads));
-        if (newReads >= MAX_STUDYBOOK_READS)
+        if (newReads >= required)
         {
             learn(player);
         }

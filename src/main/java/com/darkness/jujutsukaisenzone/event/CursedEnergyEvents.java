@@ -29,6 +29,7 @@ import com.darkness.jujutsukaisenzone.technique.BarrierTechniqueServerLogic;
 import com.darkness.jujutsukaisenzone.technique.skillset.TechniqueSkillSetRegistry;
 import com.darkness.jujutsukaisenzone.technique.SeanceTechniqueServerLogic;
 import com.darkness.jujutsukaisenzone.technique.StrengthenTechniqueServerLogic;
+import com.darkness.jujutsukaisenzone.technique.domain.AiDomainCasterRegistry;
 import com.darkness.jujutsukaisenzone.technique.domain.DomainExpansionRouter;
 import com.darkness.jujutsukaisenzone.technique.skill.JudgmentAccuseSkillLogic;
 import com.darkness.jujutsukaisenzone.technique.skill.JudgmentJudgeEntityLogic;
@@ -143,6 +144,8 @@ public final class CursedEnergyEvents
             JudgmentJudgeEntityLogic.tickPendingAngryAnimation(serverPlayer);
             JudgmentSoundLogic.tickPendingDeathPenalty(serverPlayer);
             JudgmentTrialStackVisuals.tickForCaster(serverPlayer);
+            // AI 术师实体（五条悟等）的领域维持：无 PlayerTickEvent，需在此统一驱动。
+            AiDomainCasterRegistry.tickAll(serverPlayer.getServer());
             if (BarrierRulesData.isAutoRepairBarrier(serverPlayer.getUUID()))
             {
                 BarrierTechniqueServerLogic.staticRepairBarrierGaps(serverPlayer);
@@ -200,6 +203,7 @@ public final class CursedEnergyEvents
                 PlayerStrengthenTechniqueData.getLevel(serverPlayer).getTier(),
                 PlayerStrengthenTechniqueData.isActive(serverPlayer));
         ModNetwork.sendTechniqueSync(serverPlayer, PlayerTechniqueData.getInnateTechnique(serverPlayer));
+        com.darkness.jujutsukaisenzone.talent.InnateTalentData.syncToClient(serverPlayer);
         PlayerTechniqueIntelData.syncToClient(serverPlayer);
         com.darkness.jujutsukaisenzone.player.PlayerSpData.syncToClient(serverPlayer);
         // SP 货架随经验派生；登录时补发缺失档位并同步质量上限。

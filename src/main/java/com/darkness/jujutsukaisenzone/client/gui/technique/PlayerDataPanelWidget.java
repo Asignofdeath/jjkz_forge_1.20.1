@@ -207,9 +207,16 @@ public final class PlayerDataPanelWidget extends Widget
         int rank = PlayerCursedGradeData.getRank(player);
         lines.add(Line.row(tr("cursed_grade"), PlayerCursedGradeData.getRankDisplayName(rank)));
         lines.add(Line.row(tr("cursed_experience"), Integer.toString(PlayerCursedGradeData.getExperience(player))));
-        lines.add(Line.rowHelp(tr("heavenly_restriction"),
-                yesNo(PlayerCursedEnergyData.isHeavenlyRestricted(player)),
-                helpKey("heavenly_restriction")));
+        var talent = com.darkness.jujutsukaisenzone.talent.InnateTalentData.get(player);
+        if (talent != null)
+        {
+            var source = com.darkness.jujutsukaisenzone.talent.InnateTalentData.getSource(player);
+            String labelKey = source == com.darkness.jujutsukaisenzone.talent.InnateTalentSource.ACQUIRED
+                    ? "acquired_talent"
+                    : "innate_talent";
+            lines.add(Line.rowHelp(tr(labelKey), talent.displayComponent().getString(),
+                    helpKey(talent.id())));
+        }
         lines.add(Line.rowHelp(tr("cursed_energy_trait"),
                 PlayerCursedEnergyTraitData.getTrait(player).displayName().getString(),
                 helpKey("cursed_energy_trait")));

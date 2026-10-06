@@ -14,6 +14,7 @@ public final class MainQuestDefs
 {
     public static final String MAIN_1_1_ID = "main_1_1";
     public static final String MAIN_1_2_ID = "main_1_2";
+    public static final String MAIN_1_3_ID = "main_1_3";
 
     public static final MainQuestDef MAIN_1_1 = new MainQuestDef(
             MAIN_1_1_ID,
@@ -35,12 +36,23 @@ public final class MainQuestDefs
             MAIN_1_1_ID,
             null);
 
+    public static final MainQuestDef MAIN_1_3 = new MainQuestDef(
+            MAIN_1_3_ID,
+            "quest.jujutsukaisenzone.main_1_3.title",
+            "quest.jujutsukaisenzone.main_1_3.objective",
+            "quest.jujutsukaisenzone.main_1_3.description",
+            "quest.jujutsukaisenzone.main_1_3.briefing.org",
+            "quest.jujutsukaisenzone.main_1_3.briefing.location",
+            MAIN_1_2_ID,
+            null);
+
     private static final Map<String, MainQuestDef> BY_ID = new LinkedHashMap<>();
 
     static
     {
         register(MAIN_1_1);
         register(MAIN_1_2);
+        register(MAIN_1_3);
     }
 
     private MainQuestDefs()

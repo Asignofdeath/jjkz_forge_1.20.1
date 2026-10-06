@@ -28,6 +28,7 @@ import net.minecraft.network.protocol.game.ClientboundStopSoundPacket;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.phys.HitResult;
@@ -694,18 +695,28 @@ public final class LimitlessTechniqueSkillSet extends AbstractInnateTechniqueSki
 
     private void castBlueNormal(ServerPlayer player, boolean allowOwnerPull)
     {
-        ServerLevel level = player.serverLevel();
         double effectiveRange = getEffectiveCastRange(player, BLUE_RANGE);
-        Vec3 targetPos = resolveCrosshairPosition(player, effectiveRange);
+        castBlueNormal(player, allowOwnerPull, resolveCrosshairPosition(player, effectiveRange));
+    }
+
+    /**
+     * 苍施法真相（玩家 / AI 共用）。{@code targetPos} 由调用方决定瞄准点。
+     */
+    public void castBlueNormal(LivingEntity caster, boolean allowOwnerPull, Vec3 targetPos)
+    {
+        if (!(caster.level() instanceof ServerLevel level) || targetPos == null)
+        {
+            return;
+        }
         SpecialEffectEntity entity = ModEntities.SPECIAL_EFFECT_ENTITY.get().create(level);
         if (entity == null)
         {
             return;
         }
 
-        entity.moveTo(targetPos.x, targetPos.y, targetPos.z, player.getYRot(), 0.0F);
+        entity.moveTo(targetPos.x, targetPos.y, targetPos.z, caster.getYRot(), 0.0F);
         LimitlessBlueBehavior blue = new LimitlessBlueBehavior();
-        blue.configure(player, allowOwnerPull);
+        blue.configure(caster, allowOwnerPull);
         entity.attach(blue);
         if (!level.addFreshEntity(entity))
         {
@@ -731,21 +742,30 @@ public final class LimitlessTechniqueSkillSet extends AbstractInnateTechniqueSki
 
     private void castRedNormal(ServerPlayer player, boolean allowOwnerKnockback)
     {
-        EpicFightCompat.playLimitlessAkaShortAnimation(player);
+        castRedNormal((LivingEntity) player, allowOwnerKnockback);
+    }
 
-        ServerLevel level = player.serverLevel();
+    /** 赫施法真相（玩家 / AI 共用）。 */
+    public void castRedNormal(LivingEntity caster, boolean allowOwnerKnockback)
+    {
+        if (!(caster.level() instanceof ServerLevel level))
+        {
+            return;
+        }
+        EpicFightCompat.playLimitlessAkaShortAnimation(caster);
+
         level.playSound(
                 null,
-                player.getX(),
-                player.getY(),
-                player.getZ(),
+                caster.getX(),
+                caster.getY(),
+                caster.getZ(),
                 ModSounds.LIMITLESS_AKA_SHORT_CHARGE.get(),
                 SoundSource.PLAYERS,
                 1.0F,
                 1.0F);
 
-        Vec3 spawn = player.getEyePosition(1.0F)
-                .add(player.getLookAngle().scale(RED_SPAWN_FROM_EYE))
+        Vec3 spawn = caster.getEyePosition(1.0F)
+                .add(caster.getLookAngle().scale(RED_SPAWN_FROM_EYE))
                 .add(0.0D, RED_SPAWN_Y_OFFSET, 0.0D);
         SpecialEffectEntity entity = ModEntities.SPECIAL_EFFECT_ENTITY.get().create(level);
         if (entity == null)
@@ -753,9 +773,9 @@ public final class LimitlessTechniqueSkillSet extends AbstractInnateTechniqueSki
             return;
         }
 
-        entity.moveTo(spawn.x, spawn.y, spawn.z, player.getYRot(), player.getXRot());
+        entity.moveTo(spawn.x, spawn.y, spawn.z, caster.getYRot(), caster.getXRot());
         LimitlessRedBehavior red = new LimitlessRedBehavior();
-        red.configure(player, allowOwnerKnockback);
+        red.configure(caster, allowOwnerKnockback);
         entity.attach(red);
         if (!level.addFreshEntity(entity))
         {
@@ -766,12 +786,30 @@ public final class LimitlessTechniqueSkillSet extends AbstractInnateTechniqueSki
     /** 超远程虚式茈：长按 5 秒起手演出，满后自动进入发射阶段。 */
     private void beginRemoteMurasakiHoldRelease(ServerPlayer player, TechniqueSkill skill, int slot, long startTick)
     {
-        ServerLevel level = player.serverLevel();
+        UUID entityUuid = beginRemoteMurasakiHoldRelease((LivingEntity) player);
+        if (entityUuid == null)
+        {
+            return;
+        }
+        PlayerHoldReleaseChargeData.beginCharge(player, slot, skill.skillId(), entityUuid, startTick);
+    }
+
+    /**
+     * 超远程虚式茈起手真相（玩家 / AI 共用）。返回特效实体 UUID；失败返回 null。
+     * 玩家侧仍由 {@link PlayerHoldReleaseChargeData} 记账；AI 侧由调用方记账。
+     */
+    @Nullable
+    public UUID beginRemoteMurasakiHoldRelease(LivingEntity caster)
+    {
+        if (!(caster.level() instanceof ServerLevel level))
+        {
+            return null;
+        }
         level.playSound(
                 null,
-                player.getX(),
-                player.getY(),
-                player.getZ(),
+                caster.getX(),
+                caster.getY(),
+                caster.getZ(),
                 ModSounds.LIMITLESS_REMOTE_MURASAKI.get(),
                 SoundSource.PLAYERS,
                 1.0F,
@@ -780,24 +818,29 @@ public final class LimitlessTechniqueSkillSet extends AbstractInnateTechniqueSki
         SpecialEffectEntity entity = ModEntities.SPECIAL_EFFECT_ENTITY.get().create(level);
         if (entity == null)
         {
-            return;
+            return null;
         }
 
-        entity.moveTo(player.getX(), player.getY(), player.getZ(), player.getYRot(), player.getXRot());
+        entity.moveTo(caster.getX(), caster.getY(), caster.getZ(), caster.getYRot(), caster.getXRot());
         LimitlessRemoteMurasakiBehavior murasaki = new LimitlessRemoteMurasakiBehavior();
-        murasaki.configure(player);
+        murasaki.configure(caster);
         entity.attach(murasaki);
         if (!level.addFreshEntity(entity))
         {
-            return;
+            return null;
         }
-
-        PlayerHoldReleaseChargeData.beginCharge(player, slot, skill.skillId(), entity.getUUID(), startTick);
+        return entity.getUUID();
     }
 
     private void launchRemoteMurasakiHoldRelease(ServerPlayer player, UUID entityUuid)
     {
-        SpecialEffectEntity entity = findRemoteMurasakiChargeEntity(player, entityUuid);
+        launchRemoteMurasakiHoldRelease((LivingEntity) player, entityUuid);
+    }
+
+    /** 超远程虚式茈发射真相（玩家 / AI 共用）。 */
+    public void launchRemoteMurasakiHoldRelease(LivingEntity caster, UUID entityUuid)
+    {
+        SpecialEffectEntity entity = findRemoteMurasakiChargeEntity(caster, entityUuid);
         if (entity == null)
         {
             return;
@@ -844,9 +887,13 @@ public final class LimitlessTechniqueSkillSet extends AbstractInnateTechniqueSki
     }
 
     @Nullable
-    private SpecialEffectEntity findRemoteMurasakiChargeEntity(ServerPlayer player, UUID entityUuid)
+    private SpecialEffectEntity findRemoteMurasakiChargeEntity(LivingEntity caster, UUID entityUuid)
     {
-        Entity entity = player.serverLevel().getEntity(entityUuid);
+        if (!(caster.level() instanceof ServerLevel level) || entityUuid == null)
+        {
+            return null;
+        }
+        Entity entity = level.getEntity(entityUuid);
         if (entity instanceof SpecialEffectEntity fx
                 && fx.getEffectBehavior() instanceof LimitlessRemoteMurasakiBehavior)
         {
@@ -883,17 +930,26 @@ public final class LimitlessTechniqueSkillSet extends AbstractInnateTechniqueSki
     /** 茈普通释放：胸前蓄力锚点，蓄力结束后发射茈箭（与 Shift+3 升空悬停共用）。 */
     public void castPurpleMiniNormal(ServerPlayer player)
     {
-        ServerLevel level = player.serverLevel();
-        Vec3 chest = SpecialEffectEntity.limitlessPurpleMiniAnchorWorldPosition(player);
+        castPurpleMiniNormal((LivingEntity) player);
+    }
+
+    /** 茈普通释放真相（玩家 / AI 共用）。 */
+    public void castPurpleMiniNormal(LivingEntity caster)
+    {
+        if (!(caster.level() instanceof ServerLevel level))
+        {
+            return;
+        }
+        Vec3 chest = SpecialEffectEntity.limitlessPurpleMiniAnchorWorldPosition(caster);
         SpecialEffectEntity entity = ModEntities.SPECIAL_EFFECT_ENTITY.get().create(level);
         if (entity == null)
         {
             return;
         }
 
-        entity.moveTo(chest.x, chest.y, chest.z, player.getYRot(), player.getXRot());
+        entity.moveTo(chest.x, chest.y, chest.z, caster.getYRot(), caster.getXRot());
         LimitlessPurpleBehavior purpleMini = new LimitlessPurpleBehavior();
-        purpleMini.configure(player);
+        purpleMini.configure(caster);
         entity.attach(purpleMini);
         if (!level.addFreshEntity(entity))
         {
@@ -916,10 +972,57 @@ public final class LimitlessTechniqueSkillSet extends AbstractInnateTechniqueSki
         return player.getEyePosition().add(player.getLookAngle().scale(maxDistance));
     }
 
+    /** 瞄准点：沿视线最远 {@code maxDistance}；供 AI 朝目标看时复用。 */
+    public static Vec3 resolveLookTargetPosition(LivingEntity caster, double maxDistance)
+    {
+        if (caster instanceof ServerPlayer player)
+        {
+            return resolveCrosshairPosition(player, maxDistance);
+        }
+        return caster.getEyePosition().add(caster.getLookAngle().scale(maxDistance));
+    }
+
     private double getEffectiveCastRange(ServerPlayer player, double baseRange)
     {
-        int tier = getCastRangeTier(player);
+        return getEffectiveCastRange((LivingEntity) player, baseRange);
+    }
+
+    /** 施法距离：玩家读射程档；AI 术师按最高档。 */
+    public double getEffectiveCastRange(LivingEntity caster, double baseRange)
+    {
+        int tier;
+        if (caster instanceof ServerPlayer player)
+        {
+            tier = getCastRangeTier(player);
+        }
+        else
+        {
+            tier = CAST_RANGE_TIER_MAX;
+        }
         double ratio = tier * 0.25D;
         return baseRange * ratio;
+    }
+
+    public double blueCastRange(LivingEntity caster)
+    {
+        return getEffectiveCastRange(caster, BLUE_RANGE);
+    }
+
+    public TechniqueSkill skillDefinition(String skillId)
+    {
+        return findSkillById(skillId);
+    }
+
+    public int skillCooldownTicksFor(LivingEntity caster, TechniqueSkill skill)
+    {
+        if (skill == null)
+        {
+            return 0;
+        }
+        if (SKILL_PURPLE.equals(skill.skillId()))
+        {
+            return LimitlessPurpleSkillGrowth.cooldownTicks(caster);
+        }
+        return skill.cooldownTicks();
     }
 }

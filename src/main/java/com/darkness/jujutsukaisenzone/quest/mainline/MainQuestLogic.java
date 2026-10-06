@@ -3,6 +3,7 @@ package com.darkness.jujutsukaisenzone.quest.mainline;
 import com.darkness.jujutsukaisenzone.locate.PlayerLocateGuidance;
 import com.darkness.jujutsukaisenzone.locate.StructureLocateTarget;
 import com.darkness.jujutsukaisenzone.network.NetworkSenders;
+import com.darkness.jujutsukaisenzone.network.packet.OpenMainQuestJoinOfferS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncQuestMissionBriefingS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncQuestProgressS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncQuestTrackS2CPacket;
@@ -11,6 +12,7 @@ import com.darkness.jujutsukaisenzone.quest.mainline.main_1_1.MainQuest11Intro;
 import com.darkness.jujutsukaisenzone.quest.mainline.main_1_1.MainQuest11VillageClear;
 import com.darkness.jujutsukaisenzone.quest.mainline.main_1_1.MainQuest11VillageNightApproach;
 import com.darkness.jujutsukaisenzone.quest.mainline.main_1_2.MainQuest12Anomaly;
+import com.darkness.jujutsukaisenzone.quest.mainline.main_1_3.MainQuest13Performance;
 import java.util.ArrayList;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
@@ -34,7 +36,11 @@ public final class MainQuestLogic
     {
         if (!PlayerQuestData.isBootstrapped(player))
         {
-            PlayerQuestData.setBootstrapped(player, true);
+            dropStaleQuestProgress(player);
+            syncProgress(player);
+            PlayerLocateGuidance.clearSilent(player);
+            NetworkSenders.toPlayer(player, OpenMainQuestJoinOfferS2CPacket.firstJoin(player));
+            return;
         }
         dropStaleQuestProgress(player);
         syncProgress(player);
@@ -48,6 +54,10 @@ public final class MainQuestLogic
         if (MainQuestDefs.MAIN_1_2_ID.equals(tracked))
         {
             MainQuest12Anomaly.startIfNeeded(player);
+        }
+        if (MainQuestDefs.MAIN_1_3_ID.equals(tracked))
+        {
+            MainQuest13Performance.startIfNeeded(player);
         }
         ensureLocateForTracked(player, false);
     }
@@ -100,6 +110,10 @@ public final class MainQuestLogic
         {
             MainQuest12Anomaly.startIfNeeded(player);
         }
+        if (MainQuestDefs.MAIN_1_3_ID.equals(def.id()))
+        {
+            MainQuest13Performance.startIfNeeded(player);
+        }
         ensureLocateForTracked(player, announce);
         // 常规追踪立刻播简报；main_1_1 尚未揭幕巡镜时延后到 finishBlackout
         if (announce && !shouldDeferMissionBriefing(player, def))
@@ -146,6 +160,7 @@ public final class MainQuestLogic
         clearLocateIfOwnedByQuest(player, tracked);
         MainQuest11Intro.abort(player);
         MainQuest12Anomaly.abort(player);
+        MainQuest13Performance.abort(player);
         MainQuest11VillageNightApproach.clear(player);
         PlayerQuestData.setTrackedId(player, null);
         syncProgress(player);
@@ -244,6 +259,7 @@ public final class MainQuestLogic
         }
         MainQuest11Intro.abort(player);
         MainQuest12Anomaly.abort(player);
+        MainQuest13Performance.abort(player);
         MainQuest11VillageNightApproach.clear(player);
         PlayerQuestData.clearAllProgress(player);
         syncProgress(player);

@@ -82,7 +82,10 @@ public final class TechniqueDailyUpgradeLogic
         {
             return;
         }
-        PlayerStrengthenTechniqueData.setUpgradeChancePercent(player, current + CHANCE_PER_USE_PERCENT);
+        PlayerStrengthenTechniqueData.setUpgradeChancePercent(player,
+                Math.min(MAX_UPGRADE_CHANCE_PERCENT,
+                        current + com.darkness.jujutsukaisenzone.talent.InnateTalentData.geniusDailyUpgradeGain(
+                                player, CHANCE_PER_USE_PERCENT)));
     }
 
     private static void resolveStrengthenDayEnd(ServerPlayer player)
@@ -140,7 +143,10 @@ public final class TechniqueDailyUpgradeLogic
         {
             return;
         }
-        PlayerBarrierTechniqueData.setUpgradeChancePercent(player, current + CHANCE_PER_USE_PERCENT);
+        PlayerBarrierTechniqueData.setUpgradeChancePercent(player,
+                Math.min(MAX_UPGRADE_CHANCE_PERCENT,
+                        current + com.darkness.jujutsukaisenzone.talent.InnateTalentData.geniusDailyUpgradeGain(
+                                player, CHANCE_PER_USE_PERCENT)));
     }
 
     private static void incrementSeanceUpgradeChance(ServerPlayer player)
@@ -154,7 +160,10 @@ public final class TechniqueDailyUpgradeLogic
         {
             return;
         }
-        PlayerSeanceTechniqueData.setUpgradeChancePercent(player, current + CHANCE_PER_USE_PERCENT);
+        PlayerSeanceTechniqueData.setUpgradeChancePercent(player,
+                Math.min(MAX_UPGRADE_CHANCE_PERCENT,
+                        current + com.darkness.jujutsukaisenzone.talent.InnateTalentData.geniusDailyUpgradeGain(
+                                player, CHANCE_PER_USE_PERCENT)));
     }
 
     private static void resolveBarrierDayEnd(ServerPlayer player)

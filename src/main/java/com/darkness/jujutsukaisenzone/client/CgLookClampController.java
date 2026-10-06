@@ -20,6 +20,11 @@ public final class CgLookClampController
     {
     }
 
+    public static boolean isActive()
+    {
+        return active;
+    }
+
     public static void set(
             boolean isActive, float yaw, float pitch, float yawLimit, float pitchLimit)
     {

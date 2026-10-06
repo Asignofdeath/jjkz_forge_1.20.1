@@ -1,5 +1,6 @@
 package com.darkness.jujutsukaisenzone.technique.scaling;
 
+import com.darkness.jujutsukaisenzone.entity.combat.AiTechniqueStats;
 import com.darkness.jujutsukaisenzone.player.PlayerCursedGradeData;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
@@ -17,11 +18,20 @@ public final class SkillGrowthSteps
     /** 高于指定基准咒术等级的档位数（基准档 = 0 档加成）。 */
     public static int stepsAboveBaseline(@Nullable LivingEntity owner, int baselineGrade)
     {
-        if (!(owner instanceof Player player))
+        int rank;
+        if (owner instanceof Player player)
+        {
+            rank = PlayerCursedGradeData.getRank(player);
+        }
+        else if (AiTechniqueStats.has(owner))
+        {
+            rank = AiTechniqueStats.rank(owner);
+        }
+        else
         {
             return 0;
         }
-        return Math.max(0, PlayerCursedGradeData.getRank(player) - baselineGrade);
+        return Math.max(0, rank - baselineGrade);
     }
 
     /** 高于四级基准的咒术等级档位数（四级 = 0 档加成）。 */

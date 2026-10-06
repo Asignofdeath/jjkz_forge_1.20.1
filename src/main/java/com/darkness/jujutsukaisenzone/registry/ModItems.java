@@ -16,6 +16,8 @@ import com.darkness.jujutsukaisenzone.item.SmGavelWeaponItem;
 import com.darkness.jujutsukaisenzone.item.SoulStudybookItem;
 import com.darkness.jujutsukaisenzone.item.CursedObjectGrade;
 import com.darkness.jujutsukaisenzone.item.CursedObjectItem;
+import com.darkness.jujutsukaisenzone.item.CursedEnergyJadeItem;
+import com.darkness.jujutsukaisenzone.talent.InnateTalent;
 import com.darkness.jujutsukaisenzone.item.TechniqueIntelligenceItem;
 import com.darkness.jujutsukaisenzone.item.TrialTechniqueBinderItem;
 import net.minecraft.world.item.BlockItem;
@@ -255,6 +257,32 @@ public final class ModItems
     public static final RegistryObject<Item> CURSED_OBJECT_SUKUNA_FINGER = ITEMS.register(
             "cursed_object_sukuna_finger",
             () -> new CursedObjectItem(new Item.Properties().stacksTo(20), "两面宿傩的手指", CursedObjectGrade.SPECIAL)
+    );
+
+    /** 铿锵的咒力玉石：铁躯 */
+    public static final RegistryObject<Item> CURSED_ENERGY_JADE_CLANGOROUS = ITEMS.register(
+            "cursed_energy_jade_clangorous",
+            () -> new CursedEnergyJadeItem(new Item.Properties().stacksTo(16), InnateTalent.IRON_BODY)
+    );
+
+    /** 致密的咒力玉石：六眼 / 天才 */
+    public static final RegistryObject<Item> CURSED_ENERGY_JADE_DENSE = ITEMS.register(
+            "cursed_energy_jade_dense",
+            () -> new CursedEnergyJadeItem(new Item.Properties().stacksTo(16),
+                    InnateTalent.SIX_EYES, InnateTalent.GENIUS)
+    );
+
+    /** 哑光的咒力玉石：天与咒缚 */
+    public static final RegistryObject<Item> CURSED_ENERGY_JADE_MATTE = ITEMS.register(
+            "cursed_energy_jade_matte",
+            () -> new CursedEnergyJadeItem(new Item.Properties().stacksTo(16), InnateTalent.HEAVENLY_RESTRICTION)
+    );
+
+    /** 幻彩的咒力玉石：矫健 / 六眼 */
+    public static final RegistryObject<Item> CURSED_ENERGY_JADE_IRIDESCENT = ITEMS.register(
+            "cursed_energy_jade_iridescent",
+            () -> new CursedEnergyJadeItem(new Item.Properties().stacksTo(16),
+                    InnateTalent.AGILE, InnateTalent.SIX_EYES)
     );
 
     /** 清神糖：小幅回复脑损 */

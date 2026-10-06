@@ -1,5 +1,6 @@
 package com.darkness.jujutsukaisenzone.technique.development;
 
+import com.darkness.jujutsukaisenzone.entity.combat.AiTechniqueStats;
 import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
 import com.darkness.jujutsukaisenzone.technique.development.SkillUpgradeCost.CursedObjectIngredient;
 import com.darkness.jujutsukaisenzone.technique.skillset.TechniqueSkill;
@@ -10,10 +11,15 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 /**
  * 主动技能升级：消耗原版经验等级 + 多种咒物，写入 {@code levelTag}。
+ * <p>
+ * 技能等级是<b>施法者</b>属性，不是技能定义字段：玩家读存档 tag；
+ * 持有 {@link AiTechniqueStats} 的 AI 术师按满级（{@link SkillLevelRules#MAX_LEVEL}）结算。
  */
 public final class SkillUpgradeLogic
 {
@@ -47,7 +53,25 @@ public final class SkillUpgradeLogic
     }
 
     /**
-     * 相对 1 级的升级档数（Lv1→0，Lv5→4）。非玩家 / 未知技能按 0。
+     * 施法者技能等级：玩家走存档；AI 术师（{@link AiTechniqueStats}）恒满级；其它非玩家为 0。
+     */
+    public static int getSkillLevel(@Nullable LivingEntity owner, String techniqueId, String skillId)
+    {
+        if (owner instanceof Player player)
+        {
+            return getSkillLevel(player, techniqueId, skillId);
+        }
+        if (AiTechniqueStats.has(owner))
+        {
+            return SkillUnlockLogic.findSkillDefinition(techniqueId, skillId).isPresent()
+                    ? SkillLevelRules.MAX_LEVEL
+                    : 0;
+        }
+        return 0;
+    }
+
+    /**
+     * 相对 1 级的升级档数（Lv1→0，Lv5→4）。未知技能按 0。
      */
     public static int upgradeSteps(Player player, String techniqueId, String skillId)
     {
@@ -55,15 +79,24 @@ public final class SkillUpgradeLogic
     }
 
     /**
-     * 技能等级伤害倍率（{@link SkillLevelRules#powerMultiplier}）。非玩家按 1.0。
+     * 相对 1 级的升级档数（施法者无关入口）。
+     */
+    public static int upgradeSteps(@Nullable LivingEntity owner, String techniqueId, String skillId)
+    {
+        return Math.max(0, getSkillLevel(owner, techniqueId, skillId) - 1);
+    }
+
+    /**
+     * 技能等级伤害倍率（{@link SkillLevelRules#powerMultiplier}）。按施法者等级，不按技能定义。
      */
     public static float powerMultiplier(@Nullable LivingEntity owner, String techniqueId, String skillId)
     {
-        if (!(owner instanceof Player player))
+        int level = getSkillLevel(owner, techniqueId, skillId);
+        if (level <= 0)
         {
             return 1.0F;
         }
-        return SkillLevelRules.powerMultiplier(getSkillLevel(player, techniqueId, skillId));
+        return SkillLevelRules.powerMultiplier(level);
     }
 
     /**
@@ -110,7 +143,7 @@ public final class SkillUpgradeLogic
         {
             return false;
         }
-        return meetsCost(player, costOpt.get());
+        return meetsCost(player, adjustCost(player, costOpt.get()));
     }
 
     public static SkillUpgradeResult tryUpgradeSkill(ServerPlayer player, String techniqueId, String skillId)
@@ -149,7 +182,7 @@ public final class SkillUpgradeLogic
         {
             return SkillUpgradeResult.ALREADY_MAX;
         }
-        SkillUpgradeCost cost = costOpt.get();
+        SkillUpgradeCost cost = adjustCost(player, costOpt.get());
         boolean creativeFree = player.isCreative();
         if (!creativeFree)
         {
@@ -212,6 +245,19 @@ public final class SkillUpgradeLogic
             }
         }
         return total;
+    }
+
+    public static SkillUpgradeCost adjustCost(Player player, SkillUpgradeCost cost)
+    {
+        int xp = com.darkness.jujutsukaisenzone.talent.InnateTalentData.geniusHalveCost(player, cost.vanillaXpLevels());
+        List<CursedObjectIngredient> items = new ArrayList<>();
+        for (CursedObjectIngredient ingredient : cost.cursedObjects())
+        {
+            items.add(new CursedObjectIngredient(
+                    ingredient.item(),
+                    com.darkness.jujutsukaisenzone.talent.InnateTalentData.geniusHalveCost(player, ingredient.count())));
+        }
+        return new SkillUpgradeCost(xp, items);
     }
 
     private static void consumeItem(Player player, Item item, int amount)

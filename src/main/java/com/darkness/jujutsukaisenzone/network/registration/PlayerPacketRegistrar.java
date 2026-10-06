@@ -18,6 +18,13 @@ import com.darkness.jujutsukaisenzone.network.packet.TrackQuestC2SPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncQuestBlackoutS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncQuestLetterboxS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncQuestCodCaptionsS2CPacket;
+import com.darkness.jujutsukaisenzone.network.packet.SyncQuestRedBlackoutS2CPacket;
+import com.darkness.jujutsukaisenzone.network.packet.SyncInnateTalentS2CPacket;
+import com.darkness.jujutsukaisenzone.network.packet.OpenMainQuestJoinOfferS2CPacket;
+import com.darkness.jujutsukaisenzone.network.packet.MainQuestJoinOfferC2SPacket;
+import com.darkness.jujutsukaisenzone.network.packet.JoinOfferSetModRuleC2SPacket;
+import com.darkness.jujutsukaisenzone.network.packet.SyncQuestWakeBlinkS2CPacket;
+import com.darkness.jujutsukaisenzone.network.packet.MainQuest13CmdCamS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncCgLookClampS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.MainQuest11CabinCmdCamS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncMusicPlayS2CPacket;
@@ -142,6 +149,41 @@ public final class PlayerPacketRegistrar
                 .encoder(SyncQuestCodCaptionsS2CPacket::encode)
                 .decoder(SyncQuestCodCaptionsS2CPacket::decode)
                 .consumerMainThread(SyncQuestCodCaptionsS2CPacket::handle)
+                .add();
+        channel.messageBuilder(SyncQuestRedBlackoutS2CPacket.class, 117, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(SyncQuestRedBlackoutS2CPacket::encode)
+                .decoder(SyncQuestRedBlackoutS2CPacket::decode)
+                .consumerMainThread(SyncQuestRedBlackoutS2CPacket::handle)
+                .add();
+        channel.messageBuilder(MainQuest13CmdCamS2CPacket.class, 120, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(MainQuest13CmdCamS2CPacket::encode)
+                .decoder(MainQuest13CmdCamS2CPacket::decode)
+                .consumerMainThread(MainQuest13CmdCamS2CPacket::handle)
+                .add();
+        channel.messageBuilder(SyncInnateTalentS2CPacket.class, 121, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(SyncInnateTalentS2CPacket::encode)
+                .decoder(SyncInnateTalentS2CPacket::decode)
+                .consumerMainThread(SyncInnateTalentS2CPacket::handle)
+                .add();
+        channel.messageBuilder(OpenMainQuestJoinOfferS2CPacket.class, 122, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(OpenMainQuestJoinOfferS2CPacket::encode)
+                .decoder(OpenMainQuestJoinOfferS2CPacket::decode)
+                .consumerMainThread(OpenMainQuestJoinOfferS2CPacket::handle)
+                .add();
+        channel.messageBuilder(MainQuestJoinOfferC2SPacket.class, 123, NetworkDirection.PLAY_TO_SERVER)
+                .encoder(MainQuestJoinOfferC2SPacket::encode)
+                .decoder(MainQuestJoinOfferC2SPacket::decode)
+                .consumerMainThread(MainQuestJoinOfferC2SPacket::handle)
+                .add();
+        channel.messageBuilder(JoinOfferSetModRuleC2SPacket.class, 124, NetworkDirection.PLAY_TO_SERVER)
+                .encoder(JoinOfferSetModRuleC2SPacket::encode)
+                .decoder(JoinOfferSetModRuleC2SPacket::decode)
+                .consumerMainThread(JoinOfferSetModRuleC2SPacket::handle)
+                .add();
+        channel.messageBuilder(SyncQuestWakeBlinkS2CPacket.class, 125, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(SyncQuestWakeBlinkS2CPacket::encode)
+                .decoder(SyncQuestWakeBlinkS2CPacket::decode)
+                .consumerMainThread(SyncQuestWakeBlinkS2CPacket::handle)
                 .add();
     }
 }

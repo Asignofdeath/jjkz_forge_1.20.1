@@ -23,8 +23,15 @@ public final class ModNetwork
 {
     // ⚠️ 加/改包必须升这个号：它让「客户端缺包」在连接阶段就被干净地拒掉，
     // 而不是等登录后服务端推来一个客户端不认识的 ID、抛出难懂的解码异常再掉线。
-    // "2" = 新增 SyncModConfigS2CPacket(#105)。
-    private static final String PROTOCOL_VERSION = "2";
+    // "3" = 新增 SyncQuestRedBlackoutS2CPacket(#117) / SyncQuestHeadCameraS2CPacket(#118)（1.3 演出）。
+    // "4" = 新增 SyncQuestBlinkS2CPacket(#119) / MainQuest13CmdCamS2CPacket(#120)（1.3 演出 3-6 阶段）。
+    // "5" = 移除自研头部相机包 #118（SyncQuestHeadCameraS2CPacket），1.3 全程改由 CMDCam 运镜。
+    // "6" = 移除眨眼包 #119（SyncQuestBlinkS2CPacket），1.3 不再有眨眼/睁眼屏幕效果。
+    // "7" = 新增 SyncInnateTalentS2CPacket(#121)（生得/后天天赋）。
+    // "8" = 新增 OpenMainQuestJoinOfferS2CPacket(#122) / MainQuestJoinOfferC2SPacket(#123)（第一次进世界主线询问）。
+    // "9" = 第一次进世界界面可改 ModRules：Open 包扩字段 + JoinOfferSetModRuleC2SPacket(#124)。
+    // "10" = 新增 SyncQuestWakeBlinkS2CPacket(#125)（1.3 醒来眨眼）。
+    private static final String PROTOCOL_VERSION = "10";
     public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
             ResourceLocation.fromNamespaceAndPath(JuJutsuKaisenZone.MODID, "main"),
             () -> PROTOCOL_VERSION,
@@ -49,6 +56,11 @@ public final class ModNetwork
     public static void sendCursedEnergySync(ServerPlayer player, int current, int max)
     {
         PlayerSyncNetwork.sendCursedEnergySync(player, current, max);
+    }
+
+    public static void sendInnateTalentSync(ServerPlayer player, String talentId, String source)
+    {
+        PlayerSyncNetwork.sendInnateTalentSync(player, talentId, source);
     }
 
     public static void sendFactionSync(ServerPlayer player, String factionId)

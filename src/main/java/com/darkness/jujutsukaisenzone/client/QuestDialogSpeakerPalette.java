@@ -23,6 +23,11 @@ public final class QuestDialogSpeakerPalette
         // main_1_2 伏击
         register("三级咒灵甲", QuestDialogStance.HOSTILE);
         register("Grade 3 Spirit A", QuestDialogStance.HOSTILE);
+        // main_1_3 救场
+        register("神秘白发男子", QuestDialogStance.FRIENDLY);
+        register("Mysterious White-Haired Man", QuestDialogStance.FRIENDLY);
+        register("五条悟", QuestDialogStance.FRIENDLY);
+        register("Gojo Satoru", QuestDialogStance.FRIENDLY);
     }
 
     private QuestDialogSpeakerPalette()

@@ -38,6 +38,7 @@ public final class PlayerCursedEnergyData
         int baseMax = random.nextInt(MAX_MAX_CURSED_ENERGY - MIN_MAX_CURSED_ENERGY + 1) + MIN_MAX_CURSED_ENERGY;
         data.cursedEnergyInitialized = true;
         data.cursedEnergyBaseMax = baseMax;
+        com.darkness.jujutsukaisenzone.talent.InnateTalentLottery.rollOnFirstEnergyInit(serverPlayer, baseMax);
         int effective = computeEffectiveMax(player, baseMax);
         data.cursedEnergyCurrent = effective;
         markDirty(serverPlayer);
@@ -55,9 +56,9 @@ public final class PlayerCursedEnergyData
 
     private static int computeEffectiveMax(Player player, int baseMax)
     {
-        if (baseMax < HEAVENLY_RESTRICTION_THRESHOLD)
+        if (com.darkness.jujutsukaisenzone.talent.InnateTalentData.is(
+                player, com.darkness.jujutsukaisenzone.talent.InnateTalent.HEAVENLY_RESTRICTION))
         {
-            // 天与咒缚：总量低于 50 时直接视为“无咒力”（总量强制为 0）。
             return 0;
         }
         int rank = PlayerCursedGradeData.getRawRank(player);
@@ -69,11 +70,8 @@ public final class PlayerCursedEnergyData
 
     public static boolean isHeavenlyRestricted(Player player)
     {
-        if (player instanceof ServerPlayer serverPlayer)
-        {
-            return getBaseMax(serverPlayer) < HEAVENLY_RESTRICTION_THRESHOLD;
-        }
-        return getMax(player) < HEAVENLY_RESTRICTION_THRESHOLD;
+        return com.darkness.jujutsukaisenzone.talent.InnateTalentData.is(
+                player, com.darkness.jujutsukaisenzone.talent.InnateTalent.HEAVENLY_RESTRICTION);
     }
 
     private static int getBaseMax(ServerPlayer player)
@@ -147,14 +145,19 @@ public final class PlayerCursedEnergyData
         {
             return true;
         }
+        int billed = com.darkness.jujutsukaisenzone.talent.InnateTalentData.billCursedEnergy(player, amount);
+        if (billed <= 0)
+        {
+            return true;
+        }
         int cur = getCurrent(player);
-        if (cur < amount)
+        if (cur < billed)
         {
             return false;
         }
-        setCurrent(player, cur - amount);
+        setCurrent(player, cur - billed);
         ModNetwork.sendCursedEnergySync(player, getCurrent(player), getMax(player));
-        maybeTriggerWorkEfficiencySe(player, amount);
+        maybeTriggerWorkEfficiencySe(player, billed);
         return true;
     }
 

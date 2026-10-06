@@ -7,6 +7,7 @@ import com.lowdragmc.lowdraglib.utils.Size;
 import com.darkness.jujutsukaisenzone.client.TechniqueSkillTooltipHelper;
 import com.darkness.jujutsukaisenzone.network.ModNetwork;
 import com.darkness.jujutsukaisenzone.technique.development.SkillLevelRules;
+import com.darkness.jujutsukaisenzone.technique.development.SkillUpgradeCost;
 import com.darkness.jujutsukaisenzone.technique.development.SkillUpgradeCost.CursedObjectIngredient;
 import com.darkness.jujutsukaisenzone.technique.development.SkillUpgradeCostRegistry;
 import com.darkness.jujutsukaisenzone.technique.development.SkillUpgradeLogic;
@@ -277,7 +278,8 @@ public final class SkillTreeNodeWidget extends com.lowdragmc.lowdraglib.gui.widg
                     .withStyle(ChatFormatting.GOLD));
             return;
         }
-        SkillUpgradeCostRegistry.costForNextLevel(skillId, level).ifPresent(cost -> {
+        SkillUpgradeCostRegistry.costForNextLevel(skillId, level).ifPresent(raw -> {
+            SkillUpgradeCost cost = SkillUpgradeLogic.adjustCost(player, raw);
             tooltip.add(Component.translatable("gui.jujutsukaisenzone.skill_tree.upgrade_header")
                     .withStyle(ChatFormatting.YELLOW));
             if (player.isCreative())

@@ -2,6 +2,8 @@ package com.darkness.jujutsukaisenzone.client.model.entity;
 
 import com.darkness.jujutsukaisenzone.JuJutsuKaisenZone;
 import com.darkness.jujutsukaisenzone.entity.CutsceneActorEntity;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.resources.ResourceLocation;
 import software.bernie.geckolib.model.DefaultedEntityGeoModel;
 
@@ -22,6 +24,26 @@ public class CutsceneActorModel extends DefaultedEntityGeoModel<CutsceneActorEnt
     @Override
     public ResourceLocation getTextureResource(CutsceneActorEntity animatable)
     {
+        String override = animatable.getTextureOverride();
+        if (override != null && !override.isEmpty())
+        {
+            if (CutsceneActorEntity.TEXTURE_LOCAL_PLAYER_SKIN.equals(override))
+            {
+                LocalPlayer local = Minecraft.getInstance().player;
+                if (local != null)
+                {
+                    return local.getSkinTextureLocation();
+                }
+            }
+            else
+            {
+                ResourceLocation parsed = ResourceLocation.tryParse(override);
+                if (parsed != null)
+                {
+                    return parsed;
+                }
+            }
+        }
         return ResourceLocation.fromNamespaceAndPath(
                 JuJutsuKaisenZone.MODID, "textures/entity/" + appearance(animatable) + ".png");
     }

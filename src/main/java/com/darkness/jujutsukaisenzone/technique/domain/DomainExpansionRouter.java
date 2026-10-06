@@ -9,6 +9,7 @@ import net.minecraft.core.BlockPos;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * 领域展开路由器 - 根据玩家术式类型路由到对应的领域实现。
@@ -84,6 +85,21 @@ public final class DomainExpansionRouter
     }
 
     /**
+     * 按 UUID 查询该施法者是否持有任意活跃领域（玩家 / AI 实体通用）。
+     */
+    public static boolean hasActiveDomain(UUID casterUuid)
+    {
+        for (AbstractDomainExpansion domain : ALL_DOMAINS)
+        {
+            if (domain.hasActiveDomain(casterUuid))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * 检查指定位置是否在任何活跃领域范围内（遍历所有领域实例）。
      *
      * @param level 服务端世界
@@ -132,6 +148,38 @@ public final class DomainExpansionRouter
         {
             domain.tickMaintain(player);
         }
+    }
+
+    /**
+     * 对所有领域实例执行 tickMaintain（AI 实体施法者版）。
+     * <p>
+     * 由 {@code CursedEnergyEvents} 在遍历「已登记的 AI 领域施法者」时调用。
+     * 与玩家路径共用同一套维持逻辑，只是咒力 / 战斗模式 / 模式来自
+     * {@link DomainCaster} 的实体实现。
+     *
+     * @param caster AI 实体施法者
+     */
+    public static void tickMaintainAll(DomainCaster caster)
+    {
+        for (AbstractDomainExpansion domain : ALL_DOMAINS)
+        {
+            domain.tickMaintain(caster);
+        }
+    }
+
+    /**
+     * 任一领域实现下，该施法者是否持有活跃领域（含展开动画 / 蓄力中）。
+     */
+    public static boolean hasAnyActiveDomain(DomainCaster caster)
+    {
+        for (AbstractDomainExpansion domain : ALL_DOMAINS)
+        {
+            if (domain.hasActiveDomain(caster.uid()))
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

@@ -6,6 +6,7 @@ import com.darkness.jujutsukaisenzone.quest.mainline.main_1_1.MainQuest11Intro;
 import com.darkness.jujutsukaisenzone.quest.mainline.main_1_1.MainQuest11VillageClear;
 import com.darkness.jujutsukaisenzone.quest.mainline.main_1_1.MainQuest11VillageNightApproach;
 import com.darkness.jujutsukaisenzone.quest.mainline.main_1_2.MainQuest12Anomaly;
+import com.darkness.jujutsukaisenzone.quest.mainline.main_1_3.MainQuest13Performance;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
@@ -39,6 +40,7 @@ public final class QuestEvents
         {
             MainQuest11Intro.abort(player);
             MainQuest12Anomaly.abort(player);
+            MainQuest13Performance.abort(player);
             MainQuest11VillageNightApproach.clear(player);
         }
     }
@@ -58,6 +60,7 @@ public final class QuestEvents
         MainQuest11VillageNightApproach.tick(serverPlayer);
         MainQuest12Anomaly.tick(serverPlayer);
         MainQuest12Anomaly.tickHealthLock(serverPlayer);
+        MainQuest13Performance.tick(serverPlayer);
         if (serverPlayer.tickCount % 100 != 0)
         {
             return;

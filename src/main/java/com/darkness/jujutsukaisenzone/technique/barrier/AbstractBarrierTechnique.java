@@ -118,6 +118,21 @@ public abstract class AbstractBarrierTechnique implements IBarrierTechnique
     }
 
     /**
+     * 排序球壳展开顺序（施法者无关版）：AI 实体没有玩家朝向，退化为「由下向上」排序。
+     */
+    protected List<BlockPos> sortShellBlocksForExpansion(
+            List<BlockPos> shellBlocks, BlockPos center,
+            com.darkness.jujutsukaisenzone.technique.domain.DomainCaster caster)
+    {
+        ServerPlayer player = caster.player();
+        if (player != null)
+        {
+            return sortShellBlocksForExpansion(shellBlocks, center, player);
+        }
+        return sortBottomUp(shellBlocks, center);
+    }
+
+    /**
      * 从下向上排序（普通结界术）。
      * <p>
      * 按 Y 坐标升序排序，Y 坐标相同的按到中心的水平距离升序。
@@ -264,6 +279,21 @@ public abstract class AbstractBarrierTechnique implements IBarrierTechnique
     protected void onBarrierClosed(ServerPlayer player, BarrierInstance instance)
     {
         // 默认无操作，子类可覆盖
+    }
+
+    /**
+     * 当结界关闭时的回调（施法者无关版）：玩家与 AI 实体共用。
+     * <p>
+     * 默认：有玩家 → 转调 {@link #onBarrierClosed(ServerPlayer, BarrierInstance)}；AI 实体 → 无操作。
+     * 术式领域（{@code AbstractDomainExpansion}）覆写本方法以让 AI 施法也能执行领域专属清理。
+     */
+    protected void onBarrierClosed(com.darkness.jujutsukaisenzone.technique.domain.DomainCaster caster, BarrierInstance instance)
+    {
+        ServerPlayer player = caster.player();
+        if (player != null)
+        {
+            onBarrierClosed(player, instance);
+        }
     }
 
     // ==================== 共享数据结构 ====================
@@ -681,6 +711,19 @@ public abstract class AbstractBarrierTechnique implements IBarrierTechnique
     }
 
     /**
+     * 清理单个结界实例（施法者无关版）：玩家与 AI 实体共用。
+     * <p>
+     * 与 {@link #clearBarrierInstance(ServerPlayer, BarrierInstance)} 的唯一差别是回调走
+     * {@code caster}，世界侧还原仍旧按维度执行。
+     */
+    protected final void clearBarrierInstance(
+            com.darkness.jujutsukaisenzone.technique.domain.DomainCaster caster, BarrierInstance instance)
+    {
+        onBarrierClosed(caster, instance);
+        restoreBarrierWorld(caster.level(), instance);
+    }
+
+    /**
      * 仅执行世界侧还原：天空盒方块 → 球壳方块 → 被替换的原方块。
      * <p>
      * 不触发 {@link #onBarrierClosed} 回调，供拿不到在线施术者对象的场合使用
@@ -796,8 +839,10 @@ public abstract class AbstractBarrierTechnique implements IBarrierTechnique
 
     /**
      * 检查玩家是否在战斗模式。
+     * <p>
+     * 对 {@code DomainCaster.PlayerCaster}（跨包）开放，故为 {@code public}。
      */
-    protected final boolean isInBattleMode(ServerPlayer player)
+    public final boolean isInBattleMode(ServerPlayer player)
     {
         return player.isAlive() && EpicFightCompat.isBattleMode(player);
     }

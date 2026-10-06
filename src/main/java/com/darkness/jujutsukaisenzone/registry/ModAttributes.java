@@ -14,6 +14,7 @@ import net.minecraftforge.registries.DeferredRegister;
 import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraftforge.registries.RegistryObject;
 import org.jetbrains.annotations.Nullable;
+import yesman.epicfight.world.entity.ai.attribute.EpicFightAttributes;
 
 /**
  * 攻防面板属性：抗性（防御）与穿透（攻击）成对；另有玩家效率类属性。
@@ -193,7 +194,15 @@ public final class ModAttributes
 
     /**
      * ⚠️ 属性必须挂到实体类型上才读得到，否则 {@code entity.getAttribute(...)} 返回 {@code null}。
-     * 抗性/穿透挂全部生物；效率类仅玩家。
+     * <p>
+     * <b>挂载策略</b>：
+     * <ul>
+     *   <li>抗性 / 穿透 → 全部生物（数据包 {@code mob_combat_stats} 表就是靠这四条落到属性上的）；</li>
+     *   <li>效率类（反转 / 领域量表 / 暴击 / 破韧）→ 默认只给玩家；</li>
+     *   <li><b>AI 术师</b>（{@code jujutsukaisenzone:gojo_satoru}）额外挂上效率类与暴击——
+     *       它是「会开领域、会出伤」的完整术师，缺了这些在 {@code CritRules} 一类系统里会走 fallback。
+     *       默认值即中性值（效率 100 = 1.0 倍，破韧 0），故不影响既有行为。</li>
+     * </ul>
      */
     @SubscribeEvent
     public static void onEntityAttributeModification(EntityAttributeModificationEvent event)
@@ -209,5 +218,26 @@ public final class ModAttributes
         event.add(EntityType.PLAYER, DOMAIN_GAUGE_CHARGE_EFFICIENCY.get());
         event.add(EntityType.PLAYER, CRIT_CHANCE.get());
         event.add(EntityType.PLAYER, BREAK_POTENCY.get());
+
+        /*
+         * AI 术师实体（会开真实领域、走统一伤害体系的完整术师）同样需要效率类属性。
+         * 直接引用本模组的 RegistryObject<EntityType<GojoSatoruEntity>>，
+         * 类型天然满足 EntityType<? extends LivingEntity>（不像 ForgeRegistries 取回的是裸通配）。
+         */
+        event.add(ModEntities.GOJO_SATORU.get(), REVERSE_TECHNIQUE_EFFICIENCY.get());
+        event.add(ModEntities.GOJO_SATORU.get(), DOMAIN_GAUGE_CHARGE_EFFICIENCY.get());
+        event.add(ModEntities.GOJO_SATORU.get(), CRIT_CHANCE.get());
+        event.add(ModEntities.GOJO_SATORU.get(), BREAK_POTENCY.get());
+
+        /* Epic Fight 人形 patch 所需属性（对齐 EF humanoid()，不改 base）。 */
+        event.add(ModEntities.GOJO_SATORU.get(), EpicFightAttributes.WEIGHT.get());
+        event.add(ModEntities.GOJO_SATORU.get(), EpicFightAttributes.ARMOR_NEGATION.get());
+        event.add(ModEntities.GOJO_SATORU.get(), EpicFightAttributes.IMPACT.get());
+        event.add(ModEntities.GOJO_SATORU.get(), EpicFightAttributes.MAX_STRIKES.get());
+        event.add(ModEntities.GOJO_SATORU.get(), EpicFightAttributes.STUN_ARMOR.get());
+        event.add(ModEntities.GOJO_SATORU.get(), EpicFightAttributes.OFFHAND_ATTACK_SPEED.get());
+        event.add(ModEntities.GOJO_SATORU.get(), EpicFightAttributes.OFFHAND_MAX_STRIKES.get());
+        event.add(ModEntities.GOJO_SATORU.get(), EpicFightAttributes.OFFHAND_ARMOR_NEGATION.get());
+        event.add(ModEntities.GOJO_SATORU.get(), EpicFightAttributes.OFFHAND_IMPACT.get());
     }
 }

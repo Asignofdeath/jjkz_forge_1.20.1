@@ -161,6 +161,11 @@ public final class JjkzPlayerDataStorage extends SavedData
         private static final String TAG_MAIN_12_AMBUSH_ORIGIN = "main12AmbushOrigin";
         private static final String TAG_MAIN_12_DECOR_PLACED = "main12DecorPlaced";
         private static final String TAG_MAIN_12_HEALTH_LOCKED = "main12HealthLocked";
+        private static final String TAG_MAIN_13_PERFORMANCE_DONE = "main13PerformanceDone";
+        private static final String TAG_INNATE_TALENT_ID = "innateTalentId";
+        private static final String TAG_INNATE_TALENT_SOURCE = "innateTalentSource";
+        private static final String TAG_TECHNIQUE_ATK_OBJ_MODE = "techniqueAtkObjMode";
+        private static final String TAG_TECHNIQUE_ATK_OBJ_IDS = "techniqueAtkObjIds";
 
         boolean cursedEnergyInitialized;
         int cursedEnergyBaseMax;
@@ -222,6 +227,12 @@ public final class JjkzPlayerDataStorage extends SavedData
         @javax.annotation.Nullable BlockPos main12AmbushOrigin;
         boolean main12DecorPlaced;
         boolean main12HealthLocked;
+        /** 1.3「特级术师的实力」演出是否已播完（复活点续播用）。 */
+        boolean main13PerformanceDone;
+        public String innateTalentId = "";
+        public String innateTalentSource = "";
+        public String techniqueAtkObjMode = "";
+        public final java.util.LinkedHashSet<UUID> techniqueAtkObjIds = new java.util.LinkedHashSet<>();
 
         private static PlayerDataEntry load(CompoundTag tag)
         {
@@ -354,6 +365,30 @@ public final class JjkzPlayerDataStorage extends SavedData
             }
             entry.main12DecorPlaced = tag.getBoolean(TAG_MAIN_12_DECOR_PLACED);
             entry.main12HealthLocked = tag.getBoolean(TAG_MAIN_12_HEALTH_LOCKED);
+            entry.main13PerformanceDone = tag.getBoolean(TAG_MAIN_13_PERFORMANCE_DONE);
+            entry.innateTalentId = tag.getString(TAG_INNATE_TALENT_ID);
+            entry.innateTalentSource = tag.getString(TAG_INNATE_TALENT_SOURCE);
+            entry.techniqueAtkObjMode = tag.getString(TAG_TECHNIQUE_ATK_OBJ_MODE);
+            entry.techniqueAtkObjIds.clear();
+            if (tag.contains(TAG_TECHNIQUE_ATK_OBJ_IDS, Tag.TAG_LIST))
+            {
+                ListTag ids = tag.getList(TAG_TECHNIQUE_ATK_OBJ_IDS, Tag.TAG_STRING);
+                for (int i = 0; i < ids.size(); i++)
+                {
+                    String raw = ids.getString(i);
+                    if (raw == null || raw.isBlank())
+                    {
+                        continue;
+                    }
+                    try
+                    {
+                        entry.techniqueAtkObjIds.add(UUID.fromString(raw));
+                    }
+                    catch (IllegalArgumentException ignored)
+                    {
+                    }
+                }
+            }
             return entry;
         }
 
@@ -463,6 +498,19 @@ public final class JjkzPlayerDataStorage extends SavedData
             }
             tag.putBoolean(TAG_MAIN_12_DECOR_PLACED, main12DecorPlaced);
             tag.putBoolean(TAG_MAIN_12_HEALTH_LOCKED, main12HealthLocked);
+            tag.putBoolean(TAG_MAIN_13_PERFORMANCE_DONE, main13PerformanceDone);
+            tag.putString(TAG_INNATE_TALENT_ID, innateTalentId == null ? "" : innateTalentId);
+            tag.putString(TAG_INNATE_TALENT_SOURCE, innateTalentSource == null ? "" : innateTalentSource);
+            tag.putString(TAG_TECHNIQUE_ATK_OBJ_MODE, techniqueAtkObjMode == null ? "" : techniqueAtkObjMode);
+            ListTag atkObjIds = new ListTag();
+            for (UUID id : techniqueAtkObjIds)
+            {
+                if (id != null)
+                {
+                    atkObjIds.add(net.minecraft.nbt.StringTag.valueOf(id.toString()));
+                }
+            }
+            tag.put(TAG_TECHNIQUE_ATK_OBJ_IDS, atkObjIds);
             return tag;
         }
 

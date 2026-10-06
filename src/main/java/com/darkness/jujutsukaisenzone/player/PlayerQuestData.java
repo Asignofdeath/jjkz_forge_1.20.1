@@ -89,6 +89,7 @@ public final class PlayerQuestData
         entry.main12AmbushOrigin = null;
         entry.main12DecorPlaced = false;
         entry.main12HealthLocked = false;
+        entry.main13PerformanceDone = false;
         dirty(player);
     }
 
@@ -219,6 +220,18 @@ public final class PlayerQuestData
     public static void setMain12HealthLocked(ServerPlayer player, boolean value)
     {
         data(player).main12HealthLocked = value;
+        dirty(player);
+    }
+
+    /** 1.3 演出是否已播完（防重入 / 复活点续播）。 */
+    public static boolean isMain13PerformanceDone(ServerPlayer player)
+    {
+        return data(player).main13PerformanceDone;
+    }
+
+    public static void setMain13PerformanceDone(ServerPlayer player, boolean value)
+    {
+        data(player).main13PerformanceDone = value;
         dirty(player);
     }
 

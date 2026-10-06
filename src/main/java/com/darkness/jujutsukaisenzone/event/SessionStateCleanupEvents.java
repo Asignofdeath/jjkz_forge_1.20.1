@@ -2,6 +2,8 @@ package com.darkness.jujutsukaisenzone.event;
 
 import com.darkness.jujutsukaisenzone.JuJutsuKaisenZone;
 import com.darkness.jujutsukaisenzone.technique.BarrierTechniqueServerLogic;
+import com.darkness.jujutsukaisenzone.technique.domain.AiDomainCasterRegistry;
+import com.darkness.jujutsukaisenzone.technique.domain.AiDomainModeData;
 import com.darkness.jujutsukaisenzone.technique.domain.DomainExpansionRouter;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
@@ -62,6 +64,8 @@ public final class SessionStateCleanupEvents
         DomainExpansionRouter.restoreAllWorldAll(server);
         BarrierTechniqueServerLogic.restoreAllWorld(server);
         // 3) 清空进程级静态容器，杜绝跨存档残留
+        AiDomainCasterRegistry.clearAll();
+        AiDomainModeData.clearAll();
         DomainExpansionRouter.resetAllSessionState();
         BarrierTechniqueServerLogic.resetSessionState();
     }

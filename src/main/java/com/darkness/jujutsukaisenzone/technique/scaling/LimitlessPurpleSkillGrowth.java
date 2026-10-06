@@ -1,7 +1,6 @@
 package com.darkness.jujutsukaisenzone.technique.scaling;
 
-import com.darkness.jujutsukaisenzone.player.PlayerCursedGradeData;
-import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.LivingEntity;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -21,9 +20,9 @@ public final class LimitlessPurpleSkillGrowth
     {
     }
 
-    public static int cooldownTicks(@Nullable Player player)
+    public static int cooldownTicks(@Nullable LivingEntity owner)
     {
-        int steps = SkillGrowthSteps.stepsAboveBaseline(player);
+        int steps = SkillGrowthSteps.stepsAboveBaseline(owner);
         return BASELINE_COOLDOWN_TICKS - COOLDOWN_REDUCTION_PER_RANK * steps;
     }
 }

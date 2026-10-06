@@ -38,6 +38,7 @@ import com.darkness.jujutsukaisenzone.technique.MeltdownRepairLearnLogic;
 import com.darkness.jujutsukaisenzone.player.PlayerTenShadowsContractData;
 import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
 import com.darkness.jujutsukaisenzone.player.PlayerTechniqueIntelData;
+import com.darkness.jujutsukaisenzone.technique.TechniqueAtkObjShackle;
 import com.darkness.jujutsukaisenzone.technique.skill.TenShadowsShikigami;
 import com.darkness.jujutsukaisenzone.player.PlayerSpData;
 import com.darkness.jujutsukaisenzone.player.PlayerSpNodeData;
@@ -56,7 +57,11 @@ import com.darkness.jujutsukaisenzone.technique.crit.CritRules;
 import com.darkness.jujutsukaisenzone.technique.DomainExpansionServerLogic;
 import com.darkness.jujutsukaisenzone.technique.domain.JudgmentDomainTrialLogic;
 import com.darkness.jujutsukaisenzone.network.ModNetwork;
+import com.darkness.jujutsukaisenzone.network.NetworkSenders;
+import com.darkness.jujutsukaisenzone.network.packet.MainQuest13CmdCamS2CPacket;
+import com.darkness.jujutsukaisenzone.compat.EpicFightCompat;
 import com.darkness.jujutsukaisenzone.compat.StylizedDamageIntegrationRegistrar;
+import com.darkness.jujutsukaisenzone.registry.JjkzLivingEntitySummons;
 import com.darkness.jujutsukaisenzone.registry.ModAttributes;
 import com.darkness.jujutsukaisenzone.registry.ModEntities;
 import com.mojang.brigadier.CommandDispatcher;
@@ -65,16 +70,20 @@ import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import java.util.Collection;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.UUID;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
+import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.projectile.ProjectileUtil;
@@ -198,6 +207,7 @@ public final class JjkzCommands
                         .then(buildDomainExpansionCheatBranch())
                         .then(buildTenShadowsCheatBranch())
                         .then(buildSpecialEffectBranch())
+                        .then(buildLivingEntityBranch())
                         .then(buildDemonSubduingShrineBranch())
                         .then(buildTengenWedgeBranch())
                         .then(buildWedgeSpawnBranch())
@@ -212,6 +222,8 @@ public final class JjkzCommands
                         .then(buildRushIntoTheZoneClimaxBranch())
                         .then(buildModRulesBranch())
                         .then(buildDomainSphereDebugBranch())
+                        .then(buildShackleBranch())
+                        .then(buildFallTestBranch())
         );
     }
 
@@ -798,6 +810,104 @@ public final class JjkzCommands
                             ServerPlayer player = ctx.getSource().getPlayerOrException();
                             return DomainSphereDebugLogic.close(player) ? 1 : 0;
                         }));
+    }
+
+    /**
+     * 试 1.3 同款倒地 + 外置背影镜：{@code /jjkz falltest}
+     * <p>
+     * 战斗模式 → {@code playAnimationInstantly(the_player_fell_to_the_ground)} → 1.3 背影 cmdcam。
+     */
+    private static LiteralArgumentBuilder<CommandSourceStack> buildFallTestBranch()
+    {
+        return Commands.literal("falltest")
+                .executes(ctx -> executeFallTest(ctx.getSource().getPlayerOrException()));
+    }
+
+    private static int executeFallTest(ServerPlayer player)
+    {
+        EpicFightCompat.setBattleMode(player, true);
+        EpicFightCompat.playPlayerFellToTheGroundAnimation(player);
+        Vec3 pos = player.position();
+        double yawRad = Math.toRadians(player.getYRot());
+        double lookX = pos.x + (-Math.sin(yawRad) * 2.2D);
+        double lookZ = pos.z + (Math.cos(yawRad) * 2.2D);
+        NetworkSenders.toPlayer(player, MainQuest13CmdCamS2CPacket.backView(
+                pos.x, pos.y, pos.z, lookX, lookZ));
+        player.sendSystemMessage(Component.literal(
+                "falltest：战斗模式 + Instantly 倒地 + 1.3 背影 cmdcam。"));
+        return 1;
+    }
+
+    /** 术式伤害对象：{@code /jjkz shackle technique_atk_obj wl|bl <选择器>} / {@code clear} */
+    private static LiteralArgumentBuilder<CommandSourceStack> buildShackleBranch()
+    {
+        return Commands.literal("shackle")
+                .then(Commands.literal("technique_atk_obj")
+                        .then(Commands.literal("wl")
+                                .then(Commands.argument("targets", EntityArgument.entities())
+                                        .executes(ctx -> executeTechniqueAtkObjReplace(
+                                                ctx.getSource().getPlayerOrException(),
+                                                TechniqueAtkObjShackle.MODE_WL,
+                                                EntityArgument.getEntities(ctx, "targets")))))
+                        .then(Commands.literal("bl")
+                                .then(Commands.argument("targets", EntityArgument.entities())
+                                        .executes(ctx -> executeTechniqueAtkObjReplace(
+                                                ctx.getSource().getPlayerOrException(),
+                                                TechniqueAtkObjShackle.MODE_BL,
+                                                EntityArgument.getEntities(ctx, "targets")))))
+                        .then(Commands.literal("clear")
+                                .executes(ctx -> executeTechniqueAtkObjClear(
+                                        ctx.getSource().getPlayerOrException()))));
+    }
+
+    private static int executeTechniqueAtkObjReplace(
+            ServerPlayer player, String mode, Collection<? extends Entity> targets)
+    {
+        LinkedHashSet<UUID> ids = new LinkedHashSet<>();
+        for (Entity entity : targets)
+        {
+            if (entity instanceof LivingEntity)
+            {
+                ids.add(entity.getUUID());
+            }
+        }
+        TechniqueAtkObjShackle.replace(player, mode, ids);
+        String label = TechniqueAtkObjShackle.MODE_WL.equals(mode) ? "白名单" : "黑名单";
+        player.sendSystemMessage(Component.literal("术式伤害对象已设为" + label + "（" + ids.size() + "）。"));
+        return 1;
+    }
+
+    private static int executeTechniqueAtkObjClear(ServerPlayer player)
+    {
+        TechniqueAtkObjShackle.clear(player);
+        player.sendSystemMessage(Component.literal("已清除术式伤害对象限定。"));
+        return 1;
+    }
+
+    /** 召唤模组生物：{@code /jjkz living_entity gojosatoru_teacher} */
+    private static LiteralArgumentBuilder<CommandSourceStack> buildLivingEntityBranch()
+    {
+        LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal("living_entity")
+                .requires(source -> source.hasPermission(Commands.LEVEL_GAMEMASTERS));
+        for (String id : JjkzLivingEntitySummons.ids())
+        {
+            root.then(Commands.literal(id).executes(ctx -> executeSummonLivingEntity(ctx.getSource(), id)));
+        }
+        return root;
+    }
+
+    private static int executeSummonLivingEntity(CommandSourceStack source, String id)
+    {
+        ServerLevel level = source.getLevel();
+        Vec3 pos = source.getPosition();
+        Entity entity = JjkzLivingEntitySummons.spawn(id, level, pos, source.getRotation().y);
+        if (entity == null)
+        {
+            source.sendFailure(Component.literal("召唤失败：未知或不支持的 living_entity id：" + id));
+            return 0;
+        }
+        source.sendSuccess(() -> Component.literal("已召唤 " + id + "。"), true);
+        return 1;
     }
 
     /** 召唤伏魔神龛：{@code /jjkz summonDemonSubduingShrine} */

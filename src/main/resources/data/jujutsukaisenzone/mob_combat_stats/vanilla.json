@@ -320,6 +320,19 @@
         "specialized": true,
         "resistance": 0.35
       }
+    },
+    "jujutsukaisenzone:gojo_satoru": {
+      "physical_resistance": 50,
+      "technique_resistance": 60,
+      "physical_penetration": 40,
+      "technique_penetration": 50,
+      "poise": {
+        "value": 300,
+        "regen": 6,
+        "damage_reduction": 0.35,
+        "specialized": true,
+        "resistance": 0.3
+      }
     }
   }
 }

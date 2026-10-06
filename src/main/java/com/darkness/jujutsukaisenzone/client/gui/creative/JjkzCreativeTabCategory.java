@@ -33,6 +33,10 @@ public enum JjkzCreativeTabCategory
                     ModItems.DOMAIN_STUDYBOOK,
                     ModItems.SOUL_STUDYBOOK,
                     ModItems.TECHNIQUE_INTELLIGENCE,
+                    ModItems.CURSED_ENERGY_JADE_CLANGOROUS,
+                    ModItems.CURSED_ENERGY_JADE_DENSE,
+                    ModItems.CURSED_ENERGY_JADE_MATTE,
+                    ModItems.CURSED_ENERGY_JADE_IRIDESCENT,
                     ModItems.BRAIN_SOOTHING_CANDY,
                     ModItems.BRAIN_CALMING_PILL
             )),

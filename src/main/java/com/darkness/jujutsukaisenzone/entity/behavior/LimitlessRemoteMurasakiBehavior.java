@@ -99,10 +99,7 @@ public class LimitlessRemoteMurasakiBehavior extends EffectBehavior
         this.flightScreenShakeTicks = 0;
         this.purpleOverlaySent = false;
         this.maxFlightDistance = SkillCombatConfigRegistry.resolveRemoteMurasakiMaxFlightDistance(owner);
-        if (owner instanceof ServerPlayer serverPlayer)
-        {
-            EpicFightCompat.playRemoteMurasakiStartAnimation(serverPlayer);
-        }
+        EpicFightCompat.playRemoteMurasakiStartAnimation(owner);
     }
 
     /** 起手演出中线前方锚点，供 {@link LimitlessRemoteMurasakiStartOrbBehavior} 使用。 */
@@ -202,10 +199,17 @@ public class LimitlessRemoteMurasakiBehavior extends EffectBehavior
             this.remainingLifeTicks--;
         }
 
-        if (this.startElapsedTicks >= LimitlessRemoteMurasakiConfig.HOLD_RELEASE_CHARGE_TICKS
-                && owner instanceof ServerPlayer serverPlayer)
+        if (this.startElapsedTicks >= LimitlessRemoteMurasakiConfig.HOLD_RELEASE_CHARGE_TICKS)
         {
-            LimitlessTechniqueSkillSet.INSTANCE.tryAutoCompleteRemoteMurasakiHoldRelease(serverPlayer, entity.getUUID());
+            if (owner instanceof ServerPlayer serverPlayer)
+            {
+                LimitlessTechniqueSkillSet.INSTANCE.tryAutoCompleteRemoteMurasakiHoldRelease(serverPlayer, entity.getUUID());
+            }
+            else if (com.darkness.jujutsukaisenzone.entity.combat.AiTechniqueStats.has(owner))
+            {
+                /* AI：咒力/冷却已在起手时扣完，蓄满后直接走发射真相。 */
+                LimitlessTechniqueSkillSet.INSTANCE.launchRemoteMurasakiHoldRelease(owner, entity.getUUID());
+            }
         }
     }
 
@@ -271,11 +275,8 @@ public class LimitlessRemoteMurasakiBehavior extends EffectBehavior
         this.phase = PHASE_FIRE;
         this.remainingLifeTicks = LimitlessRemoteMurasakiConfig.FIRE_DELAY_TICKS;
 
-        if (owner instanceof ServerPlayer serverPlayer)
-        {
-            EpicFightCompat.stopRemoteMurasakiStartAnimation(serverPlayer);
-            EpicFightCompat.playRemoteMurasakiFireAnimation(serverPlayer);
-        }
+        EpicFightCompat.stopRemoteMurasakiStartAnimation(owner);
+        EpicFightCompat.playRemoteMurasakiFireAnimation(owner);
 
         Vec3 anchor = anchorWorldPosition(owner);
         entity.setPos(anchor.x, anchor.y, anchor.z);

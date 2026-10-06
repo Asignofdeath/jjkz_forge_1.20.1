@@ -32,6 +32,11 @@ public final class QuestDialogVoice
         BY_CAPTION.put("quest.jujutsukaisenzone.main_1_1.talk.8", ModSounds.QUEST_MAIN_1_1_TALK_8);
         BY_CAPTION.put("quest.jujutsukaisenzone.main_1_1.talk.10", ModSounds.QUEST_MAIN_1_1_TALK_10);
         BY_CAPTION.put("quest.jujutsukaisenzone.main_1_1.talk.11", ModSounds.QUEST_MAIN_1_1_TALK_11);
+        BY_CAPTION.put("quest.jujutsukaisenzone.main_1_3.talk.1", ModSounds.QUEST_MAIN_1_3_TALK_1);
+        BY_CAPTION.put("quest.jujutsukaisenzone.main_1_3.talk.3", ModSounds.QUEST_MAIN_1_3_TALK_3);
+        BY_CAPTION.put("quest.jujutsukaisenzone.main_1_3.talk.4", ModSounds.QUEST_MAIN_1_3_TALK_4);
+        BY_CAPTION.put("quest.jujutsukaisenzone.main_1_3.talk.5", ModSounds.QUEST_MAIN_1_3_TALK_5);
+        BY_CAPTION.put("quest.jujutsukaisenzone.main_1_3.talk.6", ModSounds.QUEST_MAIN_1_3_TALK_6);
     }
 
     private QuestDialogVoice()

@@ -1,11 +1,14 @@
 package com.darkness.jujutsukaisenzone.entity;
 
+import com.darkness.jujutsukaisenzone.faction.FactionStance;
+import com.darkness.jujutsukaisenzone.faction.JjkzFactions;
 import com.darkness.jujutsukaisenzone.gameplay.CursedSpiritGrade;
 import com.darkness.jujutsukaisenzone.gameplay.CursedSpiritHealthTable;
 import javax.annotation.Nullable;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.DifficultyInstance;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.MobSpawnType;
 import net.minecraft.world.entity.SpawnGroupData;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
@@ -18,7 +21,6 @@ import net.minecraft.world.entity.ai.goal.WaterAvoidingRandomStrollGoal;
 import net.minecraft.world.entity.ai.goal.target.HurtByTargetGoal;
 import net.minecraft.world.entity.ai.goal.target.NearestAttackableTargetGoal;
 import net.minecraft.world.entity.monster.Monster;
-import net.minecraft.world.entity.npc.AbstractVillager;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.ServerLevelAccessor;
@@ -32,6 +34,10 @@ public class Grade3CurseSpiritAEntity extends Monster
     public Grade3CurseSpiritAEntity(EntityType<? extends Grade3CurseSpiritAEntity> type, Level level)
     {
         super(type, level);
+        if (!level.isClientSide)
+        {
+            JjkzFactions.assign(this, JjkzFactions.CURSE_SPIRIT);
+        }
     }
 
     public static AttributeSupplier.Builder createAttributes()
@@ -66,7 +72,27 @@ public class Grade3CurseSpiritAEntity extends Monster
         this.goalSelector.addGoal(8, new LookAtPlayerGoal(this, Player.class, 8.0F));
         this.goalSelector.addGoal(8, new RandomLookAroundGoal(this));
         this.targetSelector.addGoal(1, new HurtByTargetGoal(this));
-        this.targetSelector.addGoal(2, new NearestAttackableTargetGoal<>(this, Player.class, true));
-        this.targetSelector.addGoal(3, new NearestAttackableTargetGoal<>(this, AbstractVillager.class, false));
+        this.targetSelector.addGoal(2, new NearestAttackableTargetGoal<>(this, LivingEntity.class, 10, true, false, null));
+    }
+
+    @Override
+    public boolean canAttack(LivingEntity target)
+    {
+        return super.canAttack(target) && FactionStance.canAggress(this, target);
+    }
+
+    @Override
+    public void addAdditionalSaveData(CompoundTag tag)
+    {
+        super.addAdditionalSaveData(tag);
+        JjkzFactions.copyToSave(this, tag);
+    }
+
+    @Override
+    public void readAdditionalSaveData(CompoundTag tag)
+    {
+        super.readAdditionalSaveData(tag);
+        JjkzFactions.restoreFromSave(this, tag);
+        JjkzFactions.assign(this, JjkzFactions.CURSE_SPIRIT);
     }
 }
