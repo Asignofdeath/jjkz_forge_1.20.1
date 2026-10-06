@@ -1,11 +1,14 @@
 package com.darkness.jujutsukaisenzone.quest.mainline.main_1_2;
 
+import com.darkness.jujutsukaisenzone.api.screen.ScreenShakeKind;
 import com.darkness.jujutsukaisenzone.entity.Grade3CurseSpiritAEntity;
 import com.darkness.jujutsukaisenzone.locate.PlayerLocateGuidance;
 import com.darkness.jujutsukaisenzone.locate.StructureLocateTarget;
 import com.darkness.jujutsukaisenzone.locate.StructureLocator;
+import com.darkness.jujutsukaisenzone.network.ModNetwork;
 import com.darkness.jujutsukaisenzone.network.NetworkSenders;
 import com.darkness.jujutsukaisenzone.network.packet.SyncQuestCodCaptionsS2CPacket;
+import com.darkness.jujutsukaisenzone.network.packet.SyncQuestMain12BloodSkyS2CPacket;
 import com.darkness.jujutsukaisenzone.player.PlayerQuestData;
 import com.darkness.jujutsukaisenzone.quest.mainline.MainQuestDefs;
 import com.darkness.jujutsukaisenzone.quest.mainline.MainQuestLogic;
@@ -34,13 +37,22 @@ import net.minecraft.world.phys.Vec3;
 
 /**
  * 主线 1.2：进村探索 → 探索超时伏击 → 残血锁血或跑够距离结束。
- * 探索中远离村庄中心过远则放弃任务（非包围盒判定，中心距离 + 宽限）。
+ * 探索中远离村庄中心过远：ghost_ambient 开播前放弃任务；开播后拉回村内（中心距离 + 宽限）。
  * 结束时不清理本波咒灵（留给 1.3）。
  */
 public final class MainQuest12Anomaly
 {
     /** 探索时长：120 秒。 */
     public static final int EXPLORE_TICKS = 2400;
+    /**
+     * {@link ModSounds#QUEST_MAIN_1_2_GHOST_AMBIENT} 笑声爆发点（秒），与伏击刷怪同拍。
+     * 开播时刻 = {@link #EXPLORE_TICKS} − 本值 × 20。
+     */
+    public static final int GHOST_AMBIENT_STINGER_SEC = 56;
+    public static final int GHOST_AMBIENT_START_TICKS = EXPLORE_TICKS - GHOST_AMBIENT_STINGER_SEC * 20;
+    /** 伏击刷怪瞬间：单次屏幕冲击（甩出再收回）。 */
+    private static final int AMBUSH_SCREEN_SHAKE_TICKS = 12;
+    private static final float AMBUSH_SCREEN_SHAKE_MAX_DEG = 10.0F;
     public static final int MAX_SPAWN = 30;
     /** {@code fall_down.ogg} 约 1.35s，之后接 squeeze_and_pop。 */
     private static final int FALL_DOWN_TICKS = 27;
@@ -54,6 +66,9 @@ public final class MainQuest12Anomaly
      */
     public static final double ABANDON_GRACE_BLOCKS = 48.0D;
     public static final double ABANDON_MIN_DISTANCE = 80.0D;
+    /** ghost_ambient 开播后：超出边界时拉回村内，落点约为允许半径的该比例。 */
+    private static final double PULL_BACK_INNER_RATIO = 0.82D;
+    private static final int PULL_BACK_COOLDOWN_TICKS = 10;
 
     public static final String OBJECTIVE_EXPLORE = "quest.jujutsukaisenzone.main_1_2.objective.explore";
     public static final String OBJECTIVE_FLEE = "quest.jujutsukaisenzone.main_1_2.objective.flee";
@@ -69,6 +84,11 @@ public final class MainQuest12Anomaly
      * 伏击编排：玩家句与三级咒灵甲战吼交错；
      * 短间隔只用于「不同说话人」同屏，单人连句用长间隔顶替。
      */
+    private static final String BLOOD_SKY_LINE_KEY = "quest.jujutsukaisenzone.main_1_2.blood_sky.1";
+    private static final String[] PULL_BACK_KEYS = {
+            "quest.jujutsukaisenzone.main_1_2.pull_back.1",
+            "quest.jujutsukaisenzone.main_1_2.pull_back.2"
+    };
     private static final String[] AMBUSH_KEYS = {
             "quest.jujutsukaisenzone.main_1_2.ambush.1",
             "quest.jujutsukaisenzone.main_1_2.ambush.roar.1",
@@ -95,6 +115,12 @@ public final class MainQuest12Anomaly
     public static boolean isRunning(ServerPlayer player)
     {
         return SESSIONS.containsKey(player.getUUID());
+    }
+
+    public static boolean isExplorePhase(ServerPlayer player)
+    {
+        Session session = SESSIONS.get(player.getUUID());
+        return session != null && session.phase == Phase.EXPLORE;
     }
 
     /** 伏击残血锁血：会话内或存档标记（1.2 结束后仍生效，防场上咒灵秒杀）。 */
@@ -167,7 +193,9 @@ public final class MainQuest12Anomaly
 
     public static void abort(ServerPlayer player)
     {
+        clearBloodSky(player);
         MainQuest12LoopTrap.clear(player);
+        MainQuest12VillageTriggers.clear(player);
         Session removed = SESSIONS.remove(player.getUUID());
         if (removed != null)
         {
@@ -178,7 +206,9 @@ public final class MainQuest12Anomaly
     /** 任务标记完成后清理运行时会话（不丢场上咒灵；残血锁血标记保留给 1.3）。 */
     public static void onCompleted(ServerPlayer player)
     {
+        clearBloodSky(player);
         MainQuest12LoopTrap.clear(player);
+        MainQuest12VillageTriggers.clear(player);
         Session removed = SESSIONS.remove(player.getUUID());
         if (removed != null)
         {
@@ -191,6 +221,11 @@ public final class MainQuest12Anomaly
         PlayerQuestData.clearMain12Ambush(player);
         PlayerQuestData.setMain12DecorPlaced(player, false);
         playCompleteSounds(player);
+    }
+
+    private static void clearBloodSky(ServerPlayer player)
+    {
+        NetworkSenders.toPlayer(player, SyncQuestMain12BloodSkyS2CPacket.clear());
     }
 
     private static void playCompleteSounds(ServerPlayer player)
@@ -335,27 +370,112 @@ public final class MainQuest12Anomaly
     private static void tickExplore(ServerPlayer player, Session session)
     {
         session.exploreTicks++;
+        if (session.pullBackCooldown > 0)
+        {
+            session.pullBackCooldown--;
+        }
         if (session.villageCenter != null
                 && horizontalDistance(player, session.villageCenter) > session.abandonDistance)
         {
-            abandonExplore(player, session);
-            return;
+            if (session.exploreTicks >= GHOST_AMBIENT_START_TICKS)
+            {
+                pullBackToVillage(player, session);
+            }
+            else
+            {
+                abandonExplore(player, session);
+                return;
+            }
         }
         MainQuest12LoopTrap.tick(
                 player,
                 session.exploreTicks,
                 session.villageCenter,
                 session.abandonDistance);
+        MainQuest12VillageTriggers.tick(player, session.exploreTicks);
+        if (session.exploreTicks >= GHOST_AMBIENT_START_TICKS)
+        {
+            MainQuest12TorchSnuff.tick(player, session.villageBounds);
+        }
+        if (!session.ghostAmbientPlayed && session.exploreTicks == GHOST_AMBIENT_START_TICKS)
+        {
+            session.ghostAmbientPlayed = true;
+            player.playNotifySound(
+                    ModSounds.QUEST_MAIN_1_2_GHOST_AMBIENT.get(),
+                    SoundSource.MASTER,
+                    1.0F,
+                    1.0F);
+            NetworkSenders.toPlayer(player, SyncQuestMain12BloodSkyS2CPacket.show());
+            NetworkSenders.toPlayer(player, SyncQuestCodCaptionsS2CPacket.playUniform(
+                    new String[] {BLOOD_SKY_LINE_KEY},
+                    0,
+                    LINE_TICKS));
+        }
         if (session.exploreTicks >= EXPLORE_TICKS)
         {
             beginAmbush(player, session);
         }
     }
 
-    /** 探索中走太远：放弃 1.2（未完成，可再追踪），不触发伏击。 */
+    /**
+     * ghost_ambient 开播后：超出允许半径则拉回村内（朝村中心方向）。
+     */
+    private static void pullBackToVillage(ServerPlayer player, Session session)
+    {
+        if (session.villageCenter == null || session.pullBackCooldown > 0)
+        {
+            return;
+        }
+        Vec3 center = session.villageCenter;
+        double dx = player.getX() - center.x;
+        double dz = player.getZ() - center.z;
+        double dist = Math.sqrt(dx * dx + dz * dz);
+        if (dist < 1.0E-4D)
+        {
+            return;
+        }
+        double targetDist = session.abandonDistance * PULL_BACK_INNER_RATIO;
+        double scale = targetDist / dist;
+        double x = center.x + dx * scale;
+        double z = center.z + dz * scale;
+        ServerLevel level = player.serverLevel();
+        int ix = Mth.floor(x);
+        int iz = Mth.floor(z);
+        int surfaceY = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, ix, iz);
+        double y = Math.max(player.getY(), surfaceY);
+        player.teleportTo(x, y, z);
+        player.setDeltaMovement(0.0D, 0.0D, 0.0D);
+        player.hurtMarked = true;
+        player.connection.resetPosition();
+        session.pullBackCooldown = PULL_BACK_COOLDOWN_TICKS;
+        playPullBackLine(player, session);
+    }
+
+    /** 每次拉回各播一句，各场探索最多各一次。 */
+    private static void playPullBackLine(ServerPlayer player, Session session)
+    {
+        for (int i = 0; i < PULL_BACK_KEYS.length; i++)
+        {
+            int bit = 1 << i;
+            if ((session.pullBackLinesPlayed & bit) != 0)
+            {
+                continue;
+            }
+            session.pullBackLinesPlayed |= bit;
+            NetworkSenders.toPlayer(player, SyncQuestCodCaptionsS2CPacket.playUniform(
+                    new String[] {PULL_BACK_KEYS[i]},
+                    0,
+                    LINE_TICKS));
+            return;
+        }
+    }
+
+    /** 探索中走太远（ghost_ambient 开播前）：放弃 1.2（未完成，可再追踪），不触发伏击。 */
     private static void abandonExplore(ServerPlayer player, Session session)
     {
+        clearBloodSky(player);
         MainQuest12LoopTrap.clear(player);
+        MainQuest12VillageTriggers.clear(player);
         clearMonologue(player, session, true);
         SESSIONS.remove(player.getUUID());
         MainQuestLogic.untrack(player, false);
@@ -364,6 +484,10 @@ public final class MainQuest12Anomaly
 
     private static void tickAmbush(ServerPlayer player, Session session)
     {
+        if (session.ghostAmbientPlayed)
+        {
+            MainQuest12TorchSnuff.tick(player, session.villageBounds);
+        }
         tickHealthLock(player);
         if (session.pendingComplete)
         {
@@ -403,6 +527,10 @@ public final class MainQuest12Anomaly
             PlayerQuestData.setMain12DecorPlaced(player, true);
         }
         playMonologueQueue(player, session);
+        if (session.villageBounds != null && session.villageCenter != null)
+        {
+            MainQuest12VillageTriggers.begin(player, session.villageBounds, session.villageCenter);
+        }
     }
 
     private static void bindVillageCenter(Session session)
@@ -433,12 +561,15 @@ public final class MainQuest12Anomaly
     private static void beginAmbush(ServerPlayer player, Session session)
     {
         MainQuest12LoopTrap.clear(player);
+        MainQuest12VillageTriggers.clear(player);
         clearMonologue(player, session, true);
         session.phase = Phase.AMBUSH;
         session.ambushOrigin = player.position();
         session.healthLocked = false;
         PlayerQuestData.setMain12AmbushStarted(player, true);
         PlayerQuestData.setMain12AmbushOrigin(player, BlockPos.containing(session.ambushOrigin));
+        ModNetwork.sendScreenShake(
+                player, ScreenShakeKind.SINGLE, AMBUSH_SCREEN_SHAKE_TICKS, AMBUSH_SCREEN_SHAKE_MAX_DEG);
         spawnGrade3Around(player);
         playAmbushQueue(player);
         MainQuestLogic.syncTrackHud(player);
@@ -561,6 +692,9 @@ public final class MainQuest12Anomaly
         /** 超出该水平距离则放弃探索。 */
         double abandonDistance = ABANDON_MIN_DISTANCE;
         int exploreTicks;
+        boolean ghostAmbientPlayed;
+        int pullBackCooldown;
+        int pullBackLinesPlayed;
         boolean monologueFinished;
         @Nullable Vec3 ambushOrigin;
         boolean healthLocked;

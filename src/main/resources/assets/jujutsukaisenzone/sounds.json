@@ -348,6 +348,14 @@
   "quest.main_1_3.talk.6": {
     "sounds": [{ "name": "jujutsukaisenzone:quest/main_1_3/talk_6" }]
   },
+  "quest.main_1_2.ghost_ambient": {
+    "sounds": [
+      {
+        "name": "jujutsukaisenzone:quest/ghost_ambient_sound_2",
+        "stream": true
+      }
+    ]
+  },
   "quest.fall_down": {
     "sounds": [{ "name": "jujutsukaisenzone:quest/fall_down" }]
   },

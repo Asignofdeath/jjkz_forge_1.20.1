@@ -23,6 +23,7 @@ import com.darkness.jujutsukaisenzone.network.packet.SyncInnateTalentS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.OpenMainQuestJoinOfferS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.MainQuestJoinOfferC2SPacket;
 import com.darkness.jujutsukaisenzone.network.packet.JoinOfferSetModRuleC2SPacket;
+import com.darkness.jujutsukaisenzone.network.packet.SyncQuestMain12BloodSkyS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncQuestWakeBlinkS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.MainQuest13CmdCamS2CPacket;
 import com.darkness.jujutsukaisenzone.network.packet.SyncCgLookClampS2CPacket;
@@ -184,6 +185,11 @@ public final class PlayerPacketRegistrar
                 .encoder(SyncQuestWakeBlinkS2CPacket::encode)
                 .decoder(SyncQuestWakeBlinkS2CPacket::decode)
                 .consumerMainThread(SyncQuestWakeBlinkS2CPacket::handle)
+                .add();
+        channel.messageBuilder(SyncQuestMain12BloodSkyS2CPacket.class, 126, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(SyncQuestMain12BloodSkyS2CPacket::encode)
+                .decoder(SyncQuestMain12BloodSkyS2CPacket::decode)
+                .consumerMainThread(SyncQuestMain12BloodSkyS2CPacket::handle)
                 .add();
     }
 }

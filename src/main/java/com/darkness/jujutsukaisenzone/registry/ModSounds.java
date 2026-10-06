@@ -115,6 +115,12 @@ public final class ModSounds
     public static final RegistryObject<SoundEvent> QUEST_MAIN_1_3_TALK_4 = register("quest.main_1_3.talk.4");
     public static final RegistryObject<SoundEvent> QUEST_MAIN_1_3_TALK_5 = register("quest.main_1_3.talk.5");
     public static final RegistryObject<SoundEvent> QUEST_MAIN_1_3_TALK_6 = register("quest.main_1_3.talk.6");
+    /**
+     * 1.2 探索伏击铺垫：低沉氛围；约 56s 处笑声爆发，与三级咒灵甲包围同拍。
+     * 探索第 64s 开播，第 120s 伏击（{@code assets/.../sounds/quest/ghost_ambient_sound_2}）。
+     */
+    public static final RegistryObject<SoundEvent> QUEST_MAIN_1_2_GHOST_AMBIENT =
+            register("quest.main_1_2.ghost_ambient");
     /** 1.2 完成：摔倒（{@code assets/.../sounds/quest/fall_down}）。 */
     public static final RegistryObject<SoundEvent> QUEST_FALL_DOWN = register("quest.fall_down");
     /** 1.2 完成：fall_down 结束后播放（{@code assets/.../sounds/quest/squeeze_and_pop}）。 */

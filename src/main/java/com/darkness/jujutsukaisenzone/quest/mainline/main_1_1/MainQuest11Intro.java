@@ -36,8 +36,8 @@ import net.minecraft.world.phys.Vec3;
  */
 public final class MainQuest11Intro
 {
-    public static final int LINE_TICKS = 70;
-    public static final int GAP_TICKS = 10;
+    public static final int LINE_TICKS = 45;
+    public static final int GAP_TICKS = 5;
     /** 开场全黑居中旁白。 */
     public static final String[] BLACKOUT_KEYS = {
             "quest.jujutsukaisenzone.main_1_1.blackout.1",

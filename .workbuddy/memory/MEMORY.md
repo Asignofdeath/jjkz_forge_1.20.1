@@ -4,8 +4,8 @@
 
 ## 环境 / 工具
 - ⛔ **禁跑 `./gradlew`**（含 compileJava）：锁 `build/`、憋输出、能卡 10min~1h。编译由用户在 IDEA 做，AI 只做静态自查。
-- ✅ **静态自查 = 全工程 javac**：**直接跑** `tools/jjkz_static_check.py`（JDK bin 先入 PATH），输出落盘再读全。产物落 `%TEMP%/jjkz_check_out`，与 `build/` 无关 ⇒ 不怕游戏文件锁。**基线 2026-10-03 = 731 文件 / 292 jar / exit 0 / 0 错误 / 配置常量旁路 0**。
-- ⛔⛔ **别用 `%TEMP%/jjkz_run_check.py` 那个 wrapper**：它把 stdout 重定向进 StringIO 再落盘，**会谎报 `exit = 0 / 0 错误`**（2026-10-03 实测：工程有 3 个编译错误时它照样全绿）。已受控验证**脚本本身是可靠的**（丢一个故意写错的 `__Probe.java` 进去，脚本 exit=1 且报出文件名）⇒ 不可信的只是 wrapper。怀疑「检查是不是真跑了」时，就用这个探针法验一次。
+- ✅ **静态自查 = 全工程 javac**：**直接跑** `tools/jjkz_static_check.py`（JDK bin 先入 PATH），产物落 `%TEMP%/jjkz_check_out`，与 `build/` 无关 ⇒ 不怕游戏文件锁。**基线 2026-10-07 = 834 文件 / 294 jar / exit 0 / 0 错误 / 配置常量旁路 0**。
+- ⛔⛔ **别用 `%TEMP%/jjkz_run_check.py` 那个 wrapper**：它把 stdout 重定向进 StringIO 再落盘，**会谎报 `exit = 0 / 0 错误`**（工程里塞 3 个编译错误它照样全绿）。脚本本身可靠（丢一个故意写错的 `__Probe.java` 进去，exit=1 且报出文件名）⇒ 怀疑「检查是不是真跑了」就用这个探针法验。
 - ⛔ **游戏客户端开着时 IDEA 绝不能构建 / 重跑 Client**：JVM 占住 `build/classes/java/main` ⇒ Gradle 前置清理删一半 ⇒ 产物残缺，游戏侧只报「找不到某个类」/ Mixin `ClassMetadataNotFoundException`，**症状与真因完全不像**。修复 = 关游戏 → 删 `build/classes/java/main` 重建。排查顺序：`idea.log`(Gradle 真错) > `run/logs/latest.log` > `run/crash-reports/`（其 "Suspected Mod" 会误导）。
 - JDK bin：`C:\Users\19316\.gradle\jdks\eclipse_adoptium-17-amd64-windows\jdk-17.0.20.1+1\bin\`。javac 报错是 **GBK**（grep 中文静默失败）；无 classpath 时「方法不会覆盖或实现超类型的方法」是**误报**。
 - ⛔ **同一文件多处 Edit 必须串行**（并行会静默丢改动，工具却报成功）⇒ 改完 grep 复核每一处调用点。EBUSY = 被占用，重试。
@@ -68,5 +68,7 @@
 - **怪物韧性条**（载体 = EF `stun shield`）：⛔ EF 只在 `EpicFightDamageSource` 时碰盾 ⇒ 破韧自写，`MobPoiseEvents#onLivingHurt` @LOWEST，固定扣 `PoiseRules.POISE_DAMAGE_BASE`。⛔ 末影龙在 `applyPoise` / `onLivingHurt` / `onLivingTick` **三处都豁免**。⛔ 特质克制表 + 破韧质量闸门已删。⛔ 监守者 / 潜影贝 / 远古守卫者暂无条。
 - **进程级静态会话状态**：领域 / 结界活跃实例由静态单例持有，退出世界不重载类 ⇒ 跨会话残留。统一兜底 `event/SessionStateCleanupEvents`。⛔ 新增任何「进程级静态会话容器」都要挂进这里，别零散 `.clear()`。
 - ⛔ **领域实现必须有 caster 版 tick，否则 AI 施法者「演出哑火」**（2026-10-05 立）：`DomainCaster` 双路径（`PlayerCaster` / `EntityCaster`）下，`AbstractDomainExpansion#tickMaintain(DomainCaster)` 只跑通用咒力/崩解判定 —— **一切「某刻触发」的演出（延迟换天空盒 / 水墨 / 闪光 / 音效）都必须子类自己覆写 `tickMaintain(DomainCaster)` 去驱动**。只覆写 `tickMaintain(ServerPlayer)` 的领域，AI 施法者永远等不到这些压轴。同理 `cast(DomainCaster)` 是 AI 唯一施法入口，玩家版 `cast(ServerPlayer)` 里的开场演出（蓄力白幕 / 展开音效）在 AI 侧**不存在**，需要就在 `applyDomainSpecificEffect(DomainCaster)` AI 分支补。
+- ⚠️ **1.2 鬼打墙 `MainQuest12LoopTrap`**：轨迹**只在玩家移动时**记点（`SAMPLE_MIN_MOVE = 1.0`），触发前再过 `MIN_REWIND_DISTANCE = 4.0` 距离闸门（不够就**延后且不消耗次数**）。触发是**固定编排** 1~2 次（`600` / `1500` 刻），已无概率。⛔ 反例教训：按**时间**采样的轨迹，玩家静止 >6 秒会被脚下同一坐标填满 ⇒ 折返 = 原地空转。
+- ⛔ **对领域施法者动 `setNoAi` 只能在 `cast()` 之后**：`beginAiCasterPoseLock` 在 cast 当拍读 `isNoAi()` 存为 `originNoAi`、释放时写回 ⇒ 若在 cast **之前**先 `setNoAi(true)`，领域最终会把 AI 恢复成「关」，**永久不开**。（1.3 登场锁 `tickGojoSwapLock` 因「生成后下一 tick 才设」天然满足；`abort()` 里补了放行。）
 - **客户端后处理**：`PostChain.passes` 是 private ⇒ 用 `addPass` 挂（**必须在 `resize()` 之前**）；`PostPass` 不下发 `ModelViewMat`；深度走 `depthTarget.copyDepthFrom` + `pass.addAuxAsset`；注入点 `RenderLevelStageEvent.Stage.AFTER_LEVEL`。⛔ **「以某个实体为中心」的后期效果，球心必须每帧跟踪实体**，不能只在触发瞬间发一次快照。
 - **音频 / 版权（2026-10-03 立）**：第三方版权音频（动画官方曲 / 手游音效 / 声优语音）**不随 jar 分发**，统一走**资源包接口**——保留 `ModSounds` 注册 + `sounds.json` 条目 + 触发点的 `playSound`，只把 ogg 从 `assets/.../sounds/**` 删掉；资源包放同名 ogg 即自动生效，缺失仅日志告警不崩。⛔ 新增音频先判来源，官方素材一律不进 jar。**资源披露文档 = 仓库根 `ASSETS.md`**（中文 + 英文摘要）。

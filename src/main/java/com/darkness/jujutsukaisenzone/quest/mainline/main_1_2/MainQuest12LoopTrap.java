@@ -14,6 +14,9 @@ import net.minecraft.world.phys.Vec3;
 
 /**
  * 主线 1.2 探索期「鬼打墙」：足迹折返，固定编排触发 1～2 次，附带一句自述。
+ * <p>
+ * 轨迹<b>只在玩家真正移动时</b>记点：站着不动不再往缓冲里塞同一个坐标，
+ * 否则折返点 = 当前位置、传送等于原地空转。
  */
 public final class MainQuest12LoopTrap
 {
@@ -25,7 +28,11 @@ public final class MainQuest12LoopTrap
     private static final int FIRST_TRIGGER_TICK = 600;
     /** 第 2 次固定触发刻（探索 75 秒）。 */
     private static final int SECOND_TRIGGER_TICK = 1500;
-    /** 折返到约 4～8 秒前的足迹（取样间隔 10 tick）。 */
+    /** 相对上次采样至少走这么多格才记一笔（站着不动不污染轨迹）。 */
+    private static final double SAMPLE_MIN_MOVE = 1.0D;
+    /** 折返点须离当前位置至少这么远，否则这次触发延后到走动了再放。 */
+    private static final double MIN_REWIND_DISTANCE = 4.0D;
+    /** 回退 4～8 个移动采样点作为折返目标。 */
     private static final int REWIND_MIN = 4;
     private static final int REWIND_MAX = 8;
     private static final int LINE_HOLD_TICKS = 70;
@@ -111,6 +118,18 @@ public final class MainQuest12LoopTrap
         {
             return;
         }
+        double x = player.getX();
+        double z = player.getZ();
+        if (state.hasSample)
+        {
+            double dx = x - state.lastSampleX;
+            double dz = z - state.lastSampleZ;
+            // 站着不动不记点：否则缓冲被同一个坐标填满，折返点就是脚下、传了等于没传。
+            if (dx * dx + dz * dz < SAMPLE_MIN_MOVE * SAMPLE_MIN_MOVE)
+            {
+                return;
+            }
+        }
         Vec3 pos = player.position();
         state.trailX[state.trailWrite] = pos.x;
         state.trailY[state.trailWrite] = pos.y;
@@ -120,6 +139,9 @@ public final class MainQuest12LoopTrap
         {
             state.trailCount++;
         }
+        state.lastSampleX = x;
+        state.lastSampleZ = z;
+        state.hasSample = true;
     }
 
     private static boolean tryRewind(
@@ -140,6 +162,13 @@ public final class MainQuest12LoopTrap
         double x = state.trailX[index];
         double y = state.trailY[index];
         double z = state.trailZ[index];
+        // 折返点太近就这次不触发（不消耗次数、不播台词），等玩家走动到有位移再放。
+        double nearX = x - player.getX();
+        double nearZ = z - player.getZ();
+        if (nearX * nearX + nearZ * nearZ < MIN_REWIND_DISTANCE * MIN_REWIND_DISTANCE)
+        {
+            return false;
+        }
         if (villageCenter != null)
         {
             double dx = x - villageCenter.x;
@@ -182,5 +211,8 @@ public final class MainQuest12LoopTrap
         boolean planned;
         int plannedTriggers;
         final int[] plannedTriggerTicks = new int[MAX_TRIGGERS];
+        double lastSampleX;
+        double lastSampleZ;
+        boolean hasSample;
     }
 }

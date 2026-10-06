@@ -135,7 +135,9 @@ public final class QuestCodCaptionOverlay
         {
             return;
         }
-        if (QuestBlackoutOverlay.isActive() || QuestCinematicLetterboxOverlay.isActive())
+        if (QuestBlackoutOverlay.isActive()
+                || QuestCinematicLetterboxOverlay.isActive()
+                || QuestRedBlackoutOverlay.isActive())
         {
             return;
         }
@@ -143,13 +145,13 @@ public final class QuestCodCaptionOverlay
     }
 
     /**
-     * 眨眼遮罩画在 {@link RenderGuiEvent.Post} 上，会盖住 {@link TickEvent.RenderTickEvent} 里的字幕。
-     * 眨眼进行时在 GUI 最上层再画一遍 COD，保证对白不被眼皮挡住。
+     * 红黑遮罩 / 醒来眨眼会盖住 {@link TickEvent.RenderTickEvent} 里的字幕；
+     * 在 {@link RenderGuiEvent.Post} 最上层再画一遍 COD，保证对白压在遮罩之上。
      */
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onRenderGui(RenderGuiEvent.Post event)
     {
-        if (!QuestWakeBlinkOverlay.isActive())
+        if (!QuestWakeBlinkOverlay.isActive() && !QuestRedBlackoutOverlay.isActive())
         {
             return;
         }

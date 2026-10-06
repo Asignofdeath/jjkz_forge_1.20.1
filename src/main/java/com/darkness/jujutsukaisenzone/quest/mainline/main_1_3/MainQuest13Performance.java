@@ -64,6 +64,9 @@ public final class MainQuest13Performance
     // ==================== 阶段 1：红屏→黑屏 ====================
     /** 黑屏期铺陈昏迷节奏（不少于红屏渐变时长）。 */
     private static final int BLACKOUT_TICKS = 40;
+    /** 1.2→1.3 红黑幕期间三级咒灵甲残响（与 {@link #BLACKOUT_TICKS} 同长）。 */
+    private static final String BLACKOUT_CURSE_KEY = "quest.jujutsukaisenzone.main_1_2.blackout.1";
+    private static final int BLACKOUT_CURSE_HOLD_TICKS = 80;
 
     /** 看向五条悟时的头部高度偏移（格），与 1.1 小屋对话对成人演员的口径一致。 */
     private static final double GOJO_LOOK_HEAD_Y = 1.4D;
@@ -201,7 +204,12 @@ public final class MainQuest13Performance
         // Epic Fight 倒地只驱动战斗模式骨架；先切战斗模式，倒地与 cmdcam 同一拍再播（同 falltest）。
         EpicFightCompat.setBattleMode(player, true);
         beginCgLookAtGojo(player, session);
+        NetworkSenders.toPlayer(player, SyncQuestCodCaptionsS2CPacket.clearImmediate());
         NetworkSenders.toPlayer(player, SyncQuestRedBlackoutS2CPacket.show());
+        NetworkSenders.toPlayer(player, SyncQuestCodCaptionsS2CPacket.playUniform(
+                new String[] {BLACKOUT_CURSE_KEY},
+                0,
+                BLACKOUT_CURSE_HOLD_TICKS));
 
         // 阶段 2 起：黑屏保持
         session.phase = Phase.BLACKOUT_HOLD;
@@ -228,6 +236,12 @@ public final class MainQuest13Performance
             EpicFightCompat.setBattleMode(player, session.wasEpicFightMode);
             unfreezeCurses(session);
             session.gojoSwapLock = false;
+            // 中断落在 2 秒窗口内时也要把 AI 放回去，别让实体停在 noAi。
+            if (session.level != null && session.gojoEntityId != null
+                    && session.level.getEntity(session.gojoEntityId) instanceof Mob gojo)
+            {
+                gojo.setNoAi(false);
+            }
         }
     }
 
@@ -247,7 +261,7 @@ public final class MainQuest13Performance
         session.ticks++;
         // 芝诺墙：挡住圈内非白名单生物与飞行物（白名单 = 本场玩家、五条悟）。
         tickZenoWall(player, session);
-        // 五条悟实体登场锁：生成后 2 秒内硬锁朝向 + 移动（详见 tickGojoSwapLock）。
+        // 五条悟实体登场锁：生成后 2 秒内暂停 AI + 硬锁朝向 + 硬锁移动（详见 tickGojoSwapLock）。
         tickGojoSwapLock(session);
         // 阶段 3：Geo 演员 stand_up_and_protect 起播 3 秒后，切 look_back 段。
         tickGojoActorLookBack(player, session);
@@ -290,6 +304,7 @@ public final class MainQuest13Performance
                 px, session.originPos.y, pz, gx, gz));
         session.gojoFeetY = gy;
         // 先眨眼（从全闭接上红黑幕），再撤红黑，避免闪一帧实景。对白等睁眼后再播。
+        NetworkSenders.toPlayer(player, SyncQuestCodCaptionsS2CPacket.fadeAll());
         NetworkSenders.toPlayer(player, SyncQuestWakeBlinkS2CPacket.play());
         NetworkSenders.toPlayer(player, SyncQuestRedBlackoutS2CPacket.clear());
         advance(session, Phase.WAKE_BLINK);
@@ -447,11 +462,11 @@ public final class MainQuest13Performance
 
     /**
      * 五条悟实体「登场锁」：从 {@link #buildDomain} 生成 {@link GojoSatoruEntity} 那一刻起，
-     * 连续 {@link #GOJO_SWAP_LOCK_TICKS} 刻（2 秒）硬锁<b>朝向</b> + 硬锁<b>移动</b>，
+     * 连续 {@link #GOJO_SWAP_LOCK_TICKS} 刻（2 秒）<b>暂停 AI</b>，并硬锁<b>朝向</b> + 硬锁<b>移动</b>，
      * 压住蓄力 / 结印期的乱动乱转。
      * <p>
      * 锁朝向 = Geo 演员消失时的朝向（{@code buildDomain} 里的 {@code yaw}），不是面向玩家。
-     * 每 tick 复写位置 / 朝向并标记同步，抵抗同 tick 内其它系统的位姿改写；到点即置
+     * 每 tick 复写位置 / 朝向并标记同步，抵抗同 tick 内其它系统的位姿改写；到点恢复 AI 并置
      * {@code gojoSwapLock=false} 放手，<b>不干预</b>领域后续自己的强制朝向。
      */
     private static void tickGojoSwapLock(Session session)
@@ -461,16 +476,23 @@ public final class MainQuest13Performance
         {
             return;
         }
+        Entity raw = session.level.getEntity(session.gojoEntityId);
+        Mob gojo = raw instanceof Mob mob ? mob : null;
         if (session.ticks - session.gojoSwapLockStart >= GOJO_SWAP_LOCK_TICKS)
         {
             session.gojoSwapLock = false;
+            if (gojo != null)
+            {
+                gojo.setNoAi(false);
+            }
             return;
         }
-        Entity raw = session.level.getEntity(session.gojoEntityId);
-        if (!(raw instanceof LivingEntity gojo))
+        if (gojo == null)
         {
             return;
         }
+        // 暂停 AI：与位姿锁同一个 2 秒窗口。
+        gojo.setNoAi(true);
         // 锁移动：速度清零 + 每 tick 拉回锚点，并标记同步。
         gojo.setDeltaMovement(Vec3.ZERO);
         gojo.hasImpulse = true;

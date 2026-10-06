@@ -18,7 +18,8 @@ import net.minecraftforge.fml.common.Mod;
  * 与 {@link QuestBlackoutOverlay} 的区别：后者是纯黑开场旁白；本层是红→黑的「受创」遮罩，
  * 红屏必须硬切（0 帧就满屏红），随后线性/平滑过渡到黑并保持全黑，直到服务端显式清除。
  * <p>
- * 屏幕空间全屏矩形，画在所有 HUD 之上；绘制路径对齐 {@link QuestBlackoutOverlay}。
+ * 屏幕空间全屏矩形；{@link RenderGuiEvent.Post} {@link EventPriority#HIGHEST} 先画，
+ * 再由 {@link QuestCodCaptionOverlay} 在同一事件 {@link EventPriority#LOWEST} 把字幕盖在遮罩之上。
  */
 @Mod.EventBusSubscriber(modid = JuJutsuKaisenZone.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE, value = Dist.CLIENT)
 public final class QuestRedBlackoutOverlay
@@ -68,7 +69,7 @@ public final class QuestRedBlackoutOverlay
         }
     }
 
-    @SubscribeEvent(priority = EventPriority.LOWEST)
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onRenderGui(RenderGuiEvent.Post event)
     {
         if (!active)
