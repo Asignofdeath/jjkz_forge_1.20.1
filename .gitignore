@@ -36,6 +36,7 @@ javac_*.log
 ldlib.mixins.json
 ldlib-common.mixins.json
 /assets/ldlib/
+src/main/resources/assets/ldlib/
 tools/_tmp*
 
 # Files from Forge MDK
