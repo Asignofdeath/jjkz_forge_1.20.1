@@ -375,5 +375,13 @@
         "stream": true
       }
     ]
+  },
+  "music.dj_boss": {
+    "sounds": [
+      {
+        "name": "jujutsukaisenzone:music/dj_boss",
+        "stream": true
+      }
+    ]
   }
 }

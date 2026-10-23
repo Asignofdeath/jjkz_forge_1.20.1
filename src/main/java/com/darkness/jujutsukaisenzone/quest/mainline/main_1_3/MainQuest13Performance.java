@@ -5,6 +5,8 @@ import com.darkness.jujutsukaisenzone.compat.EpicFightCompat;
 import com.darkness.jujutsukaisenzone.entity.CutsceneActorEntity;
 import com.darkness.jujutsukaisenzone.entity.GojoSatoruEntity;
 import com.darkness.jujutsukaisenzone.entity.Grade3CurseSpiritAEntity;
+import com.darkness.jujutsukaisenzone.music.ModMusic;
+import com.darkness.jujutsukaisenzone.music.MusicPriority;
 import com.darkness.jujutsukaisenzone.network.ModNetwork;
 import com.darkness.jujutsukaisenzone.network.NetworkSenders;
 import com.darkness.jujutsukaisenzone.network.packet.MainQuest13CmdCamS2CPacket;
@@ -164,6 +166,14 @@ public final class MainQuest13Performance
      */
     private static final int GOJO_SWAP_LOCK_TICKS = 40;
 
+    /** 追踪开始后第 3 秒起播剧情曲。 */
+    private static final int TRACK_MUSIC_DELAY_TICKS = 60;
+    private static final String TRACK_MUSIC_ID = "dj_boss";
+    private static final float TRACK_MUSIC_VOLUME = 0.3F;
+    private static final int TRACK_MUSIC_DURATION_MS = 60_000;
+    private static final int TRACK_MUSIC_FADE_IN_MS = 2_000;
+    private static final int TRACK_MUSIC_FADE_OUT_MS = 2_000;
+
     private static final Map<UUID, Session> SESSIONS = new ConcurrentHashMap<>();
 
     private MainQuest13Performance()
@@ -228,6 +238,7 @@ public final class MainQuest13Performance
         NetworkSenders.toPlayer(player, SyncCgLookClampS2CPacket.clear());
         NetworkSenders.toPlayer(player, SyncQuestCodCaptionsS2CPacket.clearImmediate());
         NetworkSenders.toPlayer(player, SyncQuestWakeBlinkS2CPacket.clear());
+        ModMusic.stopIf(player, MusicPriority.STORY, 0);
         ModNetwork.sendPlayerInputLockSync(player, false);
         player.setInvisible(false);
         MainQuest13Actors.despawnFor(player);
@@ -259,6 +270,7 @@ public final class MainQuest13Performance
         PlayerCgLock.tick(player);
 
         session.ticks++;
+        maybePlayTrackMusic(player, session);
         // 芝诺墙：挡住圈内非白名单生物与飞行物（白名单 = 本场玩家、五条悟）。
         tickZenoWall(player, session);
         // 五条悟实体登场锁：生成后 2 秒内暂停 AI + 硬锁朝向 + 硬锁移动（详见 tickGojoSwapLock）。
@@ -274,6 +286,25 @@ public final class MainQuest13Performance
             case SWAP_MODEL -> tickSwapModel(player, session);
             case DOMAIN -> tickDomain(player, session);
         }
+    }
+
+    /** 追踪开始后第 3 秒：小音量播 dj_boss，1 分钟。 */
+    private static void maybePlayTrackMusic(ServerPlayer player, Session session)
+    {
+        if (session.trackMusicStarted || session.ticks < TRACK_MUSIC_DELAY_TICKS)
+        {
+            return;
+        }
+        session.trackMusicStarted = true;
+        ModMusic.play(
+                player,
+                TRACK_MUSIC_ID,
+                MusicPriority.STORY,
+                false,
+                TRACK_MUSIC_FADE_IN_MS,
+                TRACK_MUSIC_VOLUME,
+                TRACK_MUSIC_DURATION_MS,
+                TRACK_MUSIC_FADE_OUT_MS);
     }
 
     // ==================== 阶段推进 ====================
@@ -956,6 +987,7 @@ public final class MainQuest13Performance
         int phaseStartTick;
         /** 布景失败时置 false，阻止继续推进。 */
         boolean running = true;
+        boolean trackMusicStarted;
         boolean blindfoldStarted;
         @Nullable Vec3 originPos;
         float originYaw;

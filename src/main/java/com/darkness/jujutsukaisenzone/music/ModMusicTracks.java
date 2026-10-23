@@ -39,6 +39,12 @@ public final class ModMusicTracks
                 "music.jujutsukaisenzone.leisurely_and_carefree.title",
                 "music.jujutsukaisenzone.leisurely_and_carefree.source",
                 false);
+        register(
+                "dj_boss",
+                "music/dj_boss",
+                "music.jujutsukaisenzone.dj_boss.title",
+                "music.jujutsukaisenzone.dj_boss.source",
+                false);
     }
 
     private ModMusicTracks()

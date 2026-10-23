@@ -566,6 +566,8 @@
   "message.jujutsukaisenzone.music.empty": "Music library is empty.",
   "music.jujutsukaisenzone.leisurely_and_carefree.title": "Leisurely and Carefree",
   "music.jujutsukaisenzone.leisurely_and_carefree.source": "乌鸦Producer",
+  "music.jujutsukaisenzone.dj_boss.title": "DJ Boss",
+  "music.jujutsukaisenzone.dj_boss.source": "乌鸦Producer",
   "message.jujutsukaisenzone.skill_unlock.active_not_max_level": "Linked active skill is not max level",
   "message.jujutsukaisenzone.skill_upgrade.success": "Skill upgraded",
   "message.jujutsukaisenzone.skill_upgrade.already_max": "Skill is already max level",
