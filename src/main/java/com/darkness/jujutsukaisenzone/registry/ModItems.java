@@ -253,6 +253,24 @@ public final class ModItems
             () -> new CursedObjectItem(new Item.Properties().stacksTo(64), "损坏的皮质手表", CursedObjectGrade.COMMON)
     );
 
+    /** 咒物：鉛の入った腰当て（通用 SE「生命抬切痕上限」载体） */
+    public static final RegistryObject<Item> CURSED_OBJECT_LEAD_WAIST_GUARD = ITEMS.register(
+            "cursed_object_lead_waist_guard",
+            () -> new CursedObjectItem(new Item.Properties().stacksTo(64), "灌铅的护腰", CursedObjectGrade.COMMON)
+    );
+
+    /** 咒物：きれいなガーゼ（通用 SE「切痕快愈」载体） */
+    public static final RegistryObject<Item> CURSED_OBJECT_CLEAN_GAUZE_ROLL = ITEMS.register(
+            "cursed_object_clean_gauze_roll",
+            () -> new CursedObjectItem(new Item.Properties().stacksTo(64), "干净的纱布卷", CursedObjectGrade.COMMON)
+    );
+
+    /** 咒物：焦げた止血綿（通用 SE「断肢不流血」载体） */
+    public static final RegistryObject<Item> CURSED_OBJECT_CAUTERIZED_COTTON = ITEMS.register(
+            "cursed_object_cauterized_cotton",
+            () -> new CursedObjectItem(new Item.Properties().stacksTo(64), "烧焦的止血棉", CursedObjectGrade.COMMON)
+    );
+
     /** 咒物：両面宿儺の指 */
     public static final RegistryObject<Item> CURSED_OBJECT_SUKUNA_FINGER = ITEMS.register(
             "cursed_object_sukuna_finger",

@@ -66,6 +66,9 @@ public enum JjkzCreativeTabCategory
                     ModItems.CURSED_OBJECT_PROOF_OF_THE_STRONGEST,
                     ModItems.CURSED_OBJECT_FILLED_TIMESHEET,
                     ModItems.CURSED_OBJECT_DAMAGED_LEATHER_WATCH,
+                    ModItems.CURSED_OBJECT_LEAD_WAIST_GUARD,
+                    ModItems.CURSED_OBJECT_CLEAN_GAUZE_ROLL,
+                    ModItems.CURSED_OBJECT_CAUTERIZED_COTTON,
                     ModItems.CURSED_OBJECT_SUKUNA_FINGER
             ));
 

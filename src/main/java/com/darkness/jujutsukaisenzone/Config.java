@@ -3,6 +3,8 @@ package com.darkness.jujutsukaisenzone;
 import com.darkness.jujutsukaisenzone.config.CfgSpec;
 import com.darkness.jujutsukaisenzone.config.ConfigFileLayer;
 import com.darkness.jujutsukaisenzone.entity.data.LimitlessBlueConfig;
+import com.darkness.jujutsukaisenzone.entity.data.BlackHoleSkillConfig;
+import com.darkness.jujutsukaisenzone.entity.data.LimitlessBlueStrangleConfig;
 import com.darkness.jujutsukaisenzone.entity.data.LimitlessRedConfig;
 import com.darkness.jujutsukaisenzone.entity.data.LimitlessRemoteMurasakiConfig;
 import com.darkness.jujutsukaisenzone.entity.data.ShrineHachiConfig;
@@ -400,6 +402,32 @@ public class Config
             .defineInRange("skillCombat.limitlessBlue.pullRadiusPerRank",
                     LimitlessBlueConfig.PULL_RADIUS_PER_RANK, 0.0D, 10000.0D);
 
+    private static final CfgSpec.DoubleValue LIMITLESS_BLUE_STRANGLE_DAMAGE_BASELINE = BUILDER
+            .comment("苍之绞杀：每次伤害倍率（1.0=100% 术式强度）")
+            .defineInRange("skillCombat.limitlessBlueStrangle.damageBaseline",
+                    LimitlessBlueStrangleConfig.DAMAGE, 0.0D, 10000.0D);
+    private static final CfgSpec.DoubleValue LIMITLESS_BLUE_STRANGLE_DAMAGE_PER_RANK = BUILDER
+            .comment("苍之绞杀：伤害倍率每升一级咒术等级的增量（强度面板开启时通常为 0）")
+            .defineInRange("skillCombat.limitlessBlueStrangle.damagePerRank",
+                    LimitlessBlueStrangleConfig.DAMAGE_PER_RANK, 0.0D, 10000.0D);
+
+    private static final CfgSpec.DoubleValue LIMITLESS_DARK_STAR_SCRATCH_DAMAGE_BASELINE = BUILDER
+            .comment("极之番——暗星：飞行擦伤倍率（1.0=100% 术式强度）")
+            .defineInRange("skillCombat.limitlessDarkStar.scratchDamageBaseline",
+                    BlackHoleSkillConfig.SCRATCH_DAMAGE, 0.0D, 10000.0D);
+    private static final CfgSpec.DoubleValue LIMITLESS_DARK_STAR_SCRATCH_DAMAGE_PER_RANK = BUILDER
+            .comment("极之番——暗星：飞行擦伤倍率每升一级咒术等级的增量（强度面板开启时通常为 0）")
+            .defineInRange("skillCombat.limitlessDarkStar.scratchDamagePerRank",
+                    BlackHoleSkillConfig.SCRATCH_DAMAGE_PER_RANK, 0.0D, 10000.0D);
+    private static final CfgSpec.DoubleValue LIMITLESS_DARK_STAR_DAMAGE_BASELINE = BUILDER
+            .comment("极之番——暗星：驻留坍缩每跳伤害倍率（1.0=100% 术式强度）")
+            .defineInRange("skillCombat.limitlessDarkStar.damageBaseline",
+                    BlackHoleSkillConfig.DAMAGE, 0.0D, 10000.0D);
+    private static final CfgSpec.DoubleValue LIMITLESS_DARK_STAR_DAMAGE_PER_RANK = BUILDER
+            .comment("极之番——暗星：驻留伤害倍率每升一级咒术等级的增量（强度面板开启时通常为 0）")
+            .defineInRange("skillCombat.limitlessDarkStar.damagePerRank",
+                    BlackHoleSkillConfig.DAMAGE_PER_RANK, 0.0D, 10000.0D);
+
     private static final CfgSpec.DoubleValue LIMITLESS_RED_EXPLOSION_POWER_BASELINE = BUILDER
             .comment("赫：爆炸威力基准值")
             .defineInRange("skillCombat.limitlessRed.explosionPowerBaseline",
@@ -519,6 +547,12 @@ public class Config
     public static double limitlessBlueDamagePerRank;
     public static double limitlessBluePullRadiusBaseline;
     public static double limitlessBluePullRadiusPerRank;
+    public static double limitlessBlueStrangleDamageBaseline;
+    public static double limitlessBlueStrangleDamagePerRank;
+    public static double limitlessDarkStarScratchDamageBaseline;
+    public static double limitlessDarkStarScratchDamagePerRank;
+    public static double limitlessDarkStarDamageBaseline;
+    public static double limitlessDarkStarDamagePerRank;
     public static double limitlessRedExplosionPowerBaseline;
     public static double limitlessRedExplosionPowerPerRank;
     public static double limitlessRedKnockbackRadiusBaseline;
@@ -669,6 +703,12 @@ public class Config
         limitlessBlueDamagePerRank = LIMITLESS_BLUE_DAMAGE_PER_RANK.get();
         limitlessBluePullRadiusBaseline = LIMITLESS_BLUE_PULL_RADIUS_BASELINE.get();
         limitlessBluePullRadiusPerRank = LIMITLESS_BLUE_PULL_RADIUS_PER_RANK.get();
+        limitlessBlueStrangleDamageBaseline = LIMITLESS_BLUE_STRANGLE_DAMAGE_BASELINE.get();
+        limitlessBlueStrangleDamagePerRank = LIMITLESS_BLUE_STRANGLE_DAMAGE_PER_RANK.get();
+        limitlessDarkStarScratchDamageBaseline = LIMITLESS_DARK_STAR_SCRATCH_DAMAGE_BASELINE.get();
+        limitlessDarkStarScratchDamagePerRank = LIMITLESS_DARK_STAR_SCRATCH_DAMAGE_PER_RANK.get();
+        limitlessDarkStarDamageBaseline = LIMITLESS_DARK_STAR_DAMAGE_BASELINE.get();
+        limitlessDarkStarDamagePerRank = LIMITLESS_DARK_STAR_DAMAGE_PER_RANK.get();
         limitlessRedExplosionPowerBaseline = LIMITLESS_RED_EXPLOSION_POWER_BASELINE.get();
         limitlessRedExplosionPowerPerRank = LIMITLESS_RED_EXPLOSION_POWER_PER_RANK.get();
         limitlessRedKnockbackRadiusBaseline = LIMITLESS_RED_KNOCKBACK_RADIUS_BASELINE.get();

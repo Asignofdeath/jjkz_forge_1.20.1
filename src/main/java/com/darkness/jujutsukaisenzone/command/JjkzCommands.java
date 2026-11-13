@@ -3,6 +3,7 @@ package com.darkness.jujutsukaisenzone.command;
 import com.darkness.jujutsukaisenzone.effect.RushIntoTheZoneClimaxEffect;
 import com.darkness.jujutsukaisenzone.JuJutsuKaisenZone;
 import com.darkness.jujutsukaisenzone.advancement.HeavenlyRestrictionAdvancements;
+import com.darkness.jujutsukaisenzone.entity.BlackHoleEntity;
 import com.darkness.jujutsukaisenzone.entity.DemonSubduingShrineEntity;
 import com.darkness.jujutsukaisenzone.entity.JujutsuCouncilStaffEntity;
 import com.darkness.jujutsukaisenzone.entity.SpecialEffectEntity;
@@ -78,6 +79,7 @@ import java.util.UUID;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.EntityArgument;
+import com.mojang.brigadier.arguments.FloatArgumentType;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
@@ -207,6 +209,7 @@ public final class JjkzCommands
                         .then(buildDomainExpansionCheatBranch())
                         .then(buildTenShadowsCheatBranch())
                         .then(buildSpecialEffectBranch())
+                        .then(buildBlackholeABranch())
                         .then(buildLivingEntityBranch())
                         .then(buildDemonSubduingShrineBranch())
                         .then(buildTengenWedgeBranch())
@@ -907,6 +910,36 @@ public final class JjkzCommands
             return 0;
         }
         source.sendSuccess(() -> Component.literal("已召唤 " + id + "。"), true);
+        return 1;
+    }
+
+    /** 召唤黑洞_A：{@code /jjkz summonBlackholeA [史瓦西半径]}，纯视觉演示 */
+    private static LiteralArgumentBuilder<CommandSourceStack> buildBlackholeABranch()
+    {
+        return Commands.literal("summonBlackholeA")
+                .requires(source -> source.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                .executes(ctx -> executeSummonBlackholeA(ctx.getSource(), 3.0F))
+                .then(Commands.argument("schwarzschildRadius", FloatArgumentType.floatArg(0.1F, 20.0F))
+                        .executes(ctx -> executeSummonBlackholeA(ctx.getSource(),
+                                FloatArgumentType.getFloat(ctx, "schwarzschildRadius"))));
+    }
+
+    private static int executeSummonBlackholeA(CommandSourceStack source, float schwarzschildRadius)
+    {
+        ServerLevel level = source.getLevel();
+        Vec3 pos = source.getPosition();
+
+        BlackHoleEntity entity = ModEntities.BLACK_HOLE_A.get().create(level);
+        if (entity == null)
+        {
+            source.sendFailure(Component.literal("召唤失败：黑洞_A 实体创建失败。"));
+            return 0;
+        }
+
+        entity.moveTo(pos.x, pos.y, pos.z, source.getRotation().y, 0.0F);
+        entity.setSchwarzschildRadius(schwarzschildRadius);
+        level.addFreshEntity(entity);
+        source.sendSuccess(() -> Component.literal("已召唤黑洞_A（史瓦西半径 " + schwarzschildRadius + " 格）。"), true);
         return 1;
     }
 

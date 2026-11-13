@@ -1,53 +1,127 @@
 """全工程 javac 静态检查：不跑 gradlew、不写 build/，classpath 从 gradle 缓存现场拼。
 
+机器无关：PROJECT 取本脚本所在项目的根目录；gradle 缓存取当前用户 ~\\.gradle。
+classpath 两条铁律（2026-10-24 修噪音）：
+  1. 含 .java 条目的 jar 一律跳过（ForgeGradle deobf 依赖可能混进纯源码 jar，
+     javac 会隐式编译它们，把依赖模组内部访问 MC 私有成员的错全算到本工程头上）。
+  2. 同一构件（artifact）只留版本最新的一份（新旧 LDLib 同 classpath 时
+     javac 认旧版，会出现「新版才有方法」的假性找不到符号）。
+
 输出是 GBK，必须按 GBK 解码后再统计（否则 grep 中文关键字会静默失败）。
 """
 import collections
 import os
 import re
 import subprocess
+import sys
+import tempfile
 import zipfile
 
-PROJECT = r'C:\D\MineMOD\JuJutsuKaisenZone_forge-1.20.1'
-KEEP = (r'C:\Users\19316\.gradle\caches\forge_gradle\minecraft_user_repo\net\minecraftforge'
-        r'\forge\1.20.1-47.4.10_mapped_official_1.20.1'
-        r'\forge-1.20.1-47.4.10_mapped_official_1.20.1.jar')
-roots = [r'C:\Users\19316\.gradle\caches\forge_gradle',
-         r'C:\Users\19316\.gradle\caches\modules-2\files-2.1']
+PROJECT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+GRADLE_HOME = os.path.join(os.path.expanduser('~'), '.gradle')
+ROOTS = [os.path.join(GRADLE_HOME, 'caches', 'forge_gradle'),
+         os.path.join(GRADLE_HOME, 'caches', 'modules-2', 'files-2.1')]
+KEEP_GLOB = os.path.join(GRADLE_HOME, 'caches', 'forge_gradle', 'minecraft_user_repo',
+                         'net', 'minecraftforge', 'forge',
+                         '*', 'forge-*_mapped_official_1.20.1.jar')
+TMP = tempfile.gettempdir()
 
-jars = []
-for root in roots:
+
+def version_sort_key(ver):
+    """从版本段提取可排序 key：'7809449_mapped_official_1.20.1' ->
+    ((7809449,), official) ；'20.14.16-mc1.20.1-forge_mapped_...' -> ((20,14,16,1,20,1,forge), official)。"""
+    mapping = 1 if '_mapped_official' in ver else 0
+    core = ver.split('_mapped')[0]
+    parts = re.findall(r'[A-Za-z]+|\d+', core)
+    key = tuple(int(p) if p.isdigit() else p for p in parts)
+    # 混元组比较：统一转成 (int|str) 序列，数字段前加 0 / 字符串段前加 1 保证可比较
+    norm = tuple((0, p) if isinstance(p, int) else (1, p) for p in key)
+    return (norm, mapping)
+
+
+def artifact_key(path):
+    """仅对 deobf_dependencies 内的 jar 返回 (artifact, version)；其余路径 → None。
+    结构：deobf_dependencies/<flavor>/<maven>/<artifact>/<version _mapped ...>/<file>"""
+    norm = path.replace('\\', '/')
+    if 'deobf_dependencies/' not in norm:
+        return None
+    rel = norm.split('deobf_dependencies/')[1].split('/')
+    if len(rel) >= 4:
+        return rel[-3], rel[-2]
+    return None
+
+
+def jar_has_sources(path):
+    try:
+        with zipfile.ZipFile(path) as z:
+            for n in z.namelist():
+                if n.endswith('.java'):
+                    return True
+    except Exception:
+        pass
+    return False
+
+
+def contains_minecraft(path):
+    try:
+        return 'net/minecraft/network/chat/Component.class' in zipfile.ZipFile(path).namelist()
+    except Exception:
+        return False
+
+
+keep = [p for p in __import__('glob').glob(KEEP_GLOB)]
+if not keep:
+    print('!! 找不到 forge mapped jar：', KEEP_GLOB)
+    sys.exit(2)
+
+candidates = [keep[0]]
+for root in ROOTS:
     for dp, dn, fn in os.walk(root):
         for f in fn:
             if not f.endswith('.jar') or '-sources' in f or '-javadoc' in f:
                 continue
             p = os.path.join(dp, f)
+            if os.path.normcase(p) == os.path.normcase(keep[0]):
+                continue
             if 'mergeMappings' in p or os.path.getsize(p) < 2000:
                 continue
-            if os.path.normcase(p) == os.path.normcase(KEEP):
-                jars.append(p)
-                continue
-            try:
-                if 'net/minecraft/network/chat/Component.class' in zipfile.ZipFile(p).namelist():
-                    continue
-            except Exception:
-                pass
-            jars.append(p)
-jars = [KEEP] + [j for j in jars if j != KEEP]
+            candidates.append(p)
+
+# 过滤：deobf_dependencies 内（1）含 .java 的纯源码 jar 跳过；（2）同构件只留最新版（official 优先）。
+# 其余缓存（modules-2、minecraft_user_repo 等）结构不可靠，原样全收。
+best = {}
+tail = []
+for p in candidates:
+    key = artifact_key(p)
+    if key is None:
+        if contains_minecraft(p):
+            continue
+        tail.append(p)
+        continue
+    if jar_has_sources(p):
+        continue
+    art, ver = key
+    k = version_sort_key(ver)
+    cur = best.get(art)
+    if cur is None or k > cur[0]:
+        best[art] = (k, p)
+jars = [keep[0]] + [v[1] for v in best.values()] + tail
 
 src_root = os.path.join(PROJECT, 'src', 'main', 'java')
 srcs = [os.path.join(dp, f).replace('\\', '/')
         for dp, dn, fn in os.walk(src_root) for f in fn if f.endswith('.java')]
 
-argf = 'C:/Users/19316/AppData/Local/Temp/jjkz_args.txt'
+argf = os.path.join(TMP, 'jjkz_args.txt')
+outdir = os.path.join(TMP, 'jjkz_check_out')
+os.makedirs(outdir, exist_ok=True)
 with open(argf, 'w', encoding='utf-8') as fh:
     fh.write('-encoding UTF-8\n-proc:none\n-nowarn\n-Xmaxerrs 10000\n')
-    fh.write('-d "C:/Users/19316/AppData/Local/Temp/jjkz_check_out"\n')
+    fh.write('-d "%s"\n' % outdir.replace('\\', '/'))
     fh.write('-cp "%s"\n' % ';'.join(x.replace('\\', '/') for x in jars))
     for s in srcs:
         fh.write('"%s"\n' % s)
 
-print('srcs =', len(srcs), 'jars =', len(jars))
+print('srcs =', len(srcs), 'jars =', len(jars), '(候选', len(candidates), ')')
 p = subprocess.run(['javac', '@' + argf], capture_output=True)
 raw = p.stdout.decode('gbk', errors='replace') + p.stderr.decode('gbk', errors='replace')
 print('exit =', p.returncode)
@@ -65,6 +139,15 @@ for k, v in kinds.most_common(20):
     print(v, '|', k)
 for k, v in files.most_common(20):
     print(v, '|', k)
+if raw.strip() and sum(kinds.values()):
+    print('---- 错误原文（前 60 行）----')
+    shown = 0
+    for line in raw.splitlines():
+        if '错误' in line:
+            print(line)
+            shown += 1
+            if shown >= 60:
+                break
 
 # ---- 守卫：skillCombat 配置常量旁路 ----
 # 下面这些常量是 Forge 配置项（config/jujutsukaisenzone-common.toml 的 [skillCombat] 段）的

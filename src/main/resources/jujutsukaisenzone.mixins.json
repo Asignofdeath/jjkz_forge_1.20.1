@@ -4,9 +4,9 @@
   "package": "com.darkness.jujutsukaisenzone.mixin",
   "compatibilityLevel": "JAVA_17",
   "refmap": "jujutsukaisenzone.refmap.json",
-  "plugin": "",
   "mixins": [
     "DamageSourceMixin",
+    "DismembermentEngineMixin",
     "RangedAttributeAccessor",
     "SetPathPacketMixin"
   ],
@@ -16,5 +16,7 @@
     "client.EntityTurnMixin",
     "client.MusicManagerMixin"
   ],
-  "server": []
+  "injectors": {
+    "defaultRequire": 1
+  }
 }

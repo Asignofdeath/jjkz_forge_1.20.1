@@ -2,6 +2,8 @@ package com.darkness.jujutsukaisenzone.technique.config;
 
 import com.darkness.jujutsukaisenzone.Config;
 import com.darkness.jujutsukaisenzone.entity.data.LimitlessBlueConfig;
+import com.darkness.jujutsukaisenzone.entity.data.BlackHoleSkillConfig;
+import com.darkness.jujutsukaisenzone.entity.data.LimitlessBlueStrangleConfig;
 import com.darkness.jujutsukaisenzone.entity.data.LimitlessRedConfig;
 import com.darkness.jujutsukaisenzone.entity.data.LimitlessRemoteMurasakiConfig;
 import com.darkness.jujutsukaisenzone.entity.data.ShrineHachiConfig;
@@ -42,6 +44,8 @@ import java.util.Map;
 public final class SkillCombatConfigRegistry
 {
     public static final String SKILL_LIMITLESS_BLUE = LimitlessTechniqueSkillSet.SKILL_BLUE;
+    public static final String SKILL_LIMITLESS_BLUE_STRANGLE = LimitlessTechniqueSkillSet.SKILL_BLUE_STRANGLE;
+    public static final String SKILL_LIMITLESS_DARK_STAR = LimitlessTechniqueSkillSet.SKILL_DARK_STAR;
     public static final String SKILL_LIMITLESS_RED = LimitlessTechniqueSkillSet.SKILL_RED;
     public static final String SKILL_LIMITLESS_REMOTE_PURPLE = LimitlessTechniqueSkillSet.SKILL_REMOTE_PURPLE;
     public static final String SKILL_SHRINE_KAI = ShrineTechniqueSkillSet.SKILL_KAI;
@@ -72,6 +76,16 @@ public final class SkillCombatConfigRegistry
         put(loaded, SKILL_LIMITLESS_BLUE,
                 stat("damage", Config.limitlessBlueDamageBaseline, Config.limitlessBlueDamagePerRank * perRankFactor, baselineGrade),
                 stat("pull_radius", Config.limitlessBluePullRadiusBaseline, Config.limitlessBluePullRadiusPerRank, baselineGrade));
+
+        put(loaded, SKILL_LIMITLESS_BLUE_STRANGLE,
+                stat("damage", Config.limitlessBlueStrangleDamageBaseline,
+                        Config.limitlessBlueStrangleDamagePerRank * perRankFactor, baselineGrade));
+
+        put(loaded, SKILL_LIMITLESS_DARK_STAR,
+                stat("scratch_damage", Config.limitlessDarkStarScratchDamageBaseline,
+                        Config.limitlessDarkStarScratchDamagePerRank * perRankFactor, baselineGrade),
+                stat("damage", Config.limitlessDarkStarDamageBaseline,
+                        Config.limitlessDarkStarDamagePerRank * perRankFactor, baselineGrade));
 
         put(loaded, SKILL_LIMITLESS_RED,
                 stat("explosion_power", Config.limitlessRedExplosionPowerBaseline, Config.limitlessRedExplosionPowerPerRank, baselineGrade),
@@ -143,6 +157,13 @@ public final class SkillCombatConfigRegistry
         put(map, SKILL_LIMITLESS_BLUE,
                 stat("damage", LimitlessBlueConfig.DAMAGE, LimitlessBlueConfig.DAMAGE_PER_RANK),
                 stat("pull_radius", LimitlessBlueConfig.PULL_RADIUS, LimitlessBlueConfig.PULL_RADIUS_PER_RANK));
+
+        put(map, SKILL_LIMITLESS_BLUE_STRANGLE,
+                stat("damage", LimitlessBlueStrangleConfig.DAMAGE, LimitlessBlueStrangleConfig.DAMAGE_PER_RANK));
+
+        put(map, SKILL_LIMITLESS_DARK_STAR,
+                stat("scratch_damage", BlackHoleSkillConfig.SCRATCH_DAMAGE, BlackHoleSkillConfig.SCRATCH_DAMAGE_PER_RANK),
+                stat("damage", BlackHoleSkillConfig.DAMAGE, BlackHoleSkillConfig.DAMAGE_PER_RANK));
 
         put(map, SKILL_LIMITLESS_RED,
                 stat("explosion_power", LimitlessRedConfig.ARROW_EXPLOSION_POWER,

@@ -16,6 +16,7 @@ import com.darkness.jujutsukaisenzone.registry.ModSounds;
 import com.darkness.jujutsukaisenzone.photon.OwnerOnlyShrineSlashFx;
 import com.darkness.jujutsukaisenzone.technique.TechniqueDamageSources;
 import com.darkness.jujutsukaisenzone.technique.scaling.ShrineDomainSkillGrowth;
+import com.darkness.jujutsukaisenzone.technique.skill.ShrineCutMarkLogic;
 import net.minecraft.ChatFormatting;
 import net.minecraft.advancements.Advancement;
 import net.minecraft.commands.CommandSourceStack;
@@ -1356,11 +1357,13 @@ public final class ShrineDomainExpansion extends AbstractTechniqueDomain
             return false;
         }
 
-        if (!TechniqueDamageSources.deal(target, owner, ShrineDomainSkillGrowth.slashDamage(owner),
-                "shrine_domain_slash"))
+        float damage = ShrineDomainSkillGrowth.slashDamage(owner);
+        if (!TechniqueDamageSources.deal(target, owner, damage, "shrine_domain_slash"))
         {
             return false;
         }
+        ShrineCutMarkLogic.applyRandomLimb(
+                owner, target, ShrineCutMarkLogic.DOMAIN_SLASH_BASE, damage);
 
         if (!target.isAlive())
         {
@@ -1376,11 +1379,13 @@ public final class ShrineDomainExpansion extends AbstractTechniqueDomain
             return false;
         }
 
-        if (!TechniqueDamageSources.deal(target, owner, ShrineDomainSkillGrowth.powerSlashDamage(owner),
-                "shrine_domain_power_slash"))
+        float damage = ShrineDomainSkillGrowth.powerSlashDamage(owner);
+        if (!TechniqueDamageSources.deal(target, owner, damage, "shrine_domain_power_slash"))
         {
             return false;
         }
+        ShrineCutMarkLogic.applyRandomLimb(
+                owner, target, ShrineCutMarkLogic.DOMAIN_POWER_SLASH_BASE, damage);
 
         if (!target.isAlive())
         {

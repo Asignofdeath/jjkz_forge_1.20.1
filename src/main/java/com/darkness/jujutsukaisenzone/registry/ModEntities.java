@@ -1,6 +1,7 @@
 package com.darkness.jujutsukaisenzone.registry;
 
 import com.darkness.jujutsukaisenzone.JuJutsuKaisenZone;
+import com.darkness.jujutsukaisenzone.entity.BlackHoleEntity;
 import com.darkness.jujutsukaisenzone.entity.ChubukushishiEntity;
 import com.darkness.jujutsukaisenzone.entity.CourtSeatEntity;
 import com.darkness.jujutsukaisenzone.entity.CutsceneActorEntity;
@@ -138,6 +139,16 @@ public final class ModEntities
                             .updateInterval(2)
                             .fireImmune()
                             .build("gojo_satoru"));
+
+    /** 黑洞_A（纯视觉演示：史瓦西黑洞，无物理作用） */
+    public static final RegistryObject<EntityType<BlackHoleEntity>> BLACK_HOLE_A =
+            ENTITY_TYPES.register("blackhole_a",
+                    () -> EntityType.Builder.<BlackHoleEntity>of(BlackHoleEntity::new, MobCategory.MISC)
+                            .sized(2.0F, 2.0F)
+                            .clientTrackingRange(32)
+                            .updateInterval(20)
+                            .fireImmune()
+                            .build("blackhole_a"));
 
     /** 三级咒灵甲（暂用尸壳模型占位） */
     public static final RegistryObject<EntityType<Grade3CurseSpiritAEntity>> GRADE_3_CURSE_SPIRIT_A =

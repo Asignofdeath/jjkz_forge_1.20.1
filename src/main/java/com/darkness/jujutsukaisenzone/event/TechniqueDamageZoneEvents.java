@@ -203,7 +203,7 @@ public final class TechniqueDamageZoneEvents
                 && type != null
                 && event.getAmount() > 0.0F)
         {
-            maybeForceRatioSpotCrit(critAttacker, target, type);
+            maybeForceRatioSpotCrit(critAttacker, target, type, event.getAmount());
             float afterCrit = CritRules.applyCritZone(
                     critAttacker, type, event.getAmount(), critAttacker.getRandom());
             if (Math.abs(afterCrit - event.getAmount()) > 0.0001F)
@@ -522,7 +522,8 @@ public final class TechniqueDamageZoneEvents
      * <p>
      * 副作用（已被接受）：本击不能暴击时不再击破弱点，光点保留给后续可暴击的一击。
      */
-    private static void maybeForceRatioSpotCrit(ServerPlayer attacker, LivingEntity target, SkillDamageType type)
+    private static void maybeForceRatioSpotCrit(
+            ServerPlayer attacker, LivingEntity target, SkillDamageType type, float hitDamage)
     {
         if (!PlayerTechniqueData.isRatio(attacker))
         {
@@ -532,7 +533,7 @@ public final class TechniqueDamageZoneEvents
         {
             return;
         }
-        if (RatioSpotLogic.tryBreakSpot(attacker, target))
+        if (RatioSpotLogic.tryBreakSpot(attacker, target, hitDamage))
         {
             CritRules.forceNext(attacker, RatioSpotLogic.forcedCritMult(attacker));
         }

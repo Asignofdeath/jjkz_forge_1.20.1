@@ -58,6 +58,9 @@ public final class ModCreativeTabEvents
         event.accept(ModItems.CURSED_OBJECT_PROOF_OF_THE_STRONGEST, CreativeModeTab.TabVisibility.SEARCH_TAB_ONLY);
         event.accept(ModItems.CURSED_OBJECT_FILLED_TIMESHEET, CreativeModeTab.TabVisibility.SEARCH_TAB_ONLY);
         event.accept(ModItems.CURSED_OBJECT_DAMAGED_LEATHER_WATCH, CreativeModeTab.TabVisibility.SEARCH_TAB_ONLY);
+        event.accept(ModItems.CURSED_OBJECT_LEAD_WAIST_GUARD, CreativeModeTab.TabVisibility.SEARCH_TAB_ONLY);
+        event.accept(ModItems.CURSED_OBJECT_CLEAN_GAUZE_ROLL, CreativeModeTab.TabVisibility.SEARCH_TAB_ONLY);
+        event.accept(ModItems.CURSED_OBJECT_CAUTERIZED_COTTON, CreativeModeTab.TabVisibility.SEARCH_TAB_ONLY);
         event.accept(ModItems.CURSED_OBJECT_SUKUNA_FINGER, CreativeModeTab.TabVisibility.SEARCH_TAB_ONLY);
         event.accept(ModItems.CURSED_ENERGY_JADE_CLANGOROUS, CreativeModeTab.TabVisibility.SEARCH_TAB_ONLY);
         event.accept(ModItems.CURSED_ENERGY_JADE_DENSE, CreativeModeTab.TabVisibility.SEARCH_TAB_ONLY);

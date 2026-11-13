@@ -2,11 +2,15 @@ package com.darkness.jujutsukaisenzone.technique.skillset;
 
 import com.darkness.jujutsukaisenzone.compat.EpicFightCompat;
 import com.darkness.jujutsukaisenzone.event.LimitlessPurpleShiftSpecialEvents;
+import com.darkness.jujutsukaisenzone.entity.BlackHoleEntity;
 import com.darkness.jujutsukaisenzone.entity.SpecialEffectEntity;
+import com.darkness.jujutsukaisenzone.entity.data.BlackHoleSkillConfig;
 import com.darkness.jujutsukaisenzone.entity.behavior.LimitlessBlueBehavior;
+import com.darkness.jujutsukaisenzone.entity.behavior.LimitlessBlueStrangleBehavior;
 import com.darkness.jujutsukaisenzone.entity.behavior.LimitlessPurpleBehavior;
 import com.darkness.jujutsukaisenzone.entity.behavior.LimitlessRedBehavior;
 import com.darkness.jujutsukaisenzone.entity.behavior.LimitlessRemoteMurasakiBehavior;
+import com.darkness.jujutsukaisenzone.entity.data.LimitlessBlueStrangleConfig;
 import com.darkness.jujutsukaisenzone.entity.data.LimitlessRemoteMurasakiConfig;
 import com.darkness.jujutsukaisenzone.player.BarrierTechniqueLevel;
 import com.darkness.jujutsukaisenzone.player.PlayerCursedEnergyData;
@@ -23,10 +27,12 @@ import com.darkness.jujutsukaisenzone.technique.development.TechniqueSkillTree;
 import com.darkness.jujutsukaisenzone.technique.development.UnlockCondition;
 import com.darkness.jujutsukaisenzone.technique.scaling.LimitlessPurpleSkillGrowth;
 import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.game.ClientboundStopSoundPacket;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
@@ -53,18 +59,28 @@ public final class LimitlessTechniqueSkillSet extends AbstractInnateTechniqueSki
     /** 茈普通释放 */
     private static final int SLOT_PURPLE_NORMAL = 3;
     private static final int SLOT_REMOTE_PURPLE = 4;
+    private static final int SLOT_BLUE_STRANGLE = 5;
+    /** 极之番——暗星（黑洞_A 时空坍缩体） */
+    private static final int SLOT_DARK_STAR = 6;
     private static final int BLUE_COST = 50;
+    private static final int BLUE_STRANGLE_COST = 80;
     private static final int RED_COST = 100;
     private static final int PURPLE_COST = 120;
     private static final int REMOTE_PURPLE_COST = 200;
+    private static final int DARK_STAR_COST = 150;
     private static final int BLUE_COOLDOWN_TICKS = 20 * 5;
+    private static final int BLUE_STRANGLE_COOLDOWN_TICKS = 20 * 12;
     private static final int RED_COOLDOWN_TICKS = 20 * 10;
     private static final int PURPLE_COOLDOWN_TICKS = 20 * 14;
     private static final int REMOTE_PURPLE_COOLDOWN_TICKS = 20 * 30;
+    private static final int DARK_STAR_COOLDOWN_TICKS = 20 * 20;
+    private static final double DARK_STAR_RANGE = 40.0D;
     private static final String TAG_LIMITLESS_UNLOCK_SLOT_1 = "jujutsukaisenzone_limitless_unlock_slot_1";
     private static final String TAG_LIMITLESS_UNLOCK_SLOT_2 = "jujutsukaisenzone_limitless_unlock_slot_2";
     private static final String TAG_LIMITLESS_UNLOCK_SLOT_3 = "jujutsukaisenzone_limitless_unlock_slot_3";
     private static final String TAG_LIMITLESS_UNLOCK_SLOT_4 = "jujutsukaisenzone_limitless_unlock_slot_4";
+    private static final String TAG_LIMITLESS_UNLOCK_SLOT_5 = "jujutsukaisenzone_limitless_unlock_slot_5";
+    private static final String TAG_LIMITLESS_UNLOCK_SLOT_6 = "jujutsukaisenzone_limitless_unlock_slot_6";
     /** Shift+1/2/3 变体招式解锁，与原槽位 {@link #TAG_LIMITLESS_UNLOCK_SLOT_1} 等无关。 */
     private static final String TAG_LIMITLESS_UNLOCK_VARIANT_SHIFT_SLOT_1 = "jujutsukaisenzone_limitless_unlock_variant_shift_slot_1";
     private static final String TAG_LIMITLESS_UNLOCK_VARIANT_SHIFT_SLOT_2 = "jujutsukaisenzone_limitless_unlock_variant_shift_slot_2";
@@ -73,10 +89,14 @@ public final class LimitlessTechniqueSkillSet extends AbstractInnateTechniqueSki
     private static final String TAG_LIMITLESS_LEVEL_SLOT_2 = "jujutsukaisenzone_limitless_level_slot_2";
     private static final String TAG_LIMITLESS_LEVEL_SLOT_3 = "jujutsukaisenzone_limitless_level_slot_3";
     private static final String TAG_LIMITLESS_LEVEL_SLOT_4 = "jujutsukaisenzone_limitless_level_slot_4";
+    private static final String TAG_LIMITLESS_LEVEL_SLOT_5 = "jujutsukaisenzone_limitless_level_slot_5";
+    private static final String TAG_LIMITLESS_LEVEL_SLOT_6 = "jujutsukaisenzone_limitless_level_slot_6";
     private static final String TAG_LIMITLESS_COOLDOWN_SLOT_1 = "jujutsukaisenzone_limitless_cooldown_slot_1";
     private static final String TAG_LIMITLESS_COOLDOWN_SLOT_2 = "jujutsukaisenzone_limitless_cooldown_slot_2";
     private static final String TAG_LIMITLESS_COOLDOWN_SLOT_3 = "jujutsukaisenzone_limitless_cooldown_slot_3";
     private static final String TAG_LIMITLESS_COOLDOWN_SLOT_4 = "jujutsukaisenzone_limitless_cooldown_slot_4";
+    private static final String TAG_LIMITLESS_COOLDOWN_SLOT_5 = "jujutsukaisenzone_limitless_cooldown_slot_5";
+    private static final String TAG_LIMITLESS_COOLDOWN_SLOT_6 = "jujutsukaisenzone_limitless_cooldown_slot_6";
     private static final String TAG_LIMITLESS_CAST_RANGE_TIER = "jujutsukaisenzone_limitless_cast_range_tier";
     public static final int CAST_RANGE_TIER_MIN = 1;
     public static final int CAST_RANGE_TIER_MAX = 4;
@@ -86,9 +106,12 @@ public final class LimitlessTechniqueSkillSet extends AbstractInnateTechniqueSki
 
     // 技能 ID 常量（配合快捷栏配置使用）
     public static final String SKILL_BLUE = "limitless_blue";
+    public static final String SKILL_BLUE_STRANGLE = "limitless_blue_strangle";
     public static final String SKILL_RED = "limitless_red";
     public static final String SKILL_PURPLE = "limitless_purple";
     public static final String SKILL_REMOTE_PURPLE = "limitless_remote_murasaki";
+    /** 极之番——暗星：黑洞_A 时空坍缩体 */
+    public static final String SKILL_DARK_STAR = "limitless_dark_star";
     /** 领域「无量空处」在开发树上的 nodeId。 */
     public static final String NODE_DOMAIN_MURYOKUSHO = "limitless_domain_muryokusho";
     /**
@@ -136,6 +159,11 @@ public final class LimitlessTechniqueSkillSet extends AbstractInnateTechniqueSki
                     "textures/gui/technique/limitless_blue.png",
                     BLUE_COST, BLUE_COOLDOWN_TICKS, DEFAULT_MAX_OUTPUT_CHARGE_TICKS,
                     TAG_LIMITLESS_COOLDOWN_SLOT_1, TAG_LIMITLESS_UNLOCK_SLOT_1, TAG_LIMITLESS_LEVEL_SLOT_1),
+            new TechniqueSkill(SKILL_BLUE_STRANGLE, SLOT_BLUE_STRANGLE,
+                    net.minecraft.network.chat.Component.literal("苍之绞杀"),
+                    "textures/gui/technique/limitless_blue.png",
+                    BLUE_STRANGLE_COST, BLUE_STRANGLE_COOLDOWN_TICKS, 0,
+                    TAG_LIMITLESS_COOLDOWN_SLOT_5, TAG_LIMITLESS_UNLOCK_SLOT_5, TAG_LIMITLESS_LEVEL_SLOT_5),
             new TechniqueSkill(SKILL_RED, 2, net.minecraft.network.chat.Component.literal("赫"),
                     "textures/gui/technique/limitless_red.png",
                     RED_COST, RED_COOLDOWN_TICKS, DEFAULT_MAX_OUTPUT_CHARGE_TICKS,
@@ -148,11 +176,20 @@ public final class LimitlessTechniqueSkillSet extends AbstractInnateTechniqueSki
                     net.minecraft.network.chat.Component.literal("「稍微乱来一下」· 超远程虚式茈"),
                     "textures/gui/technique/remote_murasaki.png",
                     REMOTE_PURPLE_COST, REMOTE_PURPLE_COOLDOWN_TICKS, 0,
-                    TAG_LIMITLESS_COOLDOWN_SLOT_4, TAG_LIMITLESS_UNLOCK_SLOT_4, TAG_LIMITLESS_LEVEL_SLOT_4)
+                    TAG_LIMITLESS_COOLDOWN_SLOT_4, TAG_LIMITLESS_UNLOCK_SLOT_4, TAG_LIMITLESS_LEVEL_SLOT_4),
+            new TechniqueSkill(SKILL_DARK_STAR, SLOT_DARK_STAR,
+                    net.minecraft.network.chat.Component.literal("极之番——暗星"),
+                    "textures/gui/technique/limitless_purple.png",
+                    DARK_STAR_COST, DARK_STAR_COOLDOWN_TICKS, 0,
+                    TAG_LIMITLESS_COOLDOWN_SLOT_6, TAG_LIMITLESS_UNLOCK_SLOT_6, TAG_LIMITLESS_LEVEL_SLOT_6)
     );
 
     private static final TechniqueSkillTree SKILL_TREE = TechniqueSkillTree.builder(PlayerTechniqueData.TECHNIQUE_LIMITLESS)
             .node(SkillTreeNodeDef.skill("limitless_blue", SKILL_BLUE).autoGranted().build())
+            .node(SkillTreeNodeDef.skill("limitless_blue_strangle", SKILL_BLUE_STRANGLE)
+                    .requires("limitless_blue")
+                    .intelCost(150)
+                    .build())
             .node(SkillTreeNodeDef.reference(
                     "ref_reverse_technique",
                     SkillTreeReferenceKind.COMMON_SKILL,
@@ -174,6 +211,14 @@ public final class LimitlessTechniqueSkillSet extends AbstractInnateTechniqueSki
             .node(SkillTreeNodeDef.skill("limitless_remote_murasaki", SKILL_REMOTE_PURPLE)
                     .requires("limitless_purple", REF_CURSED_GRADE_SPECIAL)
                     .intelCost(500)
+                    .build())
+            /*
+             * 极之番——暗星：黑洞_A 时空坍缩体。前置暂挂茈（数值为占位，
+             * 咒力 / 冷却 / 情报消耗可在实测后调整）。
+             */
+            .node(SkillTreeNodeDef.skill("limitless_dark_star", SKILL_DARK_STAR)
+                    .requires("limitless_purple")
+                    .intelCost(300)
                     .build())
             /*
              * 领域「无量空处」：习得领域展开的<b>瞬间自动点亮</b>，不消耗术式情报、也不需要点选。
@@ -278,8 +323,10 @@ public final class LimitlessTechniqueSkillSet extends AbstractInnateTechniqueSki
         switch (skillId)
         {
             case SKILL_BLUE -> castBlueNormal(player, false);
+            case SKILL_BLUE_STRANGLE -> castBlueStrangle(player);
             case SKILL_RED -> castRedNormal(player, false);
             case SKILL_PURPLE -> castPurpleMiniNormal(player);
+            case SKILL_DARK_STAR -> castDarkStar(player);
         }
     }
 
@@ -521,6 +568,10 @@ public final class LimitlessTechniqueSkillSet extends AbstractInnateTechniqueSki
         {
             castBlueNormal(player, false);
         }
+        else if (slot == SLOT_BLUE_STRANGLE)
+        {
+            castBlueStrangle(player);
+        }
         else if (slot == SLOT_RED_NORMAL)
         {
             castRedNormal(player, false);
@@ -528,6 +579,10 @@ public final class LimitlessTechniqueSkillSet extends AbstractInnateTechniqueSki
         else if (slot == SLOT_PURPLE_NORMAL)
         {
             castPurpleMiniNormal(player);
+        }
+        else if (slot == SLOT_DARK_STAR)
+        {
+            castDarkStar(player);
         }
     }
 
@@ -581,8 +636,10 @@ public final class LimitlessTechniqueSkillSet extends AbstractInnateTechniqueSki
         return switch (slot)
         {
             case SLOT_BLUE_NORMAL -> BLUE_COST;
+            case SLOT_BLUE_STRANGLE -> BLUE_STRANGLE_COST;
             case SLOT_RED_NORMAL -> RED_COST;
             case SLOT_PURPLE_NORMAL -> PURPLE_COST;
+            case SLOT_DARK_STAR -> DARK_STAR_COST;
             default -> 0;
         };
     }
@@ -613,8 +670,10 @@ public final class LimitlessTechniqueSkillSet extends AbstractInnateTechniqueSki
         return switch (slot)
         {
             case SLOT_BLUE_NORMAL -> BLUE_COOLDOWN_TICKS;
+            case SLOT_BLUE_STRANGLE -> BLUE_STRANGLE_COOLDOWN_TICKS;
             case SLOT_RED_NORMAL -> RED_COOLDOWN_TICKS;
             case SLOT_PURPLE_NORMAL -> PURPLE_COOLDOWN_TICKS;
+            case SLOT_DARK_STAR -> DARK_STAR_COOLDOWN_TICKS;
             default -> 0;
         };
     }
@@ -624,9 +683,11 @@ public final class LimitlessTechniqueSkillSet extends AbstractInnateTechniqueSki
     {
         TechniqueSkill skill = switch (slot)
         {
-            case SLOT_BLUE_NORMAL -> SKILLS.get(0);
-            case SLOT_RED_NORMAL -> SKILLS.get(1);
-            case SLOT_PURPLE_NORMAL -> SKILLS.get(2);
+            case SLOT_BLUE_NORMAL -> findSkillById(SKILL_BLUE);
+            case SLOT_BLUE_STRANGLE -> findSkillById(SKILL_BLUE_STRANGLE);
+            case SLOT_RED_NORMAL -> findSkillById(SKILL_RED);
+            case SLOT_PURPLE_NORMAL -> findSkillById(SKILL_PURPLE);
+            case SLOT_DARK_STAR -> findSkillById(SKILL_DARK_STAR);
             default -> null;
         };
         if (skill == null)
@@ -642,8 +703,10 @@ public final class LimitlessTechniqueSkillSet extends AbstractInnateTechniqueSki
         String key = switch (slot)
         {
             case SLOT_BLUE_NORMAL -> TAG_LIMITLESS_LEVEL_SLOT_1;
+            case SLOT_BLUE_STRANGLE -> TAG_LIMITLESS_LEVEL_SLOT_5;
             case SLOT_RED_NORMAL -> TAG_LIMITLESS_LEVEL_SLOT_2;
             case SLOT_PURPLE_NORMAL -> TAG_LIMITLESS_LEVEL_SLOT_3;
+            case SLOT_DARK_STAR -> TAG_LIMITLESS_LEVEL_SLOT_6;
             default -> null;
         };
         if (key == null)
@@ -663,8 +726,10 @@ public final class LimitlessTechniqueSkillSet extends AbstractInnateTechniqueSki
         return switch (slot)
         {
             case SLOT_BLUE_NORMAL -> TAG_LIMITLESS_COOLDOWN_SLOT_1;
+            case SLOT_BLUE_STRANGLE -> TAG_LIMITLESS_COOLDOWN_SLOT_5;
             case SLOT_RED_NORMAL -> TAG_LIMITLESS_COOLDOWN_SLOT_2;
             case SLOT_PURPLE_NORMAL -> TAG_LIMITLESS_COOLDOWN_SLOT_3;
+            case SLOT_DARK_STAR -> TAG_LIMITLESS_COOLDOWN_SLOT_6;
             default -> null;
         };
     }
@@ -675,8 +740,10 @@ public final class LimitlessTechniqueSkillSet extends AbstractInnateTechniqueSki
         return switch (slot)
         {
             case SLOT_BLUE_NORMAL -> "苍";
+            case SLOT_BLUE_STRANGLE -> "苍之绞杀";
             case SLOT_RED_NORMAL -> "赫";
             case SLOT_PURPLE_NORMAL -> "茈";
+            case SLOT_DARK_STAR -> "极之番——暗星";
             default -> null;
         };
     }
@@ -687,8 +754,10 @@ public final class LimitlessTechniqueSkillSet extends AbstractInnateTechniqueSki
         return switch (slot)
         {
             case SLOT_BLUE_NORMAL -> "textures/gui/technique/limitless_blue.png";
+            case SLOT_BLUE_STRANGLE -> "textures/gui/technique/limitless_blue.png";
             case SLOT_RED_NORMAL -> "textures/gui/technique/limitless_red.png";
             case SLOT_PURPLE_NORMAL -> "textures/gui/technique/limitless_purple.png";
+            case SLOT_DARK_STAR -> "textures/gui/technique/limitless_purple.png";
             default -> null;
         };
     }
@@ -740,9 +809,115 @@ public final class LimitlessTechniqueSkillSet extends AbstractInnateTechniqueSki
         level.getServer().getCommands().performPrefixedCommand(commandSource, "photon fx photon:limitless_blue_1 entity @s");
     }
 
+    /** 极之番——暗星：向前方发射一颗"时空坍缩体"（黑洞A）。 */
+    private void castDarkStar(ServerPlayer player)
+    {
+        double effectiveRange = getEffectiveCastRange(player, DARK_STAR_RANGE);
+        castDarkStar((LivingEntity) player, resolveCrosshairPosition(player, effectiveRange));
+    }
+
+    /**
+     * 暗星施法真相（玩家 / AI 共用）。{@code targetPos} 为瞄准点，发射体从视线方向的眼位偏移处生成。
+     */
+    public void castDarkStar(LivingEntity caster, @Nullable Vec3 targetPos)
+    {
+        if (!(caster.level() instanceof ServerLevel level) || targetPos == null)
+        {
+            return;
+        }
+        Vec3 look = caster.getLookAngle();
+        Vec3 spawnPos = caster.getEyePosition().add(look.scale(BlackHoleSkillConfig.SPAWN_FROM_EYE));
+        BlackHoleEntity blackHole = ModEntities.BLACK_HOLE_A.get().create(level);
+        if (blackHole == null)
+        {
+            return;
+        }
+
+        blackHole.moveTo(spawnPos.x, spawnPos.y, spawnPos.z, caster.getYRot(), 0.0F);
+        blackHole.launchAsSkill(caster);
+        level.addFreshEntity(blackHole);
+    }
+
     private void castRedNormal(ServerPlayer player, boolean allowOwnerKnockback)
     {
         castRedNormal((LivingEntity) player, allowOwnerKnockback);
+    }
+
+    /** 苍之绞杀：对视线前方最近的单体目标持续绞杀。 */
+    private void castBlueStrangle(ServerPlayer player)
+    {
+        LivingEntity target = findBlueStrangleTarget(player);
+        if (target == null)
+        {
+            player.sendSystemMessage(Component.literal("视线前方没有可绞杀的目标。"));
+            return;
+        }
+        castBlueStrangle((LivingEntity) player, target);
+    }
+
+    /** 苍之绞杀施法真相（玩家 / AI 共用）。 */
+    public void castBlueStrangle(LivingEntity caster, LivingEntity target)
+    {
+        if (!(caster.level() instanceof ServerLevel level) || target == null || !target.isAlive())
+        {
+            return;
+        }
+
+        // 临时特效：坚守者（监守者）声波 —— 起手一声，命中时每次再响
+        level.playSound(
+                null,
+                target.getX(),
+                target.getY(),
+                target.getZ(),
+                SoundEvents.WARDEN_SONIC_BOOM,
+                SoundSource.PLAYERS,
+                1.4F,
+                1.0F);
+        Vec3 center = target.position().add(0.0D, target.getBbHeight() * 0.5D, 0.0D);
+        level.sendParticles(ParticleTypes.SONIC_BOOM, center.x, center.y, center.z, 1, 0, 0, 0, 0);
+
+        SpecialEffectEntity entity = ModEntities.SPECIAL_EFFECT_ENTITY.get().create(level);
+        if (entity == null)
+        {
+            return;
+        }
+        entity.moveTo(target.getX(), target.getY(), target.getZ(), caster.getYRot(), 0.0F);
+        LimitlessBlueStrangleBehavior strangle = new LimitlessBlueStrangleBehavior();
+        strangle.configure(caster, target);
+        entity.attach(strangle);
+        level.addFreshEntity(entity);
+    }
+
+    /** 视线前方 {@link LimitlessBlueStrangleConfig#CAST_RANGE} 格内、夹角达标者中最近的一个。 */
+    @Nullable
+    private LivingEntity findBlueStrangleTarget(ServerPlayer player)
+    {
+        ServerLevel level = player.serverLevel();
+        double maxDistSqr = LimitlessBlueStrangleConfig.CAST_RANGE * LimitlessBlueStrangleConfig.CAST_RANGE;
+        Vec3 eye = player.getEyePosition();
+        Vec3 look = player.getLookAngle();
+
+        LivingEntity best = null;
+        double bestDistSqr = maxDistSqr;
+        for (LivingEntity candidate : level.getEntitiesOfClass(
+                LivingEntity.class,
+                player.getBoundingBox().inflate(LimitlessBlueStrangleConfig.CAST_RANGE),
+                e -> e.isAlive() && e != player && e.canBeSeenByAnyone()))
+        {
+            Vec3 to = candidate.position().add(0.0D, candidate.getBbHeight() * 0.5D, 0.0D).subtract(eye);
+            double distSqr = to.lengthSqr();
+            if (distSqr > bestDistSqr || distSqr < 1.0E-4D)
+            {
+                continue;
+            }
+            if (to.normalize().dot(look) < LimitlessBlueStrangleConfig.TARGET_MIN_DOT)
+            {
+                continue;
+            }
+            best = candidate;
+            bestDistSqr = distSqr;
+        }
+        return best;
     }
 
     /** 赫施法真相（玩家 / AI 共用）。 */

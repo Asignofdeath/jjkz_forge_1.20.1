@@ -1,5 +1,6 @@
 package com.darkness.jujutsukaisenzone.technique.skill;
 
+import com.darkness.jujutsukaisenzone.dismemberment.DismembermentSystem;
 import com.darkness.jujutsukaisenzone.player.PlayerRatioBreakData;
 import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
 import com.darkness.jujutsukaisenzone.technique.development.SkillUpgradeLogic;
@@ -160,12 +161,17 @@ public final class RatioSpotLogic
         return closest.distanceToSqr(spot) <= HIT_RADIUS * HIT_RADIUS;
     }
 
+    /** 弱点击破时对该肢施加的基础切痕（再加伤害换算，并吃护甲/体抗）。 */
+    public static final float BREAK_CUT_MARK_BASE = 12.0F;
+
     /**
-     * 结算一次弱点击破：强制暴击、击破计数 +1、清除光点。
+     * 结算一次弱点击破：强制暴击、击破计数 +1、清除光点；
+     * 对光点部位加切痕，满上限则尝试断肢。
      *
-     * @return 是否成功击破（由乘区暴击消费强制标记）
+     * @param hitDamage 本击伤害（暴击乘区前亦可），参与切痕换算
+     * @return 是否成功击破
      */
-    public static boolean tryBreakSpot(ServerPlayer attacker, LivingEntity target)
+    public static boolean tryBreakSpot(ServerPlayer attacker, LivingEntity target, float hitDamage)
     {
         long now = attacker.level().getGameTime();
         if (!hasActiveSpot(target, attacker.getUUID(), now))
@@ -181,13 +187,36 @@ public final class RatioSpotLogic
         clearSpot(target);
         int breaks = PlayerRatioBreakData.add(attacker, 1);
 
+        String severNote = "";
+        if (part != null && part != RatioBodyPart.TORSO)
+        {
+            int added = DismembermentSystem.applyCutMarks(
+                    attacker, target, part, BREAK_CUT_MARK_BASE, hitDamage);
+            boolean severed = DismembermentSystem.trySever(attacker, target, part);
+            int marks = DismembermentSystem.getCutMarks(target, part);
+            int cap = DismembermentSystem.cutMarkCap(target);
+            if (severed)
+            {
+                severNote = " · 断肢！";
+            }
+            else if (added > 0)
+            {
+                severNote = " · 切痕 +" + added + "（" + marks + "/" + cap + "）";
+            }
+            else
+            {
+                severNote = " · 切痕被防住";
+            }
+        }
+
         attacker.displayClientMessage(
                 Component.literal("弱点击破！"
                                 + (part != null ? part.displayName() : "")
                                 + "  计数 "
                                 + breaks
                                 + "/"
-                                + PlayerRatioBreakData.MAX_BREAKS)
+                                + PlayerRatioBreakData.MAX_BREAKS
+                                + severNote)
                         .withStyle(ChatFormatting.RED),
                 true);
 
@@ -197,6 +226,13 @@ public final class RatioSpotLogic
         }
 
         return true;
+    }
+
+    /** @deprecated 改用 {@link #tryBreakSpot(ServerPlayer, LivingEntity, float)} */
+    @Deprecated
+    public static boolean tryBreakSpot(ServerPlayer attacker, LivingEntity target)
+    {
+        return tryBreakSpot(attacker, target, 0.0F);
     }
 
     /** 光点持续：Lv1=8s，每级 +1s。 */

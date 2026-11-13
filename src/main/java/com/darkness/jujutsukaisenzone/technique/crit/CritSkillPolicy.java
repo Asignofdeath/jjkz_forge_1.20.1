@@ -50,6 +50,7 @@ import java.util.Set;
  *   <li>黑闪冲击波 —— {@code BlackFlashShockwaveBehavior}（一次性 AoE，且不隶属于任何技能）</li>
  *   <li>解（挥砍 / 切割共用一处出伤）—— {@code ShrineKaiArrowBehavior#resolveAndSettleHits}</li>
  *   <li>苍 —— {@code LimitlessBlueBehavior#tick}</li>
+ *   <li>苍之绞杀 —— {@code LimitlessBlueStrangleBehavior#dealDamage}（间隔 15 tick，稳定越过无敌帧）</li>
  *   <li>捌 —— {@code ShrineHachiBehavior#dealDamage}</li>
  *   <li>茈 —— {@code LimitlessPurpleArrowBehavior} 球内扫掠</li>
  *   <li>超远程茈 —— {@code LimitlessRemoteMurasakiBehavior#damageLivingInSphere}</li>

@@ -11,6 +11,7 @@ import com.darkness.jujutsukaisenzone.registry.ModEntities;
 import com.darkness.jujutsukaisenzone.registry.ModSounds;
 import com.darkness.jujutsukaisenzone.technique.TechniqueDamageSources;
 import com.darkness.jujutsukaisenzone.technique.scaling.ShrineSkillGrowth;
+import com.darkness.jujutsukaisenzone.technique.skill.ShrineCutMarkLogic;
 import com.darkness.jujutsukaisenzone.technique.skillset.ShrineTechniqueSkillSet;
 import com.darkness.jujutsukaisenzone.technique.se.ShrineFinishCutMarks;
 import net.minecraft.nbt.CompoundTag;
@@ -27,9 +28,9 @@ import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -254,7 +255,8 @@ public class ShrineKaiArrowBehavior extends EffectBehavior
         List<LivingEntity> candidates = level.getEntitiesOfClass(LivingEntity.class, sweepBox(columnBases, columnDir));
         if (candidates.isEmpty()) return;
 
-        Set<LivingEntity> hit = new HashSet<>();
+        /* 目标 → 首次命中采样点（供碰撞箱选肢加切痕）。 */
+        Map<LivingEntity, Vec3> hit = new HashMap<>();
         int from = this.slashType == 2 ? -(ShrineKaiConfig.COLUMN_HEIGHT / 2) : 0;
         int to = this.slashType == 2 ? ShrineKaiConfig.COLUMN_HEIGHT / 2 : ShrineKaiConfig.COLUMN_HEIGHT - 1;
         for (Vec3 base : columnBases)
@@ -264,10 +266,10 @@ public class ShrineKaiArrowBehavior extends EffectBehavior
                 Vec3 sample = base.add(columnDir.scale(i));
                 for (LivingEntity target : candidates)
                 {
-                    if (hit.contains(target) || !target.isAlive()) continue;
+                    if (hit.containsKey(target) || !target.isAlive()) continue;
                     if (owner != null && target.getUUID().equals(owner.getUUID())) continue;
                     if (!GeometryUtils.aabbIntersectsSphere(sample.x, sample.y, sample.z, rSqr, target.getBoundingBox())) continue;
-                    hit.add(target);
+                    hit.put(target, sample);
                 }
             }
         }
@@ -277,12 +279,14 @@ public class ShrineKaiArrowBehavior extends EffectBehavior
         SoundEvent hitSound = this.slashType == 2
                 ? ModSounds.SHRINE_SLASH_KAI_2_HIT.get()
                 : ModSounds.SHRINE_SLASH_KAI_1_HIT.get();
-        for (LivingEntity target : hit)
+        for (Map.Entry<LivingEntity, Vec3> entry : hit.entrySet())
         {
+            LivingEntity target = entry.getKey();
             if (!target.isAlive()) continue;
             if (TechniqueDamageSources.dealCrit(target, owner, damage, ShrineTechniqueSkillSet.SKILL_KAI))
             {
                 ShrineFinishCutMarks.tryMarkFromKaiHit(owner, target);
+                ShrineCutMarkLogic.applyFromKaiHit(owner, target, entry.getValue(), damage);
                 level.playSound(null, entity.getX(), entity.getY(), entity.getZ(),
                         hitSound, SoundSource.PLAYERS, 1.0F, 1.0F);
             }

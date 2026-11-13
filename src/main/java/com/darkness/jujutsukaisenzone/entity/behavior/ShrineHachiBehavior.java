@@ -6,6 +6,7 @@ import com.darkness.jujutsukaisenzone.entity.data.ShrineHachiConfig;
 import com.darkness.jujutsukaisenzone.network.ModNetwork;
 import com.darkness.jujutsukaisenzone.technique.TechniqueDamageSources;
 import com.darkness.jujutsukaisenzone.technique.scaling.ShrineSkillGrowth;
+import com.darkness.jujutsukaisenzone.technique.skill.ShrineCutMarkLogic;
 import com.darkness.jujutsukaisenzone.technique.skillset.ShrineTechniqueSkillSet;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
@@ -119,8 +120,11 @@ public class ShrineHachiBehavior extends EffectBehavior
         LivingEntity owner = resolveOwner(entity, this.ownerUuid);
         // 放行暴击：每 DAMAGE_INTERVAL(=5) tick 一次，且目标被锁死为单一生物；原版无敌帧会把
         // 同一目标的真实结算压到最快每 10 tick 一次，掷骰频率与单发招式同一量级。
-        TechniqueDamageSources.dealCrit(target, owner, ShrineSkillGrowth.hachiDamage(owner),
-                ShrineTechniqueSkillSet.SKILL_HACHI);
+        float damage = ShrineSkillGrowth.hachiDamage(owner);
+        if (TechniqueDamageSources.dealCrit(target, owner, damage, ShrineTechniqueSkillSet.SKILL_HACHI))
+        {
+            ShrineCutMarkLogic.applyRandomLimb(owner, target, ShrineCutMarkLogic.HACHI_BASE, damage);
+        }
     }
 
     private void applyMovementLock(LivingEntity target)

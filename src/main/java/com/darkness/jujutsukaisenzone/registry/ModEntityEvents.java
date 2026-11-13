@@ -1,6 +1,7 @@
 package com.darkness.jujutsukaisenzone.registry;
 
 import com.darkness.jujutsukaisenzone.JuJutsuKaisenZone;
+import com.darkness.jujutsukaisenzone.client.renderer.entity.BlackHoleRenderer;
 import com.darkness.jujutsukaisenzone.client.renderer.entity.CutsceneActorRenderer;
 import com.darkness.jujutsukaisenzone.client.renderer.entity.GavelProjectileRenderer;
 import com.darkness.jujutsukaisenzone.client.renderer.entity.Grade3CurseSpiritARenderer;
@@ -69,6 +70,7 @@ public final class ModEntityEvents
             event.registerEntityRenderer(ModEntities.CUTSCENE_ACTOR.get(), CutsceneActorRenderer::new);
             event.registerEntityRenderer(ModEntities.GRADE_3_CURSE_SPIRIT_A.get(), Grade3CurseSpiritARenderer::new);
             event.registerEntityRenderer(ModEntities.GOJO_SATORU.get(), GojoSatoruRenderer::new);
+            event.registerEntityRenderer(ModEntities.BLACK_HOLE_A.get(), BlackHoleRenderer::new);
         }
     }
 }

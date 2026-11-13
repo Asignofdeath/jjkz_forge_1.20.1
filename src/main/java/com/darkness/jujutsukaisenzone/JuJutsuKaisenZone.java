@@ -112,6 +112,8 @@ public class JuJutsuKaisenZone
         // SE 声明表自检：必须在全部术式技能集注册完成之后（专用 SE 要拿完整术式 id 表来对照）
         // validate 末尾会核对 SeEffectDef ↔ SeMechanic 成对
         com.darkness.jujutsukaisenzone.technique.se.SeEffectRegistry.validate();
+        // 天道平衡：对策目录依赖已校验的 SeMechanic
+        com.darkness.jujutsukaisenzone.heaven.HeavenBalance.bootstrap();
         // 暴击声明表自检：必须在全部技能集 / 技能树注册完成之后（它要拿完整技能表来对照）
         com.darkness.jujutsukaisenzone.technique.crit.CritSkillPolicy.validate();
         CommonKeySkillRegistry.register(ReverseTechniqueCommonKeySkill.INSTANCE);

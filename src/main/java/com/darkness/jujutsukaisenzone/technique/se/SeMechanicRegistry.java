@@ -1,15 +1,20 @@
 package com.darkness.jujutsukaisenzone.technique.se;
 
 import com.darkness.jujutsukaisenzone.player.PlayerSeLoadoutData;
+import com.darkness.jujutsukaisenzone.technique.se.mechanic.BloodiedBandageMechanic;
 import com.darkness.jujutsukaisenzone.technique.se.mechanic.BrainChargeDullMechanic;
+import com.darkness.jujutsukaisenzone.technique.se.mechanic.CauterizedCottonMechanic;
+import com.darkness.jujutsukaisenzone.technique.se.mechanic.CleanGauzeRollMechanic;
 import com.darkness.jujutsukaisenzone.technique.se.mechanic.DamagedLeatherWatchMechanic;
 import com.darkness.jujutsukaisenzone.technique.se.mechanic.FilledTimesheetMechanic;
+import com.darkness.jujutsukaisenzone.technique.se.mechanic.LeadWaistGuardMechanic;
 import com.darkness.jujutsukaisenzone.technique.se.mechanic.MartialCritIgniteMechanic;
 import com.darkness.jujutsukaisenzone.technique.se.mechanic.MartialDomainSiphonMechanic;
 import com.darkness.jujutsukaisenzone.technique.se.mechanic.MeltdownSoftResetMechanic;
 import com.darkness.jujutsukaisenzone.technique.se.mechanic.ShrineFinishCutMechanic;
 import com.darkness.jujutsukaisenzone.technique.se.mechanic.StarEarringZenoPushMechanic;
 import com.darkness.jujutsukaisenzone.technique.se.mechanic.StrongestProofMechanic;
+import com.darkness.jujutsukaisenzone.technique.se.mechanic.WornDollMechanic;
 import net.minecraft.world.entity.player.Player;
 import org.jetbrains.annotations.Nullable;
 
@@ -43,7 +48,12 @@ public final class SeMechanicRegistry
             ZenoWallSeMechanic.class,
             LimitlessNearCasterExemptSeMechanic.class,
             WorkEfficiencySeMechanic.class,
-            CritPowerStackSeMechanic.class);
+            CritPowerStackSeMechanic.class,
+            CutMarkCapBonusSeMechanic.class,
+            CutMarkRecoverySeMechanic.class,
+            DismembermentBleedImmuneSeMechanic.class,
+            CutMarkBaseBonusSeMechanic.class,
+            CutMarkInflictBonusSeMechanic.class);
 
     private SeMechanicRegistry()
     {
@@ -61,6 +71,11 @@ public final class SeMechanicRegistry
         register(new StrongestProofMechanic());
         register(new FilledTimesheetMechanic());
         register(new DamagedLeatherWatchMechanic());
+        register(new LeadWaistGuardMechanic());
+        register(new CleanGauzeRollMechanic());
+        register(new CauterizedCottonMechanic());
+        register(new WornDollMechanic());
+        register(new BloodiedBandageMechanic());
     }
 
     private static void register(SeMechanic mechanic)

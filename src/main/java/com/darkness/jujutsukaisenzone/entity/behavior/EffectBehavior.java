@@ -57,6 +57,7 @@ public abstract class EffectBehavior
     {
         Map<String, Supplier<EffectBehavior>> map = new HashMap<>();
         register(map, LimitlessBlueBehavior.ID, LimitlessBlueBehavior::new);
+        register(map, LimitlessBlueStrangleBehavior.ID, LimitlessBlueStrangleBehavior::new);
         register(map, LimitlessRedBehavior.ID, LimitlessRedBehavior::new);
         register(map, LimitlessRedChargeBehavior.ID, LimitlessRedChargeBehavior::new);
         register(map, LimitlessPurpleBehavior.ID, LimitlessPurpleBehavior::new);

@@ -2,15 +2,20 @@ package com.darkness.jujutsukaisenzone.technique.se;
 
 import com.darkness.jujutsukaisenzone.player.PlayerTechniqueData;
 import com.darkness.jujutsukaisenzone.registry.ModItems;
+import com.darkness.jujutsukaisenzone.technique.se.mechanic.BloodiedBandageMechanic;
 import com.darkness.jujutsukaisenzone.technique.se.mechanic.BrainChargeDullMechanic;
+import com.darkness.jujutsukaisenzone.technique.se.mechanic.CauterizedCottonMechanic;
+import com.darkness.jujutsukaisenzone.technique.se.mechanic.CleanGauzeRollMechanic;
 import com.darkness.jujutsukaisenzone.technique.se.mechanic.DamagedLeatherWatchMechanic;
 import com.darkness.jujutsukaisenzone.technique.se.mechanic.FilledTimesheetMechanic;
+import com.darkness.jujutsukaisenzone.technique.se.mechanic.LeadWaistGuardMechanic;
 import com.darkness.jujutsukaisenzone.technique.se.mechanic.MartialCritIgniteMechanic;
 import com.darkness.jujutsukaisenzone.technique.se.mechanic.MartialDomainSiphonMechanic;
 import com.darkness.jujutsukaisenzone.technique.se.mechanic.MeltdownSoftResetMechanic;
 import com.darkness.jujutsukaisenzone.technique.se.mechanic.ShrineFinishCutMechanic;
 import com.darkness.jujutsukaisenzone.technique.se.mechanic.StarEarringZenoPushMechanic;
 import com.darkness.jujutsukaisenzone.technique.se.mechanic.StrongestProofMechanic;
+import com.darkness.jujutsukaisenzone.technique.se.mechanic.WornDollMechanic;
 import com.darkness.jujutsukaisenzone.technique.skillset.TechniqueSkillSetRegistry;
 import net.minecraft.world.item.Item;
 
@@ -120,6 +125,51 @@ public final class SeEffectRegistry
                 SeTrigger.PASSIVE,
                 "",
                 2,
+                SeScope.generic(),
+                SeCatalogTag.GENERIC, SeCatalogTag.ADDITIVE));
+        // 灌铅的护腰：生命抬切痕上限（通用 + 修改）
+        register(SeEffectDef.of(
+                LeadWaistGuardMechanic.SE_ID,
+                ModItems.CURSED_OBJECT_LEAD_WAIST_GUARD,
+                SeTrigger.PASSIVE,
+                "",
+                2,
+                SeScope.generic(),
+                SeCatalogTag.GENERIC, SeCatalogTag.MODIFY));
+        // 干净的纱布卷：切痕快愈（通用 + 修改）
+        register(SeEffectDef.of(
+                CleanGauzeRollMechanic.SE_ID,
+                ModItems.CURSED_OBJECT_CLEAN_GAUZE_ROLL,
+                SeTrigger.PASSIVE,
+                "",
+                2,
+                SeScope.generic(),
+                SeCatalogTag.GENERIC, SeCatalogTag.MODIFY));
+        // 烧焦的止血棉：断肢不流血（通用 + 移除）
+        register(SeEffectDef.of(
+                CauterizedCottonMechanic.SE_ID,
+                ModItems.CURSED_OBJECT_CAUTERIZED_COTTON,
+                SeTrigger.PASSIVE,
+                "",
+                2,
+                SeScope.generic(),
+                SeCatalogTag.GENERIC, SeCatalogTag.REMOVE));
+        // 古旧人偶：加痕 base +2（通用 + 增量）
+        register(SeEffectDef.of(
+                WornDollMechanic.SE_ID,
+                ModItems.CURSED_OBJECT_WORN_DOLL,
+                SeTrigger.PASSIVE,
+                "",
+                2,
+                SeScope.generic(),
+                SeCatalogTag.GENERIC, SeCatalogTag.ADDITIVE));
+        // 渗血创可贴：加痕 ×1.2（通用 + 增量）
+        register(SeEffectDef.of(
+                BloodiedBandageMechanic.SE_ID,
+                ModItems.CURSED_OBJECT_BLOODIED_BANDAGE,
+                SeTrigger.PASSIVE,
+                "",
+                1,
                 SeScope.generic(),
                 SeCatalogTag.GENERIC, SeCatalogTag.ADDITIVE));
     }
